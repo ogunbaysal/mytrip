@@ -2,11 +2,17 @@
   "name": "mytrip",
   "private": true,
   "scripts": {
-    "build": "turbo run build",
-    "dev": "turbo run dev",
-    "lint": "turbo run lint",
-    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
-    "check-types": "turbo run check-types"
+    "build": "turbo build",
+    "dev": "turbo dev",
+    "lint": "turbo lint",
+    "type-check": "turbo type-check",
+    "clean": "turbo clean",
+    "add:web": "bun add --cwd apps/web",
+    "add:dashboard": "bun add --cwd apps/dashboard", 
+    "add:admin": "bun add --cwd apps/admin",
+    "add:api": "bun add --cwd apps/api",
+    "add:db": "bun add --cwd packages/database",
+    "postinstall": "npm install --package-lock-only --ignore-scripts"
   },
   "devDependencies": {
     "prettier": "^3.6.2",

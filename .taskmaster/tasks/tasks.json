@@ -1,0 +1,679 @@
+{
+  "master": {
+    "tasks": [
+      {
+        "id": 1,
+        "title": "Setup Database Schema with Drizzle ORM for i18n",
+        "description": "Configure Drizzle ORM within the `packages/database` workspace and define the initial PostgreSQL database schema. The schema must support internationalization (i18n) for user-generated content.",
+        "details": "Based on PRD section 9.1.1. Create Drizzle schemas for: `users` (travelers, owners, admins), `places` (with base details and i18n fields like `name_tr`, `name_en`, `description_tr`, `description_en`, `slug_tr`, `slug_en`), `listings` (with a type-specific JSONB field), `blogs` (with language-specific content fields and slugs), `subscriptions`, and `payment_records`. Implement initial migration scripts and seed the database with test data for Muğla.",
+        "testStrategy": "Verify that `drizzle-kit` generates the correct SQL migration files. Run the migration against a local PostgreSQL instance. Write a test script to seed and then query the data, ensuring that i18n fields can be accessed correctly.",
+        "priority": "high",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Initialize `packages/database` Workspace and Install Dependencies",
+            "description": "Create the `packages/database` directory and set up its `package.json` file. Install necessary dependencies including `drizzle-orm`, `drizzle-kit`, `pg`, and `dotenv` for database connection and schema management.",
+            "dependencies": [],
+            "details": "Create a `package.json` file in `packages/database` with a name like `@mytrip/database`. Add scripts for migration generation (`db:generate`) and pushing changes (`db:push`). Create a `tsconfig.json` that extends the root `packages/typescript-config/base.json` once it's available, or a basic one for now. Install `drizzle-orm`, `drizzle-kit`, `pg`, `@types/pg`, and `dotenv` as dependencies.",
+            "status": "pending",
+            "testStrategy": "Run `pnpm install` from the root directory and verify that all dependencies are installed correctly within `packages/database/node_modules`."
+          },
+          {
+            "id": 2,
+            "title": "Configure Drizzle ORM and Database Connection",
+            "description": "Set up the Drizzle ORM configuration file and create a centralized database client instance. This will connect the ORM to the PostgreSQL database using environment variables.",
+            "dependencies": [],
+            "details": "Create a `drizzle.config.ts` file in the root of `packages/database`. This file will configure the schema path (`./src/schema`), output path for migrations (`./migrations`), and the database credentials, which should be loaded from a `.env` file. Create a `src/db/index.ts` file to initialize and export the Drizzle client instance, making it available for other packages in the monorepo.",
+            "status": "pending",
+            "testStrategy": "Create a simple test script that imports the DB client from `src/db/index.ts` and attempts a basic query like `SELECT 1`. Run the script to ensure the connection to the PostgreSQL database is successful."
+          },
+          {
+            "id": 3,
+            "title": "Define Core Schemas: `users`, `subscriptions`, `payment_records`",
+            "description": "Define the Drizzle schemas for the core, non-i18n-heavy tables. This includes the `users` table with roles, and the tables for managing subscriptions and payments.",
+            "dependencies": [],
+            "details": "In the `src/schema` directory, create a file for user-related schemas (e.g., `users.ts`). Define a `pgEnum` for user roles (`traveler`, `owner`, `admin`). Create the `users` table schema. In separate files, define the schemas for `subscriptions` (linking to users) and `payment_records` (linking to subscriptions).",
+            "status": "pending",
+            "testStrategy": "Run the `db:generate` script (`drizzle-kit generate:pg`) and inspect the generated SQL in the migrations folder to ensure it correctly creates the `users`, `subscriptions`, and `payment_records` tables with the correct columns, types, and relations."
+          },
+          {
+            "id": 4,
+            "title": "Define i18n Schemas: `places`, `listings`, `blogs`",
+            "description": "Define the Drizzle schemas for content-heavy tables that require internationalization, as specified in the PRD. This includes `places`, `listings`, and `blogs`.",
+            "dependencies": [],
+            "details": "In the `src/schema` directory, create files for `places.ts`, `listings.ts`, and `blogs.ts`. For the `places` schema, include columns for `name_tr`, `name_en`, `description_tr`, `description_en`, `slug_tr`, and `slug_en`. For the `blogs` schema, include similar language-specific fields for content and slugs. For the `listings` schema, define a foreign key relationship to the `places` table and include a `jsonb` column for type-specific details.",
+            "status": "pending",
+            "testStrategy": "Run the `db:generate` script again. Verify that the new migration file includes the correct SQL `CREATE TABLE` statements for `places`, `listings`, and `blogs`, paying close attention to the duplicated i18n text columns and the `jsonb` type for the listings details."
+          },
+          {
+            "id": 5,
+            "title": "Generate Initial Migration and Seed Database with Test Data",
+            "description": "Generate the complete initial SQL migration file containing all defined schemas and create a script to seed the database with initial test data for Muğla.",
+            "dependencies": [],
+            "details": "Combine all schema definitions and run `pnpm db:generate` one final time to create a single, comprehensive initial migration file. Create a `src/db/seed.ts` script that uses the Drizzle client to insert test data. This data should include at least one user of each role, and several `places` and `listings` located in Muğla, with both Turkish and English fields populated. Add a `db:seed` script to `package.json` to execute this seed file.",
+            "status": "pending",
+            "testStrategy": "First, run the migration against a clean, local PostgreSQL database. Then, run the `db:seed` script. Connect to the database with a client like `psql` or DBeaver and query the `places` and `users` tables to verify that the Muğla test data has been inserted correctly and all i18n fields are populated."
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Configure Shared `packages` for Monorepo Consistency",
+        "description": "Set up the shared packages for TypeScript (`typescript-config`), ESLint (`eslint-config`), and Tailwind CSS (`config`) to ensure consistent coding standards and styling across all applications (`web`, `dashboard`, `admin`).",
+        "details": "Following PRD section 9.1.2, create base `tsconfig.json` files in `packages/typescript-config`. Configure `packages/eslint-config` with rules for Next.js, TypeScript, and Prettier. In `packages/config`, create a `tailwind.config.js` with the Airbnb-inspired theme (colors, fonts, spacing) that can be extended by the frontend apps. Create the `packages/types` for shared interfaces, starting with User, Place, and Blog types.",
+        "testStrategy": "Create a sample file in both the `web` and `dashboard` apps that uses the shared configs. Run `tsc --noEmit` and `eslint .` from the root to confirm that shared rules are being enforced correctly. Verify that Tailwind classes from the shared config are usable in both apps.",
+        "priority": "high",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Initialize Directories and `package.json` for Shared Packages",
+            "description": "Create the directory structure and initialize the `package.json` file for each of the four new shared packages: `typescript-config`, `eslint-config`, `config`, and `types`.",
+            "dependencies": [],
+            "details": "Create the following directories: `packages/typescript-config`, `packages/eslint-config`, `packages/config`, and `packages/types`. For each new directory, create a `package.json` file with a unique, scoped name (e.g., `@mytrip/typescript-config`, `@mytrip/eslint-config`, `@mytrip/config`, `@mytrip/types`), version `0.1.0`, and a `private: true` flag. Ensure the root `package.json`'s `workspaces` array includes `\"packages/*\"`.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Create Base and Next.js Shared TypeScript Configurations",
+            "description": "In the `packages/typescript-config` package, create two reusable `tsconfig.json` files: a strict base configuration and another that extends it for Next.js applications.",
+            "dependencies": [
+              "2.1"
+            ],
+            "details": "In `packages/typescript-config`, create a `base.json` file with strict compiler options (`strict: true`, `esModuleInterop: true`, etc.). Then, create a `nextjs.json` file that extends `./base.json` and adds Next.js-specific settings like `\"jsx\": \"preserve\"`, `\"plugins\": [{\"name\": \"next\"}]`, and includes `\"next-env.d.ts\"`. Update the package's `files` array in `package.json` to include both `.json` files.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Configure Shared ESLint Package with Next.js, TypeScript, and Prettier Rules",
+            "description": "Set up the `packages/eslint-config` package with a configuration that integrates ESLint with TypeScript, Next.js, and Prettier for consistent code quality and formatting.",
+            "dependencies": [
+              "2.1"
+            ],
+            "details": "In `packages/eslint-config`, add the necessary dev dependencies: `eslint-config-next`, `eslint-config-prettier`, `@typescript-eslint/parser`, and `@typescript-eslint/eslint-plugin`. Create a main `index.js` file that exports a configuration object extending `['eslint:recommended', 'plugin:@typescript-eslint/recommended', 'next/core-web-vitals', 'prettier']`.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Define Shared Tailwind CSS Theme in `packages/config`",
+            "description": "Create a sharable Tailwind CSS configuration in `packages/config` that defines the project's Airbnb-inspired design system, including colors, fonts, and spacing.",
+            "dependencies": [
+              "2.1"
+            ],
+            "details": "In `packages/config`, add `tailwindcss` as a dependency. Create a `tailwind.config.js` file. Inside this file, define the custom theme within the `theme.extend` object. Populate `colors`, `fontFamily`, and `spacing` with values that align with the Airbnb aesthetic described in the PRD. Export this configuration so it can be required and extended by the applications.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Create Shared Type Definitions for User, Place, and Blog",
+            "description": "Establish the `packages/types` package to house shared TypeScript interfaces, starting with the core data models for `User`, `Place`, and `Blog`.",
+            "dependencies": [
+              "2.1"
+            ],
+            "details": "In `packages/types`, create a `src/` directory. Define and export TypeScript interfaces for `User`, `Place`, and `Blog` in separate files (e.g., `src/user.ts`). The `Place` and `Blog` types should include fields for internationalization (e.g., `name_en`, `name_tr`). Create a root `index.ts` file that exports all types from the package for easy consumption by other apps and packages.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Initialize Hono.js API and Core Middleware",
+        "description": "Bootstrap the `apps/api` application using Hono.js. Set up essential middleware for security, logging, and request handling.",
+        "details": "As per PRD section 9.2.1, initialize the Hono.js project in `apps/api`. Implement middleware for CORS, rate limiting (e.g., using `hono/ratelimit`), and structured logging. Set up a basic health check endpoint (e.g., `GET /health`) to verify the server is running. Connect the API to the Drizzle ORM instance defined in Task 1.",
+        "testStrategy": "Start the API server. Use a tool like `curl` or Postman to hit the `/health` endpoint and verify a 200 OK response. Test the CORS middleware by making a request from a different origin. Check server logs to ensure requests are being logged correctly.",
+        "priority": "high",
+        "dependencies": [
+          1
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Bootstrap Hono Application and Add `dev` Script",
+            "description": "Initialize the basic Hono application structure in `apps/api/src/index.ts`. Install necessary dependencies like `hono` and `@hono/node-server`, and create a `dev` script in `package.json` for running the server with hot-reloading.",
+            "dependencies": [],
+            "details": "Create a new Hono app instance in `apps/api/src/index.ts`. Use the `serve` function from `@hono/node-server` to start the server on a designated port (e.g., 3001). Add a `dev` script to `apps/api/package.json` like `\"dev\": \"tsx watch src/index.ts\"` to enable development with hot-reloading.",
+            "status": "pending",
+            "testStrategy": "Run `pnpm dev` from the `apps/api` directory and ensure the server starts without errors."
+          },
+          {
+            "id": 2,
+            "title": "Implement `GET /health` Endpoint",
+            "description": "Create a health check endpoint at `GET /health` that returns a 200 OK status and a JSON response to confirm the API server is running correctly.",
+            "dependencies": [
+              "3.1"
+            ],
+            "details": "In `apps/api/src/index.ts`, add a route handler for the `/health` path. The handler should use `c.json()` to return a simple object, for example: `{ \"status\": \"ok\", \"message\": \"API is healthy\" }`.",
+            "status": "pending",
+            "testStrategy": "After starting the server, send a GET request to `http://localhost:3001/health` using `curl` or a browser and verify it returns the expected JSON response with a 200 status code."
+          },
+          {
+            "id": 3,
+            "title": "Integrate Drizzle ORM via Middleware",
+            "description": "Connect the Hono API to the Drizzle ORM instance defined in `packages/database`. Create a middleware to inject the database client into the Hono context, making it available to all subsequent route handlers.",
+            "dependencies": [
+              "3.1"
+            ],
+            "details": "Define a `Variables` type for the Hono context to include `db`. Create a middleware using `app.use('*', ...)` that imports the `db` instance from `@mytrip/database` and attaches it to the context using `c.set('db', db)`. This will allow route handlers to access the database via `c.get('db')`.",
+            "status": "pending",
+            "testStrategy": "Modify the `/health` endpoint to perform a simple database query (e.g., `SELECT 1`) to confirm the connection is successful and the context variable is available."
+          },
+          {
+            "id": 4,
+            "title": "Configure Middleware for CORS and Structured Logging",
+            "description": "Set up essential middleware for Cross-Origin Resource Sharing (CORS) and structured request logging. This will enable frontend applications to communicate with the API and provide visibility into API traffic.",
+            "dependencies": [
+              "3.1"
+            ],
+            "details": "Install `@hono/cors` and `@hono/logger`. Apply the logger middleware using `app.use('*', logger())`. Configure the CORS middleware using `app.use('*', cors(...))` to allow requests from the frontend development servers (e.g., `http://localhost:3000` for `web` and `http://localhost:3002` for `dashboard`).",
+            "status": "pending",
+            "testStrategy": "Check the console output for structured logs when making a request to `/health`. Use browser developer tools to make a `fetch` request to `/health` from a blank page to verify that the CORS headers are correctly set and the request is not blocked."
+          },
+          {
+            "id": 5,
+            "title": "Implement Rate Limiting Middleware for Security",
+            "description": "Add a rate-limiting layer to the API using `hono/ratelimit` to protect against brute-force attacks and denial-of-service attempts.",
+            "dependencies": [
+              "3.1"
+            ],
+            "details": "Install `@hono/rate-limiter`. Initialize the rate limiter middleware with a standard configuration, such as a window of 15 minutes and a maximum of 100 requests per IP. Apply this middleware globally to all routes using `app.use('*', rateLimiter(...))`. The default key function (IP address) is sufficient for this task.",
+            "status": "pending",
+            "testStrategy": "Write a simple script to send more than 100 requests to the `/health` endpoint in a short period. Verify that after the limit is reached, the server responds with a `429 Too Many Requests` status code."
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Implement User Authentication API Endpoints",
+        "description": "Create the API endpoints for user registration, login, and session management using a JWT-based strategy.",
+        "details": "Based on PRD section 9.2.2, implement the following endpoints in the Hono.js API: `POST /api/auth/register` (hashes password with bcrypt), `POST /api/auth/login` (validates credentials and returns JWT), and `POST /api/auth/refresh` (issues a new access token). The implementation should interact with the `users` table defined in the database schema.",
+        "testStrategy": "Write integration tests for the auth flow. Test case 1: Register a new user and verify they are in the database. Test case 2: Log in with correct credentials and receive a JWT. Test case 3: Attempt to log in with incorrect credentials and receive an error. Test case 4: Use a refresh token to get a new access token.",
+        "priority": "high",
+        "dependencies": [
+          1,
+          3
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create Auth Route Structure and Input Validation Schemas",
+            "description": "Create the basic file structure for authentication routes and define Zod schemas for validating request bodies for registration and login.",
+            "dependencies": [],
+            "details": "Create a new file at `apps/api/src/routes/auth.ts`. Following the pattern in `apps/api/src/routes/users.ts`, initialize and export a new Hono router instance. In `apps/api/src/routes/index.ts`, import and register this new router under the `/auth` path. Within `auth.ts`, define and export two Zod schemas: one for registration (`email`, `password`, `fullName`) and one for login (`email`, `password`).",
+            "status": "pending",
+            "testStrategy": "After registering the route, start the API server and make a request to a placeholder endpoint like `GET /api/auth/ping` to ensure the routing is configured correctly and returns a 200 OK."
+          },
+          {
+            "id": 2,
+            "title": "Implement `POST /api/auth/register` Endpoint",
+            "description": "Build the user registration endpoint that validates input, hashes the password with bcrypt, and creates a new user record in the database.",
+            "dependencies": [
+              "4.1"
+            ],
+            "details": "In `apps/api/src/routes/auth.ts`, create a `POST /register` route handler. Use the `zodValidator` middleware with the registration schema from subtask 1. Install `bcryptjs` and `@types/bcryptjs`. Inside the handler, hash the validated password. Use the Drizzle instance from the Hono context (`c.get('db')`) to insert a new record into the `users` table (defined in `packages/db/src/schema/users.ts`) with the email, full name, and the generated `passwordHash`. Return the newly created user object, excluding the password hash.",
+            "status": "pending",
+            "testStrategy": "Send a POST request to `/api/auth/register` with valid data and verify a 201 status code and user object are returned. Check the database directly to confirm the user was created with a hashed password. Send another request with the same email to ensure the unique constraint fails."
+          },
+          {
+            "id": 3,
+            "title": "Create JWT Generation and Verification Utilities",
+            "description": "Implement utility functions for creating and verifying JSON Web Tokens (JWT) for session management.",
+            "dependencies": [],
+            "details": "Create a new utility file at `apps/api/src/lib/jwt.ts`. Install the `@hono/jwt` package. Define and export functions for signing tokens. Create a `generateTokens` function that takes a user payload (e.g., `{ id, role, email }`) and generates two tokens: a short-lived access token and a long-lived refresh token, using different secrets and expiration times. Add `JWT_SECRET` and `JWT_REFRESH_SECRET` to the environment variables.",
+            "status": "pending",
+            "testStrategy": "Write a simple unit test for the utility functions to ensure a payload can be encoded into a token and then successfully decoded and verified."
+          },
+          {
+            "id": 4,
+            "title": "Implement `POST /api/auth/login` Endpoint",
+            "description": "Build the user login endpoint that validates credentials and returns a pair of JWT access and refresh tokens upon success.",
+            "dependencies": [
+              "4.1",
+              "4.2",
+              "4.3"
+            ],
+            "details": "In `apps/api/src/routes/auth.ts`, create a `POST /login` route handler. Use the `zodValidator` with the login schema. In the handler, query the `users` table to find a user by the provided email. If a user is found, use `bcryptjs.compare()` to check if the provided password matches the stored `passwordHash`. If they match, call the `generateTokens` utility from subtask 3 to create access and refresh tokens. Return these tokens in the JSON response. If the user is not found or the password does not match, return a 401 Unauthorized error.",
+            "status": "pending",
+            "testStrategy": "Test with correct credentials to ensure a 200 status and JWTs are returned. Test with an incorrect password and a non-existent email to ensure a 401 status is returned in both cases."
+          },
+          {
+            "id": 5,
+            "title": "Implement `POST /api/auth/refresh` Endpoint",
+            "description": "Create the endpoint to issue a new access token using a valid refresh token, allowing for persistent user sessions.",
+            "dependencies": [
+              "4.1",
+              "4.3"
+            ],
+            "details": "In `apps/api/src/routes/auth.ts`, create a `POST /refresh` route handler. The handler should expect the refresh token in the request body (e.g., `{ refreshToken }`). Use the JWT verification utility with the `JWT_REFRESH_SECRET` to validate the token. If the token is valid, extract the user payload from it. Query the database to ensure the user still exists. If so, generate a new access token (only) and return it. If the refresh token is invalid or expired, return a 401 Unauthorized error.",
+            "status": "pending",
+            "testStrategy": "After logging in, use the obtained refresh token to hit the `/api/auth/refresh` endpoint and verify a new access token is returned. Attempt to use an invalid or expired refresh token and verify a 401 error is returned."
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Initialize `web` App with Next.js and `next-intl`",
+        "description": "Set up the traveler-facing `apps/web` application using Next.js 14+ with the App Router. Configure internationalization using `next-intl` for path-based routing.",
+        "details": "Following PRD section 9.3.1, initialize a new Next.js project in `apps/web`. Integrate `next-intl` to handle `/en` and `/tr` routes, setting Turkish as the default language. Create basic translation JSON files for UI strings (e.g., `common.json`). Implement the main `[locale]/layout.tsx` to set up the language context. The app should extend the shared configs from Task 2.",
+        "testStrategy": "Run the `web` app. Verify that navigating to `/` redirects to `/tr`. Verify that `/en` and `/tr` render a basic page with a translated string from the JSON files. Ensure the `lang` attribute on the `<html>` tag is set correctly for each locale.",
+        "priority": "high",
+        "dependencies": [
+          2
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Install `next-intl` and Update `package.json`",
+            "description": "Install the `next-intl` dependency and update the `apps/web/package.json` to include it. Also, add the shared workspace packages for ESLint, TypeScript, and Tailwind configuration as dev dependencies.",
+            "dependencies": [],
+            "details": "In the `apps/web` directory, run the command to install `next-intl`. Then, edit `apps/web/package.json` to add `@repo/eslint-config`, `@repo/typescript-config`, and `@repo/config` to `devDependencies`. Ensure the `lint` script is updated to `eslint . --ext .ts,.tsx`.",
+            "status": "pending",
+            "testStrategy": "Run `pnpm install` from the root directory. Verify that `next-intl` and the `@repo` packages are present in `apps/web/node_modules`."
+          },
+          {
+            "id": 2,
+            "title": "Integrate Shared TypeScript, ESLint, and Tailwind Configs",
+            "description": "Configure the `web` app to use the shared configurations from the `packages` directory for consistent tooling and styling across the monorepo.",
+            "dependencies": [
+              "5.1"
+            ],
+            "details": "Modify `apps/web/tsconfig.json` to extend `@repo/typescript-config/nextjs.json`. Create or replace `apps/web/.eslintrc.js` to extend the config from `@repo/eslint-config/next.js`. Create `apps/web/tailwind.config.ts` that imports and extends the shared config from `@repo/config/tailwind.config.js`.",
+            "status": "pending",
+            "testStrategy": "Run `pnpm lint` and `pnpm tsc --noEmit -p apps/web/tsconfig.json` from the monorepo root. Both commands should complete without errors, indicating the shared configs are correctly applied."
+          },
+          {
+            "id": 3,
+            "title": "Implement `next-intl` Middleware for Locale Routing",
+            "description": "Configure the Next.js middleware to handle internationalized routing. This involves locale detection and path prefixing for supported languages.",
+            "dependencies": [
+              "5.1"
+            ],
+            "details": "Update the existing placeholder file `apps/web/src/middleware.ts`. Import `createMiddleware` from `next-intl`. Configure it with the supported locales `['en', 'tr']` and set `defaultLocale: 'tr'`. This middleware will manage redirecting and rewriting paths to include the locale.",
+            "status": "pending",
+            "testStrategy": "After implementation, running the app and visiting a path like `/about` should result in a 404, as the middleware now expects all paths to be prefixed with a locale (e.g., `/en/about`)."
+          },
+          {
+            "id": 4,
+            "title": "Configure Root Layout with Internationalization Context",
+            "description": "Update the main layout file to fetch translation messages for the current locale and provide them to the React component tree using `next-intl`'s context provider.",
+            "dependencies": [
+              "5.3"
+            ],
+            "details": "In `apps/web/src/app/[locale]/layout.tsx`, use `getMessages` from `next-intl/server` to load the appropriate JSON file (e.g., `messages/en.json`). Wrap the `{children}` prop with `<NextIntlClientProvider messages={messages}>`. Ensure the `<html>` tag's `lang` attribute is correctly set using the `locale` param.",
+            "status": "pending",
+            "testStrategy": "The application should render without errors. Using React DevTools, inspect the component tree to confirm that `NextIntlClientProvider` is present and has the `messages` prop populated."
+          },
+          {
+            "id": 5,
+            "title": "Implement Translated Home Page and Default Locale Redirect",
+            "description": "Create a basic home page that displays a translated string and configure the routing so that visiting the root of the site (`/`) automatically redirects to the default Turkish locale (`/tr`).",
+            "dependencies": [
+              "5.3",
+              "5.4"
+            ],
+            "details": "In `apps/web/src/app/[locale]/page.tsx`, use the `useTranslations('common')` hook to retrieve and display the `title` string. In `apps/web/src/navigation.ts` (which you may need to create), define the `pathnames` configuration and export it. Update `middleware.ts` to use this navigation config. This enables the redirect from `/` to `/tr` as defined by the `defaultLocale`.",
+            "status": "pending",
+            "testStrategy": "Run the `web` app. Navigate to `/`. Verify it redirects to `/tr` and displays 'MyTrip'e Hoş Geldiniz'. Navigate to `/en` and verify it displays 'Welcome to MyTrip'."
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Implement `web` App Shared Layout and Language Switcher",
+        "description": "Create the main layout components for the `web` app, including a sticky header, a footer, and a functional language switcher, all styled to mimic the Airbnb aesthetic.",
+        "details": "As per PRD sections 7 and 9.3.1, build a `Header` component that is sticky and contains the logo, search bar placeholder, and a language switcher (TR/EN). Build a `Footer` component with placeholder links. The language switcher should change the locale in the URL (`/tr` to `/en` and vice-versa) without a full page reload, persisting the choice. Use Tailwind CSS from the shared config.",
+        "testStrategy": "Visually inspect the header and footer components to ensure they match the design philosophy. Test the language switcher by clicking it; the URL should update, and the UI text should change to the selected language. Verify the user's language choice is persisted across page navigations.",
+        "priority": "high",
+        "dependencies": [
+          5
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create Basic `Header` Component Structure",
+            "description": "Create the initial file and JSX structure for the `Header` component. This component will serve as the main navigation bar for the `web` app.",
+            "dependencies": [],
+            "details": "In `apps/web/src`, create a `components/layout` directory. Inside, create `Header.tsx`. Define a React functional component that returns a `<header>` element. Add placeholder `<div>`s for the logo, search bar, and the future language switcher. Mark the component with `\"use client\"` as it will contain interactive elements.",
+            "status": "pending",
+            "testStrategy": "Visually inspect the `web` app after integrating the component in a later step to ensure the basic structure is present."
+          },
+          {
+            "id": 2,
+            "title": "Style the `Header` and Implement Sticky Behavior",
+            "description": "Apply Tailwind CSS to the `Header` component to match the Airbnb aesthetic and make it sticky.",
+            "dependencies": [
+              "6.1"
+            ],
+            "details": "Edit `apps/web/src/components/layout/Header.tsx`. Use Tailwind CSS classes from the shared config (`packages/config/tailwind.config.ts`) to style the header container, including a white background, a bottom border, and padding. Implement the sticky behavior using `sticky top-0 z-50`. Add a placeholder logo (e.g., text or a simple SVG) and a styled placeholder for the search bar with an icon and text like \"Start your search\".",
+            "status": "pending",
+            "testStrategy": "Visually inspect the header to confirm it is sticky, has the correct styling, and contains the logo and search bar placeholders."
+          },
+          {
+            "id": 3,
+            "title": "Create and Style the `Footer` Component",
+            "description": "Create and style a basic `Footer` component with placeholder links.",
+            "dependencies": [],
+            "details": "In `apps/web/src/components/layout`, create `Footer.tsx`. The component should render a `<footer>` element. Style it with a light grey background and appropriate padding using Tailwind CSS. Add several columns of placeholder links (e.g., \"Support\", \"Community\", \"Hosting\") to mimic a standard web footer.",
+            "status": "pending",
+            "testStrategy": "Visually inspect the footer to ensure it has the correct background color and contains the placeholder link structure."
+          },
+          {
+            "id": 4,
+            "title": "Implement the `LanguageSwitcher` Component Logic",
+            "description": "Create a functional language switcher that updates the URL's locale without a full page reload.",
+            "dependencies": [
+              "6.1"
+            ],
+            "details": "Create a new client component `apps/web/src/components/layout/LanguageSwitcher.tsx`. Use the `useLocale` hook from `next-intl` to determine the active locale, and `useRouter` with `usePathname` from `next/navigation` to construct the new URL. The component should display the alternate language (e.g., if on `/tr`, show a button for \"EN\"). On click, it should use `router.replace()` to navigate to the corresponding URL in the other language (e.g., `/tr/profile` -> `/en/profile`), preserving the current path.",
+            "status": "pending",
+            "testStrategy": "Click the language switcher button. Verify the URL path changes from `/tr/...` to `/en/...` (and vice-versa) without a full page reload. Check that the `lang` attribute on the `<html>` tag updates accordingly."
+          },
+          {
+            "id": 5,
+            "title": "Integrate Layout Components into the Root Layout",
+            "description": "Add the `Header` and `Footer` components to the main application layout file to make them appear on all pages.",
+            "dependencies": [
+              "6.2",
+              "6.3",
+              "6.4"
+            ],
+            "details": "Modify `apps/web/src/app/[locale]/layout.tsx`. Import the `Header` (which includes the `LanguageSwitcher`) and `Footer` components. Place the `<Header />` component before the `{children}` prop and the `<Footer />` component after it. Wrap the `{children}` in a `<main>` tag and add top padding to it to prevent content from being obscured by the sticky header.",
+            "status": "pending",
+            "testStrategy": "Run the `web` app and navigate to different pages. Confirm that the header and footer are present on all pages. Verify the main content is not hidden behind the sticky header."
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Develop API Endpoints for Places (CRUD)",
+        "description": "Implement the backend RESTful API endpoints for creating, reading, updating, and deleting places, including search and filtering capabilities.",
+        "details": "Based on PRD section 9.2.2, create the following Hono.js endpoints: `GET /api/places` (with query params for filtering, sorting, and pagination), `GET /api/places/slug/:slug` (for SEO-friendly URLs), `POST /api/places`, `PUT /api/places/:id`, and `DELETE /api/places/:id`. The GET endpoints should be public, while CUD operations should be protected and restricted to users with the 'owner' role.",
+        "testStrategy": "Write integration tests for each endpoint. Test `GET /api/places` with various filter combinations. Test creating a place with a valid owner token. Test that a user without an owner role cannot create/update a place. Test the slug-based retrieval.",
+        "priority": "high",
+        "dependencies": [
+          1,
+          4
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create `places` Route and Implement Public GET Endpoints",
+            "description": "Create a new route module for places and implement the two public-facing GET endpoints: one for listing all places with filtering, and another for fetching a single place by its slug.",
+            "dependencies": [],
+            "details": "Create a new file `apps/api/src/routes/places.ts`. In this file, initialize a new Hono router. Implement the `GET /` endpoint to query the `places` table. This endpoint must support query parameters for pagination (`page`, `limit`), sorting (`sortBy`, `order`), and filtering (e.g., `category`, `minPrice`, `maxPrice`). Also, implement the `GET /slug/:slug` endpoint to fetch a single place using a `findFirst` query with a `where` clause on the `slug` column. These endpoints should be public and not require authentication.",
+            "status": "pending",
+            "testStrategy": "Test the `GET /` endpoint by sending requests with different combinations of query parameters for pagination, sorting, and filtering. Verify the responses are correct. Test the `GET /slug/:slug` endpoint with a valid and an invalid slug."
+          },
+          {
+            "id": 2,
+            "title": "Implement Authentication and Role-Based Authorization Middleware",
+            "description": "Create reusable middleware to handle user authentication and role-based authorization, specifically for protecting CUD endpoints and restricting access to users with the 'owner' role.",
+            "dependencies": [],
+            "details": "Create a new file `apps/api/src/middleware/auth.ts`. Based on the existing `lucia` setup in `apps/api/src/lib/auth.ts`, create an `authMiddleware` that validates the session cookie and attaches the user object to the Hono context (`c.set('user', user)`). Then, create an `ownerGuard` middleware that chains after `authMiddleware` and verifies that the user on the context has `user.role === 'owner'`. If not, it should return a 403 Forbidden error. This will be used to protect the `POST`, `PUT`, and `DELETE` endpoints.",
+            "status": "pending",
+            "testStrategy": "Write unit tests for the middleware. Test that `authMiddleware` correctly identifies a valid session and rejects an invalid one. Test that `ownerGuard` allows users with the 'owner' role to proceed and blocks users with other roles."
+          },
+          {
+            "id": 3,
+            "title": "Implement `POST /api/places` Endpoint for Place Creation",
+            "description": "Develop the endpoint for creating a new place, ensuring it's protected and only accessible to users with the 'owner' role.",
+            "dependencies": [
+              "7.2"
+            ],
+            "details": "In `apps/api/src/routes/places.ts`, create the `POST /` endpoint. Apply the `ownerGuard` middleware from subtask 2. The handler should validate the request body (consider using `hono/zod-validator`). It must automatically generate a unique `slug` from the place's title. Upon successful validation, insert a new record into the `places` table using Drizzle, setting the `ownerId` to the ID of the authenticated user from the context (`c.get('user').id`). Return the newly created place object with a 201 status code.",
+            "status": "pending",
+            "testStrategy": "Send a POST request with a valid 'owner' user's auth token and a valid place payload. Verify the place is created in the database with the correct `ownerId`. Attempt to send a request without a token or with a non-owner user's token and verify a 403 Forbidden error is returned."
+          },
+          {
+            "id": 4,
+            "title": "Implement `PUT /api/places/:id` Endpoint for Updating Places",
+            "description": "Develop the endpoint for updating an existing place, ensuring only the actual owner of the place can perform the update.",
+            "dependencies": [
+              "7.2"
+            ],
+            "details": "In `apps/api/src/routes/places.ts`, create the `PUT /:id` endpoint. Apply the `authMiddleware`. Inside the handler, first fetch the place from the database using the `:id` parameter. Then, perform an authorization check to ensure the `ownerId` of the fetched place matches the ID of the authenticated user (`place.ownerId === c.get('user').id`). If they don't match, return a 403 Forbidden error. If authorized, validate the request body and update the place record in the database. Return the updated place object.",
+            "status": "pending",
+            "testStrategy": "As the place owner, send a PUT request to update a place and verify the changes in the database. Attempt to update a place owned by another user and verify a 403 error is returned. Test updating with an invalid place ID to ensure a 404 error is returned."
+          },
+          {
+            "id": 5,
+            "title": "Implement `DELETE /api/places/:id` Endpoint and Register Routes",
+            "description": "Develop the endpoint for deleting a place, with an ownership check, and integrate the new `places` router into the main API application.",
+            "dependencies": [
+              "7.1",
+              "7.2"
+            ],
+            "details": "In `apps/api/src/routes/places.ts`, create the `DELETE /:id` endpoint. Similar to the PUT endpoint, apply the `authMiddleware` and perform an ownership check to ensure the authenticated user is the owner of the place. If authorized, delete the place record from the database. Return a 200 OK status with a success message. Finally, import `placesRoutes` into `apps/api/src/index.ts` and register it with the main Hono app using `app.route('/places', placesRoutes)`.",
+            "status": "pending",
+            "testStrategy": "As the place owner, send a DELETE request and verify the place is removed from the database. Attempt to delete a place owned by another user and verify a 403 error is returned. After registering the routes, perform a quick sanity check on all new endpoints (`GET`, `POST`, `PUT`, `DELETE`) to ensure they are reachable."
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Build `web` App Homepage with Airbnb-style Listing Grid",
+        "description": "Develop the homepage for the `web` app, replicating the Airbnb-style UI with a category filter, a grid of listing cards, and infinite scroll.",
+        "details": "Following PRD section 9.3.2, create the homepage component. It should feature: a sticky header, category pills (e.g., Hotels, Villas), and a responsive grid of listing cards. Each card must have an image carousel, a heart icon, title, subtitle, and price. Implement skeleton loaders for the initial load and an infinite scroll mechanism that fetches more places from the `/api/places` endpoint.",
+        "testStrategy": "Connect the homepage to the `GET /api/places` endpoint (Task 7). Verify that listing cards populate the grid correctly. Test the infinite scroll by scrolling to the bottom of the page. Check the skeleton loading state on initial load and subsequent fetches. Ensure the layout is responsive on mobile, tablet, and desktop.",
+        "priority": "medium",
+        "dependencies": [
+          6,
+          7
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create `ListingCard` and `ListingCardSkeleton` Components",
+            "description": "Develop the core `ListingCard` component to display a single place and a corresponding `ListingCardSkeleton` for loading states. These will be the building blocks for the homepage grid.",
+            "dependencies": [],
+            "details": "In `apps/web/components/`, create a new `ListingCard.tsx` component. Use the `Card` component from `packages/ui` as a base. The component must accept a `place` prop and display:\n- An image carousel using the `Carousel` component from `packages/ui` (shadcn/ui).\n- A heart icon from `lucide-react` positioned at the top-right for favoriting.\n- The place's title, a subtitle (e.g., location), and the price.\nAlso, create `ListingCardSkeleton.tsx` using `Skeleton` from `packages/ui` to mimic the card's layout for loading states.",
+            "status": "pending",
+            "testStrategy": "Use Storybook or a temporary page to render the `ListingCard` with mock data. Verify the image carousel is functional and all data points are displayed correctly. Check that the `ListingCardSkeleton` renders without errors."
+          },
+          {
+            "id": 2,
+            "title": "Develop Sticky Header with Category Filters",
+            "description": "Implement the sticky header for the homepage, which will contain the main navigation and a horizontally scrollable list of category filter pills.",
+            "dependencies": [],
+            "details": "Create a `HomepageHeader.tsx` component in `apps/web/components/`. Make the header container sticky to the top (`sticky top-0 z-50 bg-background`). Inside, add a horizontally scrollable container for category pills. Use the `Button` component from `packages/ui` with a `variant='ghost'` for the pills. The categories (e.g., 'Amazing views', 'Tiny homes', 'Beachfront') can be hardcoded for now. This component should be added to the `apps/web/app/[locale]/page.tsx` file.",
+            "status": "pending",
+            "testStrategy": "Verify the header sticks to the top on scroll. Test the horizontal scrolling of category pills on both desktop (with mouse drag if possible) and mobile viewports. Ensure the header does not obstruct page content incorrectly."
+          },
+          {
+            "id": 3,
+            "title": "Implement Initial Data Fetching and Responsive Grid",
+            "description": "Fetch the initial set of places from the API and render them in a responsive grid on the homepage, using the components created in the previous subtasks.",
+            "dependencies": [
+              "8.1"
+            ],
+            "details": "In `apps/web/app/[locale]/page.tsx`, convert the default export to an `async` function to fetch data on the server. Use `fetch` to call the `/api/places` endpoint. While data is loading (or if the fetch is slow), render a grid of 12-16 `ListingCardSkeleton` components. Once data is available, map over the array of places and render a `ListingCard` for each. Use Tailwind CSS to create a responsive grid (`grid`, `grid-cols-*`, `gap-*`) that adjusts the number of columns based on screen size (e.g., 1 on mobile, 2 on tablet, 4 on desktop).",
+            "status": "pending",
+            "testStrategy": "Run the `web` app and confirm that skeleton cards are shown initially, followed by the actual listing cards once the API call completes. Use browser dev tools to check that the grid layout is responsive and adjusts correctly at different breakpoints."
+          },
+          {
+            "id": 4,
+            "title": "Implement Infinite Scroll for Listings",
+            "description": "Create the infinite scroll functionality to fetch and display more listings as the user scrolls to the bottom of the page.",
+            "dependencies": [
+              "8.3"
+            ],
+            "details": "Create a new client component, `ListingGrid.tsx`, in `apps/web/components/`. This component will receive the initial list of places as a prop from `page.tsx`. Use a library like `react-intersection-observer` to add a trigger element at the bottom of the grid. When this trigger becomes visible, fetch the next page of data from `/api/places` using a client-side `fetch` call with an incrementing page/offset query parameter. Maintain the list of places in a state variable (`useState`) and append new results. Display a loading spinner or additional skeletons at the bottom while fetching.",
+            "status": "pending",
+            "testStrategy": "Scroll to the bottom of the homepage. Verify that a loading indicator appears and that new listing cards are fetched and appended to the grid. Check the network tab to ensure sequential API calls (`/api/places?page=2`, `/api/places?page=3`, etc.) are being made correctly."
+          },
+          {
+            "id": 5,
+            "title": "Connect Category Filters and Refine UI/UX",
+            "description": "Add basic client-side filtering logic to the category pills and perform a final polish on the homepage's responsiveness and styling.",
+            "dependencies": [
+              "8.2",
+              "8.4"
+            ],
+            "details": "In `HomepageHeader.tsx` and `ListingGrid.tsx`, use `useState` to manage the currently selected category. When a category pill is clicked, update the state. This should trigger a new data fetch from `/api/places?category=...` and replace the existing listings. Ensure the active category pill has a distinct visual style. Conduct a final review of the entire page across mobile, tablet, and desktop breakpoints. Fine-tune spacing, font sizes, and component alignments to match the Airbnb-style design.",
+            "status": "pending",
+            "testStrategy": "Click on a category pill. Verify the grid updates to show only listings of that category. Check that the active pill is highlighted. Test switching between categories. Perform a final visual regression test on major breakpoints to ensure a polished and consistent user experience."
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "title": "Initialize `dashboard` App with Protected Routes",
+        "description": "Set up the `apps/dashboard` project for place owners using Next.js, and implement an authentication flow with protected routes.",
+        "details": "As per PRD section 9.4.1, initialize a new Next.js project in `apps/dashboard`. Configure it to use the shared configs (Task 2). Implement an authentication flow using NextAuth.js or a similar library that integrates with the JWT API (Task 4). Create a middleware to protect all dashboard routes, redirecting unauthenticated users to a login page.",
+        "testStrategy": "Start the dashboard app. Attempt to access a protected route like `/dashboard` and verify you are redirected to the login page. Log in using valid owner credentials and confirm you can access `/dashboard`. Log out and verify you are redirected away from protected routes.",
+        "priority": "medium",
+        "dependencies": [
+          2,
+          4
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Initialize Next.js Application in `apps/dashboard`",
+            "description": "Create a new Next.js 14+ application with the App Router within the `apps/dashboard` directory. This will serve as the foundation for the place owner's dashboard.",
+            "dependencies": [],
+            "details": "Use `pnpm create next-app` to bootstrap the project inside the `apps` folder. Name the project `dashboard`. Ensure it is configured with TypeScript, Tailwind CSS, and ESLint. The project should be set up to use the App Router.",
+            "status": "pending",
+            "testStrategy": "Verify that the `apps/dashboard` directory is created with a standard Next.js project structure. Run `pnpm dev` from the `apps/dashboard` directory and confirm the default Next.js welcome page loads at `http://localhost:3001` (or another available port)."
+          },
+          {
+            "id": 2,
+            "title": "Integrate Shared ESLint, TypeScript, and Tailwind CSS Configs",
+            "description": "Configure the new `dashboard` app to use the shared configurations from the `packages/` directory, ensuring consistency across the monorepo.",
+            "dependencies": [
+              "9.1"
+            ],
+            "details": "Delete the generated `tsconfig.json`, `.eslintrc.json`, and `tailwind.config.ts` in `apps/dashboard`. Create new ones that extend the shared configs: `tsconfig.json` should extend `@repo/config-typescript/nextjs.json`, `.eslintrc.js` should use the `@repo/config-eslint/next.js` preset, and `tailwind.config.ts` should import and extend the shared config from `@repo/config-tailwind`. Ensure the `content` paths in `tailwind.config.ts` are updated to include `../../packages/ui/src/**/*.{ts,tsx}`.",
+            "status": "pending",
+            "testStrategy": "Run `pnpm lint` and `pnpm tsc --noEmit` from the `apps/dashboard` directory and verify there are no errors. Confirm that Tailwind CSS utility classes from the shared config are correctly applied to a component."
+          },
+          {
+            "id": 3,
+            "title": "Set Up NextAuth.js with Credentials Provider",
+            "description": "Install and configure NextAuth.js to handle authentication. Set up the dynamic API route and configure the `CredentialsProvider` to prepare for integration with the JWT API.",
+            "dependencies": [
+              "9.1",
+              "9.2"
+            ],
+            "details": "Add `next-auth` as a dependency. Create the file `apps/dashboard/src/app/api/auth/[...nextauth]/route.ts`. Configure NextAuth with a `CredentialsProvider` for email and password authentication. The `authorize` function within the provider should contain placeholder logic for now, as it will later call the API from Task 4. Set the `session` strategy to `jwt` and define a secret in the environment variables (`.env.local`).",
+            "status": "pending",
+            "testStrategy": "Check that the NextAuth.js endpoints (e.g., `/api/auth/signin`, `/api/auth/session`) are created. Although full login won't work, you can verify the setup by attempting to POST to the sign-in endpoint and checking the server logs for the placeholder logic execution."
+          },
+          {
+            "id": 4,
+            "title": "Create a Login Page and an Authenticated Dashboard Page",
+            "description": "Develop the UI for the login page and a basic placeholder page for the authenticated dashboard area. The login page will handle user input and trigger the sign-in process.",
+            "dependencies": [
+              "9.3"
+            ],
+            "details": "Create a new route `apps/dashboard/src/app/login/page.tsx`. This page should be a client component containing a form with email and password fields and a submit button. On submit, it should call the `signIn` function from `next-auth/react`. Also, create a simple placeholder page at `apps/dashboard/src/app/dashboard/page.tsx` that displays a welcome message like 'Welcome to your Dashboard'. This page will be protected in the next subtask.",
+            "status": "pending",
+            "testStrategy": "Navigate to `/login` and verify the login form renders correctly. Enter credentials and submit the form. Check the browser's network tab to see the request to `/api/auth/callback/credentials`. Verify the `/dashboard` page renders its content when accessed directly (before protection is added)."
+          },
+          {
+            "id": 5,
+            "title": "Implement Middleware for Protected Route Guarding",
+            "description": "Create a Next.js middleware to protect all routes within the dashboard, redirecting unauthenticated users to the login page.",
+            "dependencies": [
+              "9.3",
+              "9.4"
+            ],
+            "details": "Create a `middleware.ts` file in `apps/dashboard/src`. Use the default export from `next-auth/middleware`. Configure the middleware's `matcher` to apply to all routes except for the login page (`/login`) and NextAuth's API routes (`/api/auth/**`). The middleware should redirect any unauthenticated request to a matched route to `/login`.",
+            "status": "pending",
+            "testStrategy": "Start the application. Attempt to access `/dashboard` directly in the browser. Verify you are redirected to `/login`. After a (mocked or future) successful login, verify you can access `/dashboard`. Attempting to access `/` should also redirect to `/login`."
+          }
+        ]
+      },
+      {
+        "id": 10,
+        "title": "Develop Multi-Step Listing Creation Form in Dashboard",
+        "description": "Create the multi-step form for place owners to create and edit a listing, following the Airbnb host dashboard style.",
+        "details": "Based on PRD section 9.4.2, implement a multi-step form in the `dashboard` app. The flow should include steps for: Place Type, Location (with map picker), Floor Plan, Amenities, Photos (with drag-and-drop), Title/Description (with i18n tabs for TR/EN), and Pricing. The form should POST the data to the `/api/places` endpoint (Task 7). Include a progress bar and a 'Save & exit' option.",
+        "testStrategy": "Manually test the entire form flow. Fill out all steps and submit the form, then verify the new listing is created by checking the database or using the `web` app. Test the 'Save & exit' functionality. Validate that the form correctly sends both Turkish and English content. Ensure form validation works on each step.",
+        "priority": "medium",
+        "dependencies": [
+          7,
+          9
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Set Up Multi-Step Form Layout, Routing, and State Management",
+            "description": "Create the foundational structure for the listing creation form. This includes setting up the dynamic routing, the main layout component with a progress bar, and a Zustand store for managing form state across all steps.",
+            "dependencies": [],
+            "details": "In the `apps/dashboard` project, create a new route group and dynamic route, such as `/listings/new/[[...step]]`. Create a shared layout for this route that includes a header with a 'Save & exit' button and a `Progress` component from `packages/ui`. Initialize a Zustand store to hold the entire `Place` object, which will be populated incrementally. This store will be the single source of truth for the form data. Use `react-hook-form` and `zod` for form state management and validation within each step, syncing valid data back to the Zustand store.",
+            "status": "pending",
+            "testStrategy": "Verify that navigating to `/dashboard/listings/new` renders the initial step's layout. Check that the progress bar updates when navigating between mock steps (e.g., `/listings/new/1`, `/listings/new/2`). Use React DevTools to inspect the Zustand store and confirm its initial state."
+          },
+          {
+            "id": 2,
+            "title": "Implement 'Place Type', 'Floor Plan', and 'Amenities' Steps",
+            "description": "Develop the UI and logic for the first three steps of the form: selecting the place type, defining the floor plan (guests, beds, bathrooms), and choosing available amenities.",
+            "dependencies": [
+              "10.1"
+            ],
+            "details": "For each step, create a separate component that is conditionally rendered by the main layout. Use `Card`, `Button`, and `Checkbox` components from `packages/ui`. For 'Place Type', present options as large, clickable cards. For 'Floor Plan', use `Input` components with plus/minus controls for numeric values like guest count. For 'Amenities', display a grid of checkboxes. On each step's completion, validate the data using `react-hook-form` and `zod`, then update the central Zustand store.",
+            "status": "pending",
+            "testStrategy": "Fill out each of the three forms. Verify that selections are visually reflected. Upon clicking 'Next', confirm that the data is correctly saved to the Zustand store. Test form validation by attempting to proceed with invalid or incomplete data."
+          },
+          {
+            "id": 3,
+            "title": "Develop the 'Location' Step with an Interactive Map Picker",
+            "description": "Create the location step, allowing users to search for an address and fine-tune the location using an interactive map.",
+            "dependencies": [
+              "10.1"
+            ],
+            "details": "Integrate a mapping library like `react-leaflet` or the Google Maps API. The component should feature a search input that uses a geocoding service to find addresses. When an address is selected, the map should center on it with a draggable marker. The user can then drag the marker to pinpoint the exact location. The final address components (street, city, country) and coordinates (latitude, longitude) should be captured and saved to the Zustand store upon proceeding.",
+            "status": "pending",
+            "testStrategy": "Search for an address and verify the map centers correctly. Drag the pin to a new location and confirm the coordinates in the state are updated. Manually enter an address and check that the form fields and map state are in sync. Ensure the data is correctly persisted to the Zustand store."
+          },
+          {
+            "id": 4,
+            "title": "Implement 'Photos' and 'Title/Description' Steps",
+            "description": "Build the steps for uploading photos with drag-and-drop functionality and for entering the listing's title and description with internationalization (i18n) support.",
+            "dependencies": [
+              "10.1"
+            ],
+            "details": "For the 'Photos' step, use a library like `react-dropzone` to create a drag-and-drop upload area. Display image previews and provide a mechanism to reorder or delete photos. For the 'Title/Description' step, use the `Tabs` component from `packages/ui` to create 'Turkish' and 'English' tabs. Under each tab, provide `Input` and `Textarea` fields. Use the existing `next-intl` setup to manage translations for the UI and to structure the i18n data being saved to the Zustand store (e.g., `title: { en: '...', tr: '...' }`).",
+            "status": "pending",
+            "testStrategy": "Drag and drop several images into the photo uploader and verify that previews are shown. Test deleting an image. In the description step, switch between TR and EN tabs, enter different text in each, and confirm both are saved correctly to the Zustand store upon completion."
+          },
+          {
+            "id": 5,
+            "title": "Implement 'Pricing' Step and Final Form Submission",
+            "description": "Create the final 'Pricing' step and implement the logic to submit the completed form data to the backend API.",
+            "dependencies": [
+              "10.1",
+              "10.2",
+              "10.3",
+              "10.4"
+            ],
+            "details": "Develop the 'Pricing' step with an `Input` for the price per night. On the final review page or after the last step, add a 'Publish Listing' button. Wire this button to a `@tanstack/react-query` `useMutation` hook that performs a `POST` request to the `/api/places` endpoint. The mutation function should retrieve the complete listing data from the Zustand store, perform a final Zod validation, and send it as the request payload. Handle success and error states, showing appropriate notifications to the user and redirecting to the dashboard on success.",
+            "status": "pending",
+            "testStrategy": "Complete the entire form flow from start to finish. Click the final 'Publish Listing' button and use browser developer tools to inspect the network request, verifying that the payload sent to `/api/places` is a complete and correctly structured JSON object. Mock a successful API response and ensure the user is redirected. Mock an error response and verify that an error message is displayed."
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "created": "2025-09-26T08:53:30.669Z",
+      "updated": "2025-09-26T08:53:30.669Z",
+      "description": "Tasks for master context"
+    }
+  }
+}
