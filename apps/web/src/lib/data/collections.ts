@@ -7,7 +7,7 @@ export const FEATURED_COLLECTIONS: CollectionSummary[] = [
     name: "Mavi Tur Haftası",
     description: "Göcek'ten demir alıp sakin koyları, adaları ve gün batımı guletlerini keşfedin.",
     coverImage:
-      "https://images.unsplash.com/photo-1493555049923-7928e27c57c4?auto=format&fit=crop&w=1600&q=80",
+      "https://images.unsplash.com/photo-1591587923461-13896f6a76e7?auto=format&fit=crop&w=1600&q=80",
     itemCount: 8,
   },
   {

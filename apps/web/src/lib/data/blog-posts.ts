@@ -4,9 +4,9 @@ export const BLOG_POSTS: BlogPost[] = [
   {
     id: "bodrum-gurme-rehberi",
     slug: "bodrum-gurme-rehberi",
-    title: "Bodrum&apos;da gurme bir hafta sonu planı",
+    title: "Bodrum'da gurme bir hafta sonu planı",
     excerpt:
-      "Türkbükü&apos;nden Yalıkavak&apos;a uzanan lezzet duraklarında şef menüleri, bağ gezileri ve gizli kokteyl barları.",
+      "Türkbükü'nden Yalıkavak'a uzanan lezzet duraklarında şef menüleri, bağ gezileri ve gizli kokteyl barları.",
     coverImage:
       "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1600&q=80",
     publishedAt: "2024-08-12",
@@ -28,11 +28,11 @@ export const BLOG_POSTS: BlogPost[] = [
   {
     id: "datca-zeytin-rotasi",
     slug: "datca-zeytin-rotasi",
-    title: "Datça&apos;da yerel üreticilerle zeytin hasadı",
+    title: "Datça'da yerel üreticilerle zeytin hasadı",
     excerpt:
       "Zeytin ve badem bahçelerinde geçen hasat dönemi, atölyeler ve gurme sofralarla dolu üç günlük deneyim.",
     coverImage:
-      "https://images.unsplash.com/photo-1457991872435-6bf9c2ef2517?auto=format&fit=crop&w=1600&q=80",
+      "https://images.unsplash.com/photo-1608061443778-8965e07ebcaf?auto=format&fit=crop&w=1600&q=80",
     publishedAt: "2024-09-05",
     readTimeMinutes: 6,
     category: "deneyim",
@@ -40,7 +40,7 @@ export const BLOG_POSTS: BlogPost[] = [
   {
     id: "marmaris-yeni-oteller",
     slug: "marmaris-yeni-oteller",
-    title: "Marmaris&apos;te 2025 sezonunun öne çıkan yeni butik otelleri",
+    title: "Marmaris'te 2025 sezonunun öne çıkan yeni butik otelleri",
     excerpt:
       "Minimalist tasarım ve sürdürülebilir hizmetleriyle öne çıkan, yeni açılan 5 butik otel seçkisi.",
     coverImage:
@@ -52,7 +52,7 @@ export const BLOG_POSTS: BlogPost[] = [
   {
     id: "fethiye-dalis-deneyimi",
     slug: "fethiye-dalis-deneyimi",
-    title: "Fethiye&apos;de dalışa yeni başlayanlar için 5 öneri",
+    title: "Fethiye'de dalışa yeni başlayanlar için 5 öneri",
     excerpt:
       "Profesyonel eğitmenlerle tanışın, en iyi dalış noktalarını keşfedin ve ekipman önerilerini not alın.",
     coverImage:

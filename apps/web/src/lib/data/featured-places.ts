@@ -10,7 +10,7 @@ export const FEATURED_PLACES: PlaceSummary[] = [
     rating: 4.93,
     reviewCount: 128,
     imageUrl:
-      "https://images.unsplash.com/photo-1622396481442-9a57b1db54f3?auto=format&fit=crop&w=1600&q=80",
+      "https://images.unsplash.com/photo-1648477999235-211f19d2447d?auto=format&fit=crop&w=1600&q=80",
     city: "Selimiye",
     district: "Marmaris",
     type: "stay",
@@ -26,7 +26,7 @@ export const FEATURED_PLACES: PlaceSummary[] = [
     rating: 4.88,
     reviewCount: 94,
     imageUrl:
-      "https://images.unsplash.com/photo-1512914890250-353c97c9e7c5?auto=format&fit=crop&w=1600&q=80",
+      "https://images.unsplash.com/photo-1701445538567-11cf0f440b66?auto=format&fit=crop&w=1600&q=80",
     city: "Gümüşlük",
     district: "Bodrum",
     type: "stay",
