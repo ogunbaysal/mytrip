@@ -11,8 +11,7 @@
     "add:dashboard": "bun add --cwd apps/dashboard", 
     "add:admin": "bun add --cwd apps/admin",
     "add:api": "bun add --cwd apps/api",
-    "add:db": "bun add --cwd packages/database",
-    "postinstall": "npm install --package-lock-only --ignore-scripts"
+    "add:db": "bun add --cwd packages/database"
   },
   "devDependencies": {
     "prettier": "^3.6.2",

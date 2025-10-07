@@ -1,1 +1,1 @@
-export const db = "database placeholder";
+// Export database connection and types\nexport { db, type Database } from './connection';\n\n// Export all schema types and tables\nexport * from './schema';\n\n// Export utilities (to be added later)\nexport * from './utils';
