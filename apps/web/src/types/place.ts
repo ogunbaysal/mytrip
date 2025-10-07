@@ -34,6 +34,23 @@ export type CollectionSummary = {
   itemCount: number;
 };
 
+export type PlaceAmenity = {
+  icon: string;
+  label: string;
+};
+
+export type PlaceDetail = PlaceSummary & {
+  heroImage: string;
+  gallery: string[];
+  shortHighlights: string[];
+  description: string;
+  amenities: PlaceAmenity[];
+  checkInInfo?: string;
+  checkOutInfo?: string;
+  featuredCollections?: CollectionSummary[];
+  nearbyPlaces?: PlaceSummary[];
+};
+
 export type CollectionHighlight = {
   title: string;
   description: string;

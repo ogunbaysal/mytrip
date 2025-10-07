@@ -51,7 +51,7 @@ export const FEATURED_PLACES: PlaceSummary[] = [
   },
   {
     id: "datca-ciftlik",
-    slug: "datca-farmhouse",
+    slug: "datca-ciftlik-evi",
     name: "Datça Çiftlik Evi",
     shortDescription: "Organik zeytin çiftliğinde asma altında şef masası deneyimi.",
     nightlyPrice: 4800,
@@ -83,7 +83,7 @@ export const FEATURED_PLACES: PlaceSummary[] = [
   },
   {
     id: "datca-levrek",
-    slug: "datca-levrek-restoran",
+    slug: "datca-levrek-sofrasi",
     name: "Datça Levrek Sofrası",
     shortDescription: "Denize sıfır, odun ateşinde pişen günlük balık menüsü.",
     nightlyPrice: 950,
