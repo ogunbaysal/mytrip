@@ -25,6 +25,7 @@ import {
 import { STAY_TYPES, useAppStore } from "@/stores/app-store";
 import { searchFormSchema, type SearchFormValues } from "@/lib/validations";
 import { cn } from "@/lib/utils";
+import { useRouter } from "next/navigation";
 
 const LABELS = {
   location: "Lokasyon",
@@ -43,6 +44,8 @@ const STAY_TYPE_LABELS: Record<(typeof STAY_TYPES)[number], string> = {
 };
 
 export function PlaceSearchForm() {
+
+  const router = useRouter();
   const { searchFilters, setSearchFilters } = useAppStore((state) => ({
     searchFilters: state.searchFilters,
     setSearchFilters: state.setSearchFilters,
@@ -166,9 +169,10 @@ export function PlaceSearchForm() {
       </div>
 
       <Button
-        type="submit"
+        type="button"
         size="lg"
         className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl px-6 text-sm font-semibold sm:w-auto"
+        onClick={() => router.push(`/places`)}
       >
         <Search className="size-4" />
         {LABELS.submit}
