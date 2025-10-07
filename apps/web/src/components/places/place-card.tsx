@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import type { Route } from "next";
 
 import { useLocalizedFormatting } from "@/lib/i18n";
 import type { PlaceSummary } from "@/types";
@@ -14,7 +15,7 @@ export function PlaceCard({ place }: { place: PlaceSummary }) {
 
   return (
     <Link
-      href={`/places/${place.slug}`}
+      href={`/places/${place.slug}` as Route}
       className="group block overflow-hidden rounded-3xl border border-transparent bg-white shadow-sm transition hover:-translate-y-1 hover:border-primary/30 hover:shadow-xl"
     >
       <div className="relative aspect-[4/3] overflow-hidden">

@@ -2,13 +2,14 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import type { Route } from "next";
 
 import type { CollectionSummary } from "@/types";
 
 export function CollectionCard({ collection }: { collection: CollectionSummary }) {
   return (
     <Link
-      href={`/collections/${collection.slug}`}
+      href={`/collections/${collection.slug}` as Route}
       className="group flex flex-col gap-4 rounded-3xl border border-transparent bg-white p-4 shadow-sm transition hover:-translate-y-1 hover:border-primary/30 hover:shadow-xl"
     >
       <div className="relative aspect-[5/3] overflow-hidden rounded-2xl">

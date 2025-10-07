@@ -1,28 +1,34 @@
 import type { ReactNode } from "react";
 
 import Link from "next/link";
+import type { Route } from "next";
+
+type FooterLinkProps = {
+  href: Route;
+  label: string;
+};
 
 const companyLinks = [
   { label: "MyTrip hakkında", href: "/about" },
   { label: "Kariyer", href: "/careers" },
-  { label: "Basın", href: "/press" },
-];
+  { label: "Destek", href: "/support" },
+] as const satisfies FooterLinkProps[];
 
 const exploreLinks = [
   { label: "Seyahat dergisi", href: "/blog" },
   { label: "Hediye kartları", href: "/collections" },
-];
+] as const satisfies FooterLinkProps[];
 
 const supportLinks = [
   { label: "Yardım merkezi", href: "/support" },
   { label: "İletişim", href: "/contact" },
-];
+] as const satisfies FooterLinkProps[];
 
 const legalLinks = [
   { label: "Gizlilik", href: "/privacy" },
   { label: "Şartlar", href: "/terms" },
   { label: "Çerezler", href: "/cookies" },
-];
+] as const satisfies FooterLinkProps[];
 
 export function SiteFooter() {
   return (
@@ -79,11 +85,6 @@ function FooterColumn({ title, children }: FooterColumnProps) {
     </div>
   );
 }
-
-type FooterLinkProps = {
-  href: string;
-  label: string;
-};
 
 function FooterLink({ href, label }: FooterLinkProps) {
   return (

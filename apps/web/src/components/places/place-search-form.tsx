@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, type ComponentType, type ReactNode } from "react";
+import { useEffect, useState, type ComponentType, type ReactNode } from "react";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -204,6 +204,19 @@ function parseDateOrUndefined(value?: string | null) {
 function DatePickerField({ value, onChange, placeholder, fromDate }: DatePickerFieldProps) {
   const selectedDate = parseDateOrUndefined(value);
   const displayLabel = selectedDate ? format(selectedDate, "dd.MM.yyyy") : placeholder;
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  if (!isMounted) {
+    return (
+      <div className="text-sm font-medium text-muted-foreground">
+        {displayLabel}
+      </div>
+    );
+  }
 
   return (
     <Popover>

@@ -1,27 +1,27 @@
 "use client";
 
 import Link from "next/link";
+import type { Route } from "next";
 import { Search } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-type NavHref =
-  | string
+type NavItem =
   | {
-      pathname: string;
-      query?: Record<string, string>;
+      label: string;
+      href: Route;
+    }
+  | {
+      label: string;
+      href: Route;
+      query: Record<string, string>;
     };
-
-type NavItem = {
-  label: string;
-  href: NavHref;
-};
 
 const NAV_ITEMS: NavItem[] = [
   { label: "Konaklamalar", href: "/places" },
   { label: "Deneyimler", href: "/collections" },
-  { label: "Restoranlar", href: { pathname: "/places", query: { type: "restaurant" } } },
+  { label: "Restoranlar", href: "/places", query: { type: "restaurant" } },
   { label: "Hikayeler", href: "/blog" },
 ];
 
@@ -71,7 +71,7 @@ export function SiteHeader() {
           {NAV_ITEMS.map((item) => (
             <Link
               key={item.label}
-              href={item.href}
+              href={"query" in item ? { pathname: item.href, query: item.query } : item.href}
               className="rounded-full px-4 py-2 text-sm font-medium text-muted-foreground transition hover:bg-white hover:text-foreground"
             >
               {item.label}
