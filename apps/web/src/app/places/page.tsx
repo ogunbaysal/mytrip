@@ -28,7 +28,7 @@ export default function PlacesPage() {
   }, [data, filters.location, filters.stayType]);
 
   return (
-    <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-6 px-4 pb-24 pt-10 md:px-6 md:pt-14 lg:flex-row">
+    <div className="mx-auto flex w-full flex-col gap-6 px-4 pb-24 pt-10 md:px-6 md:pt-14 lg:flex-row">
       <div className="flex w-full flex-col gap-6 lg:w-[55%]">
         <div className="rounded-3xl border border-border bg-white/90 p-4 shadow-sm shadow-black/5">
           <div className="mb-4 space-y-1">
@@ -47,7 +47,7 @@ export default function PlacesPage() {
               {isLoading ? "Yükleniyor..." : `${filteredPlaces.length} sonuç bulundu`}
             </span>
           </div>
-          <div className="grid gap-4">
+          <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
             {filteredPlaces.length === 0 && !isLoading ? (
               <div className="rounded-3xl border border-dashed border-border/70 bg-white p-8 text-center text-sm text-muted-foreground">
                 Aramanızla eşleşen sonuç bulunamadı. Filtreleri değiştirip tekrar deneyin.

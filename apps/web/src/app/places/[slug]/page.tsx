@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { PlacesMap } from "@/components/places/places-map";
 import { CollectionCard } from "@/components/collections/collection-card";
 import { PlaceCard } from "@/components/places/place-card";
+import { PriceCard } from "@/components/places/price-card";
+import { ReservationCalendar } from "@/components/places/reservation-calendar";
 import { PLACE_DETAILS, PLACE_DETAILS_BY_SLUG } from "@/lib/data/place-details";
 
 const priceFormatter = new Intl.NumberFormat("tr-TR", {
@@ -98,34 +100,44 @@ export default async function PlaceDetailPage({
               ))}
             </div>
             <p className="text-sm leading-relaxed text-muted-foreground md:text-base">{detail.description}</p>
-          </div>
-          <div className="space-y-3 rounded-3xl border border-border bg-white/90 p-5 shadow-sm shadow-black/5">
-            <h2 className="text-lg font-semibold text-foreground">Öne çıkan olanaklar</h2>
-            <ul className="grid gap-2 text-sm text-muted-foreground">
-              {detail.amenities.map((amenity) => (
-                <li key={amenity.label} className="flex items-center gap-3">
-                  <span className="text-lg">{amenity.icon}</span>
-                  <span>{amenity.label}</span>
-                </li>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {detail.gallery.map((image) => (
+                <div key={image} className="relative aspect-[4/3] overflow-hidden rounded-3xl">
+                  <Image src={image} alt={`${detail.name} görseli`} fill className="object-cover" sizes="(max-width: 768px) 100vw, 33vw" />
+                </div>
               ))}
-            </ul>
-            {detail.checkOutInfo && <p className="text-xs text-muted-foreground">{detail.checkOutInfo}</p>}
-          </div>
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {detail.gallery.map((image) => (
-            <div key={image} className="relative aspect-[4/3] overflow-hidden rounded-3xl">
-              <Image src={image} alt={`${detail.name} görseli`} fill className="object-cover" sizes="(max-width: 768px) 100vw, 33vw" />
             </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="mx-auto w-full max-w-[1100px] space-y-6 px-4 md:px-6">
-        <h2 className="text-xl font-semibold text-foreground">Konum</h2>
-        <div className="h-[360px] overflow-hidden rounded-3xl border border-border bg-white shadow-sm shadow-black/5">
-          <PlacesMap places={[detail]} />
+            <div className="mx-auto w-full max-w-[1100px] space-y-6">
+              <h2 className="text-xl font-semibold text-foreground">Konum</h2>
+              <div className="h-[360px] overflow-hidden rounded-3xl border border-border bg-white shadow-sm shadow-black/5">
+                <PlacesMap places={[detail]} />
+              </div>
+            </div>
+          </div>
+          <div className="space-y-6">
+            {/* Price and Reservation Section */}
+            <div className="space-y-4">
+              <PriceCard 
+                nightlyPrice={detail.nightlyPrice} 
+                checkInInfo={detail.checkInInfo}
+              />
+              <ReservationCalendar />
+            </div>
+            
+            {/* Amenities Section */}
+            <div className="space-y-3 rounded-3xl border border-border bg-white/90 p-5 shadow-sm shadow-black/5">
+              <h2 className="text-lg font-semibold text-foreground">Öne çıkan olanaklar</h2>
+              <ul className="grid gap-2 text-sm text-muted-foreground">
+                {detail.amenities.map((amenity) => (
+                  <li key={amenity.label} className="flex items-center gap-3">
+                    <span className="text-lg">{amenity.icon}</span>
+                    <span>{amenity.label}</span>
+                  </li>
+                ))}
+              </ul>
+              {detail.checkOutInfo && <p className="text-xs text-muted-foreground">{detail.checkOutInfo}</p>}
+            </div>
+          </div>
         </div>
       </section>
 

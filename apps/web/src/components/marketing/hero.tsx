@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import { Sparkles } from "lucide-react";
 
-import { PlaceSearchForm } from "@/components/places/place-search-form";
+import TurkeyMap from "@/components/places/TurkeyMap";
 
 const HERO_EYEBROW = "Muğla, Türkiye";
 const HERO_TITLE = "Muğla'yı bir yerlisi gibi yaşayın";
@@ -36,9 +36,9 @@ export function HeroSection() {
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.1, ease: "easeOut" }}
-          className="w-full lg:max-w-lg"
+          className="w-full lg:max-w-2xl"
         >
-          <PlaceSearchForm />
+          <TurkeyMap className="h-[40vh]" />
         </motion.div>
       </div>
     </section>
