@@ -17,7 +17,7 @@ interface PriceCardProps {
 }
 
 export function PriceCard({ nightlyPrice, checkInInfo, totalNights = 3 }: PriceCardProps) {
-  const [nights, setNights] = useState(totalNights);
+  const [nights] = useState(totalNights);
   const totalPrice = nightlyPrice * nights;
   const serviceFee = Math.round(totalPrice * 0.12); // 12% service fee
   const taxes = Math.round(totalPrice * 0.08); // 8% taxes

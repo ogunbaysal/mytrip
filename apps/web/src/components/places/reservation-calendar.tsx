@@ -4,7 +4,6 @@ import { useState } from "react";
 import { Calendar } from "@/components/ui/calendar";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CalendarIcon } from "lucide-react";
 import { addDays, format } from "date-fns";
 import { tr } from "date-fns/locale";
 
