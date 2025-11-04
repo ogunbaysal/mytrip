@@ -8,7 +8,7 @@
     "type-check": "turbo type-check",
     "clean": "turbo clean",
     "add:web": "bun add --cwd apps/web",
-    "add:dashboard": "bun add --cwd apps/dashboard", 
+    "add:dashboard": "bun add --cwd apps/dashboard",
     "add:admin": "bun add --cwd apps/admin",
     "add:api": "bun add --cwd apps/api",
     "add:db": "bun add --cwd packages/database"
@@ -25,5 +25,8 @@
   "workspaces": [
     "apps/*",
     "packages/*"
-  ]
+  ],
+  "dependencies": {
+    "postgres": "^3.4.7"
+  }
 }
