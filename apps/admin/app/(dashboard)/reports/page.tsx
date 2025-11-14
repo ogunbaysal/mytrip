@@ -556,7 +556,7 @@ export default function ReportsPage() {
                           {report.downloads} indirme
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {new Date(report.generatedAt || report.scheduledAt || report.startedAt).toLocaleDateString('tr-TR')}
+                          {new Date(report.generatedAt || report.scheduledAt || report.startedAt || Date.now()).toLocaleDateString('tr-TR')}
                         </p>
                       </div>
                       {getStatusBadge(report.status)}

@@ -49,7 +49,7 @@ export const mockUsers: User[] = [
     createdAt: new Date("2024-03-10"),
     lastLoginAt: new Date("2024-11-13T18:45:00"),
     placeCount: 0,
-    subscriptionStatus: null,
+    subscriptionStatus: undefined,
     avatar: "/avatars/user3.jpg",
   },
   {
@@ -75,7 +75,7 @@ export const mockUsers: User[] = [
     createdAt: new Date("2024-05-18"),
     lastLoginAt: new Date("2024-11-14T16:10:00"),
     placeCount: 0,
-    subscriptionStatus: null,
+    subscriptionStatus: undefined,
   },
   {
     id: "6",
@@ -87,7 +87,7 @@ export const mockUsers: User[] = [
     createdAt: new Date("2024-01-01"),
     lastLoginAt: new Date("2024-11-14T11:00:00"),
     placeCount: 0,
-    subscriptionStatus: null,
+    subscriptionStatus: undefined,
     avatar: "/avatars/admin.jpg",
   },
   {
@@ -111,9 +111,9 @@ export const mockUsers: User[] = [
     status: "pending",
     phone: "+90 312 333 4444",
     createdAt: new Date("2024-07-30"),
-    lastLoginAt: null,
+    lastLoginAt: undefined,
     placeCount: 0,
-    subscriptionStatus: null,
+    subscriptionStatus: undefined,
   },
   {
     id: "9",
@@ -125,7 +125,7 @@ export const mockUsers: User[] = [
     createdAt: new Date("2024-08-12"),
     lastLoginAt: new Date("2024-11-14T13:25:00"),
     placeCount: 0,
-    subscriptionStatus: null,
+    subscriptionStatus: undefined,
   },
   {
     id: "10",
@@ -150,7 +150,7 @@ export const mockUsers: User[] = [
     createdAt: new Date("2024-09-20"),
     lastLoginAt: new Date("2024-11-13T20:15:00"),
     placeCount: 0,
-    subscriptionStatus: null,
+    subscriptionStatus: undefined,
   },
   {
     id: "12",
@@ -162,7 +162,7 @@ export const mockUsers: User[] = [
     createdAt: new Date("2024-10-10"),
     lastLoginAt: new Date("2024-11-14T12:55:00"),
     placeCount: 0,
-    subscriptionStatus: null,
+    subscriptionStatus: undefined,
   },
 ]
 

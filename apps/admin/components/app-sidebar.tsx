@@ -27,13 +27,20 @@ import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 
+interface MenuItem {
+  title: string
+  url: string
+  icon: any
+  badge?: string
+  subItems?: { title: string; url: string }[]
+}
+
 // Admin menu items
-const adminMenuItems = [
+const adminMenuItems: MenuItem[] = [
   {
     title: "Panel",
     url: "/dashboard",
     icon: BarChart3,
-    badge: null,
   },
   {
     title: "Kullanıcılar",
@@ -77,8 +84,7 @@ const adminMenuItems = [
     title: "Abonelikler",
     url: "/subscriptions",
     icon: CreditCard,
-    badge: null,
-    subItems: [
+      subItems: [
       { title: "Tüm Abonelikler", url: "/subscriptions" },
       { title: "Aktif Abonelikler", url: "/subscriptions/active" },
       { title: "Pasif Abonelikler", url: "/subscriptions/inactive" },
@@ -90,8 +96,7 @@ const adminMenuItems = [
     title: "Ayarlar",
     url: "/settings",
     icon: Settings,
-    badge: null,
-    subItems: [
+      subItems: [
       { title: "Genel Ayarlar", url: "/settings/general" },
       { title: "E-posta Şablonları", url: "/settings/email-templates" },
       { title: "Sistem Bildirimleri", url: "/settings/notifications" },

@@ -34,7 +34,7 @@ import { useAuth } from "@/hooks/use-auth"
 const formSchema = z.object({
   email: z.string().email("Geçerli bir e-posta adresi giriniz"),
   password: z.string().min(6, "Şifre en az 6 karakter olmalıdır"),
-  rememberMe: z.boolean().default(false),
+  rememberMe: z.boolean(),
 })
 
 type LoginFormValues = z.infer<typeof formSchema>

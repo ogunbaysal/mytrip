@@ -56,7 +56,7 @@ export default function CreateSubscriptionPage() {
   const plans = [
     { value: "basic", label: "Temel", price: "299", features: ["5 Mekan Listeleme", "Temel İstatistikler", "E-posta Destek"] },
     { value: "professional", label: "Profesyonel", price: "599", features: ["20 Mekan Listeleme", "Gelişmiş İstatistikler", "Öncelikli Destek", "Sosyal Medya"] },
-    { value: "enterprise", label: "Kurumsal", price: "1299", features: "Sınırsız Mekan", "API Erişimi", "Özel Özellikler", "7/24 Destek" }
+    { value: "enterprise", label: "Kurumsal", price: "1299", features: ["Sınırsız Mekan", "API Erişimi", "Özel Özellikler", "7/24 Destek"] }
   ]
 
   const billingCycles = [

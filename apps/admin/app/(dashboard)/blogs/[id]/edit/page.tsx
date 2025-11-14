@@ -125,7 +125,7 @@ export default function BlogEditPage() {
       .replace(/[^a-z0-9ğüşıöç\s-]/g, '')
       .replace(/\s+/g, '-')
       .replace(/-+/g, '-')
-      .trim('-')
+      .replace(/^[-]+|[-]+$/g, '')
   }
 
   // Update slug when title changes
