@@ -1,17 +1,25 @@
-import 'dotenv/config';
-import { defineConfig } from 'drizzle-kit';
+import { config } from "dotenv"
+import { defineConfig } from "drizzle-kit"
 
+for (const path of ["../../.env.local", "../../.env", ".env.local", ".env"]) {
+  config({ path })
+}
 
-const DATABASE_URL = process.env.MIGRATIONS_DB_URL!;
-if (!DATABASE_URL) {
-  throw new Error('MIGRATIONS_DB_URL must be set for drizzle-kit');
+const connectionString = process.env.DATABASE_URL
+
+if (!connectionString) {
+  throw new Error(
+    "DATABASE_URL is not set. Create a .env file (see .env.example) before running Drizzle commands."
+  )
 }
 
 export default defineConfig({
-    out: './src/db/migrations',
-    schema: './src/db/schemas/index.ts',
-    dialect: 'postgresql',
-    dbCredentials: {
-        url: DATABASE_URL,
-    }
+  schema: "./src/db/schemas",
+  out: "./src/db/migrations",
+  dialect: "postgresql",
+  dbCredentials: {
+    url: connectionString,
+  },
+  verbose: true,
+  strict: true,
 })

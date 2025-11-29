@@ -1,16 +1,9 @@
 {
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "strict": true,
-    "jsx": "react-jsx",
-    "jsxImportSource": "hono/jsx",
-    "target": "ES2022",
-    "module": "ESNext",
-    "moduleResolution": "node",
-    "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true,
-    "skipLibCheck": true,
-    "types": [
-      "bun-types"
-    ]
-  }
+    "baseUrl": ".",
+    "lib": ["esnext"],
+    "types": ["bun-types"]
+  },
+  "include": ["src/**/*.ts", "drizzle.config.ts"]
 }

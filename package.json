@@ -1,31 +1,23 @@
 {
   "name": "mytrip",
   "private": true,
+  "packageManager": "bun@1.2.22",
   "scripts": {
-    "build": "turbo build",
     "dev": "turbo dev",
+    "build": "turbo build",
     "lint": "turbo lint",
-    "type-check": "turbo type-check",
-    "clean": "turbo clean",
-    "add:web": "bun add --cwd apps/web",
-    "add:dashboard": "bun add --cwd apps/dashboard",
-    "add:admin": "bun add --cwd apps/admin",
-    "add:api": "bun add --cwd apps/api",
-    "add:db": "bun add --cwd packages/database"
+    "start": "turbo start",
+    "db:generate": "turbo db:generate --filter=api",
+    "db:migrate": "turbo db:migrate --filter=api",
+    "db:push": "turbo db:push --filter=api",
+    "db:studio": "turbo db:studio --filter=api"
   },
   "devDependencies": {
     "prettier": "^3.6.2",
     "turbo": "^2.5.8",
     "typescript": "5.9.2"
   },
-  "engines": {
-    "node": ">=18"
-  },
-  "packageManager": "bun@1.2.18",
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
+  "workspaces": ["apps/*"],
   "dependencies": {
     "postgres": "^3.4.7"
   }
