@@ -1,4 +1,12 @@
-import { pgTable, text, timestamp, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, integer, pgEnum } from "drizzle-orm/pg-core";
+
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+export const userRoleEnum = pgEnum("user_role", ["admin", "owner", "traveler"]);
+export const userStatusEnum = pgEnum("user_status", ["active", "suspended", "pending"]);
+export const subscriptionStatusEnum = pgEnum("subscription_status", ["active", "expired", "cancelled"]);
 
 // ============================================================================
 // BETTER AUTH TABLES
@@ -11,6 +19,14 @@ export const user = pgTable("user", {
   email: text("email").notNull().unique(),
   emailVerified: boolean("email_verified").notNull().default(false),
   image: text("image"),
+  // Enhanced user fields for travel booking
+  role: userRoleEnum("role").notNull().default("traveler"),
+  phone: text("phone"),
+  avatar: text("avatar"), // Profile image URL
+  status: userStatusEnum("status").notNull().default("active"),
+  lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
+  placeCount: integer("place_count").notNull().default(0), // Number of places owned
+  subscriptionStatus: subscriptionStatusEnum("subscription_status"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
