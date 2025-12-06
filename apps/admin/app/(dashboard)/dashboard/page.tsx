@@ -1,95 +1,73 @@
+"use client"
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Users, MapPin, FileText, CreditCard, TrendingUp, Eye, Clock } from "lucide-react"
-
-const dashboardStats = [
-  {
-    title: "Toplam Kullanıcı",
-    value: "1,234",
-    change: "+12%",
-    trend: "up",
-    icon: Users,
-    color: "text-blue-600",
-    bgColor: "bg-blue-100",
-  },
-  {
-    title: "Aktif Mekan",
-    value: "456",
-    change: "+8%",
-    trend: "up",
-    icon: MapPin,
-    color: "text-green-600",
-    bgColor: "bg-green-100",
-  },
-  {
-    title: "Bekleyen Blog",
-    value: "23",
-    change: "-2%",
-    trend: "down",
-    icon: FileText,
-    color: "text-orange-600",
-    bgColor: "bg-orange-100",
-  },
-  {
-    title: "Aylık Gelir",
-    value: "₺45,678",
-    change: "+18%",
-    trend: "up",
-    icon: CreditCard,
-    color: "text-purple-600",
-    bgColor: "bg-purple-100",
-  },
-]
-
-const recentActivity = [
-  {
-    id: 1,
-    user: "Ahmet Yılmaz",
-    action: "yeni mekan ekledi",
-    details: "Villa Akdeniz",
-    time: "5 dakika önce",
-    status: "pending",
-  },
-  {
-    id: 2,
-    user: "Ayşe Demir",
-    action: "blog yazısı gönderdi",
-    details: "Muğla'da Gezilecek Yerler",
-    time: "15 dakika önce",
-    status: "pending",
-  },
-  {
-    id: 3,
-    user: "Mehmet Kaya",
-    action: "abonelik yeniledi",
-    details: "Premium Plan",
-    time: "1 saat önce",
-    status: "success",
-  },
-  {
-    id: 4,
-    user: "Zeynep Çelik",
-    action: "mekan bilgilerini güncelledi",
-    details: "Otel Deniz Yıldızı",
-    time: "2 saat önce",
-    status: "success",
-  },
-  {
-    id: 5,
-    user: "Can Öztürk",
-    action: "yeni kullanıcı kaydı",
-    details: "mekan sahibi",
-    time: "3 saat önce",
-    status: "success",
-  },
-]
+import { Users, MapPin, FileText, CreditCard, Eye, Clock } from "lucide-react"
+import { useAuth } from "@/hooks/use-auth"
+import { useAnalyticsOverview, useRecentActivity } from "@/hooks/use-analytics"
+import { formatDistanceToNow } from "date-fns"
+import { tr } from "date-fns/locale"
 
 export default function DashboardPage() {
+  const { user } = useAuth()
+  const { data: stats, isLoading: isLoadingStats } = useAnalyticsOverview()
+  const { data: activities, isLoading: isLoadingActivities } = useRecentActivity()
+  
+  const dashboardStats = [
+    {
+      title: "Toplam Kullanıcı",
+      value: stats?.users.total.toLocaleString("tr-TR") || "0",
+      change: stats?.users.new ? `+${stats.users.new}` : "0",
+      trend: "up",
+      icon: Users,
+      color: "text-blue-600",
+      bgColor: "bg-blue-100",
+      periodLabel: "yeni kullanıcı",
+    },
+    {
+      title: "Aktif Mekan",
+      value: stats?.places.active.toLocaleString("tr-TR") || "0",
+      change: stats?.places.new ? `+${stats.places.new}` : "0",
+      trend: "up",
+      icon: MapPin,
+      color: "text-green-600",
+      bgColor: "bg-green-100",
+      periodLabel: "yeni mekan",
+    },
+    {
+      title: "Toplam Blog",
+      value: stats?.reviews.total.toLocaleString("tr-TR") || "0", // Map review stats or blog stats here? API returns reviews in overview, dashboard mock had blogs. Let's use reviews for now or placeholder
+      change: stats?.reviews.new ? `+${stats.reviews.new}` : "0",
+      trend: "up", // Assuming up
+      icon: FileText,
+      color: "text-orange-600",
+      bgColor: "bg-orange-100",
+      periodLabel: "yeni inceleme",
+    },
+    {
+      title: "Toplam Gelir",
+      value: stats?.bookings.totalRevenue 
+        ? new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY" }).format(stats.bookings.totalRevenue) 
+        : "₺0,00",
+      change: stats?.bookings.recentRevenue 
+        ? new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY" }).format(stats.bookings.recentRevenue) 
+        : "₺0,00",
+      trend: "up",
+      icon: CreditCard,
+      color: "text-purple-600",
+      bgColor: "bg-purple-100",
+      periodLabel: "son 30 gün",
+    },
+  ]
+
   return (
     <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
       <div className="flex items-center justify-between space-y-2">
         <h2 className="text-3xl font-bold tracking-tight">Panel</h2>
         <div className="flex items-center space-x-2">
+          <Badge variant="outline">
+            Hoşgeldin, {user?.name || "Admin"}
+          </Badge>
           <Badge variant="outline">Son 30 gün</Badge>
         </div>
       </div>
@@ -107,17 +85,16 @@ export default function DashboardPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stat.value}</div>
-              <div className="flex items-center space-x-2 text-xs text-muted-foreground">
-                {stat.trend === "up" ? (
-                  <TrendingUp className="h-3 w-3 text-green-600" />
-                ) : (
-                  <TrendingUp className="h-3 w-3 text-red-600 rotate-180" />
-                )}
-                <span className={stat.trend === "up" ? "text-green-600" : "text-red-600"}>
+              {isLoadingStats ? (
+                <div className="h-8 w-24 bg-gray-200 animate-pulse rounded mt-1" />
+              ) : (
+                <div className="text-2xl font-bold">{stat.value}</div>
+              )}
+              <div className="flex items-center space-x-2 text-xs text-muted-foreground mt-1">
+                <span className="text-green-600 font-medium">
                   {stat.change}
                 </span>
-                <span>geçen ay</span>
+                <span>{stat.periodLabel}</span>
               </div>
             </CardContent>
           </Card>
@@ -135,32 +112,50 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {recentActivity.map((activity) => (
-                <div key={activity.id} className="flex items-center space-x-4 rounded-lg border p-3">
-                  <div className="flex-shrink-0">
-                    <div className={`h-2 w-2 rounded-full ${
-                      activity.status === "success"
-                        ? "bg-green-500"
-                        : activity.status === "pending"
-                        ? "bg-yellow-500"
-                        : "bg-red-500"
-                    }`} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">
-                      <span className="font-semibold">{activity.user}</span>{" "}
-                      {activity.action}
-                    </p>
-                    <p className="text-sm text-gray-500 truncate">
-                      {activity.details}
-                    </p>
-                  </div>
-                  <div className="flex items-center space-x-2 text-xs text-gray-500">
-                    <Clock className="h-3 w-3" />
-                    <span>{activity.time}</span>
-                  </div>
+              {isLoadingActivities ? (
+                // Loading Skeletons
+                Array(5).fill(0).map((_, i) => (
+                   <div key={i} className="flex items-center space-x-4 rounded-lg border p-3">
+                     <div className="h-10 w-10 rounded-full bg-gray-100 animate-pulse" />
+                     <div className="space-y-2 flex-1">
+                       <div className="h-4 w-1/3 bg-gray-100 animate-pulse rounded" />
+                       <div className="h-3 w-1/4 bg-gray-100 animate-pulse rounded" />
+                     </div>
+                   </div>
+                ))
+              ) : activities?.length === 0 ? (
+                <div className="text-center py-4 text-muted-foreground text-sm">
+                  Henüz bir aktivite yok.
                 </div>
-              ))}
+              ) : (
+                activities?.map((activity) => (
+                  <div key={activity.id} className="flex items-center space-x-4 rounded-lg border p-3">
+                    <div className="flex-shrink-0">
+                      <div className="h-2 w-2 rounded-full bg-blue-500" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">
+                        <span className="font-semibold">{activity.userId}</span>{" "}
+                        {activity.eventType === "view" ? "görüntüledi" : 
+                         activity.eventType === "search" ? "arama yaptı" : 
+                         activity.eventType === "booking" ? "rezervasyon yaptı" : "işlem yaptı"}
+                      </p>
+                      <p className="text-sm text-gray-500 truncate">
+                        {activity.placeId ? `Mekan ID: ${activity.placeId}` : "Sistem"}
+                      </p>
+                    </div>
+                    <div className="flex items-center space-x-2 text-xs text-gray-500">
+                      <Clock className="h-3 w-3" />
+                      <span>
+                        {formatDistanceToNow(new Date(activity.createdAt), { 
+                          addSuffix: true,
+                          locale: tr 
+                        })}
+                      </span>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </CardContent>
         </Card>

@@ -1,6 +1,8 @@
 "use client"
 
-import { ChevronUp, Hotel, Users, MapPin, FileText, CreditCard, BarChart3, Settings, LogOut, ChevronDown } from "lucide-react"
+import { Hotel, Users, MapPin, FileText, CreditCard, BarChart3, Settings, LogOut, ChevronDown } from "lucide-react"
+import { useAuth } from "@/hooks/use-auth"
+import { useRouter } from "next/navigation"
 
 import {
   DropdownMenu,
@@ -23,14 +25,13 @@ import {
   SidebarGroupLabel,
   SidebarGroupContent,
 } from "@/components/ui/sidebar"
-import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 
 interface MenuItem {
   title: string
   url: string
-  icon: any
+  icon: React.ElementType
   badge?: string
   subItems?: { title: string; url: string }[]
 }
@@ -106,6 +107,17 @@ const adminMenuItems: MenuItem[] = [
 ]
 
 export function AppSidebar() {
+  const { user, logout } = useAuth()
+  const router = useRouter()
+
+  const handleLogout = async () => {
+    await logout()
+  }
+
+  const userInitials = user?.name 
+    ? user.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().substring(0, 2)
+    : "AD"
+
   return (
     <Sidebar>
       <SidebarHeader className="border-b bg-sidebar">
@@ -185,7 +197,10 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton className="text-red-600 hover:text-red-700 hover:bg-red-50">
+                <SidebarMenuButton 
+                  onClick={handleLogout}
+                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                >
                   <LogOut className="size-4" />
                   <span>Çıkış Yap</span>
                 </SidebarMenuButton>
@@ -205,12 +220,12 @@ export function AppSidebar() {
                   className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground w-full justify-start"
                 >
                   <Avatar className="h-8 w-8 rounded-lg">
-                    <AvatarImage src="/avatars/admin.jpg" alt="Admin" />
-                    <AvatarFallback className="rounded-lg">AD</AvatarFallback>
+                    <AvatarImage src={user?.image || "/avatars/admin.jpg"} alt={user?.name || "Admin"} />
+                    <AvatarFallback className="rounded-lg">{userInitials}</AvatarFallback>
                   </Avatar>
                   <div className="grid flex-1 text-left text-sm leading-tight">
-                    <span className="truncate font-semibold">Admin</span>
-                    <span className="truncate text-xs">admin@mytrip.com</span>
+                    <span className="truncate font-semibold">{user?.name || "Admin"}</span>
+                    <span className="truncate text-xs">{user?.email || "admin@mytrip.com"}</span>
                   </div>
                   <ChevronDown className="ml-auto size-4" />
                 </SidebarMenuButton>
@@ -224,22 +239,22 @@ export function AppSidebar() {
                 <DropdownMenuItem>
                   <div className="flex items-center gap-3">
                     <Avatar className="h-8 w-8 rounded-lg">
-                      <AvatarImage src="/avatars/admin.jpg" alt="Admin" />
-                      <AvatarFallback className="rounded-lg">AD</AvatarFallback>
+                      <AvatarImage src={user?.image || "/avatars/admin.jpg"} alt={user?.name || "Admin"} />
+                      <AvatarFallback className="rounded-lg">{userInitials}</AvatarFallback>
                     </Avatar>
                     <div className="flex flex-col">
-                      <p className="text-sm font-medium leading-none">Admin</p>
+                      <p className="text-sm font-medium leading-none">{user?.name || "Admin"}</p>
                       <p className="text-xs leading-none text-muted-foreground">
-                        admin@mytrip.com
+                        {user?.email || "admin@mytrip.com"}
                       </p>
                     </div>
                   </div>
                 </DropdownMenuItem>
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={() => router.push("/settings")}>
                   <Settings className="mr-2 h-4 w-4" />
                   <span>Ayarlar</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={handleLogout}>
                   <LogOut className="mr-2 h-4 w-4" />
                   <span>Çıkış Yap</span>
                 </DropdownMenuItem>

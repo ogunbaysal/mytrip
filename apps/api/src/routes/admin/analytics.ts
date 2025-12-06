@@ -18,7 +18,7 @@ app.get("/overview", async (c) => {
     const userStats = await db
       .select({
         totalUsers: sql`COUNT(*)::int`,
-        newUsers: sql`COUNT(CASE WHEN ${user.createdAt} >= NOW() - INTERVAL '${daysAgo} days' THEN 1 END)::int`,
+        newUsers: sql`COUNT(CASE WHEN ${user.createdAt} >= NOW() - INTERVAL '1 day' * ${daysAgo} THEN 1 END)::int`,
         activeUsers: sql`COUNT(CASE WHEN ${user.lastLoginAt} >= NOW() - INTERVAL '7 days' THEN 1 END)::int`,
       })
       .from(user);
@@ -28,7 +28,7 @@ app.get("/overview", async (c) => {
       .select({
         totalPlaces: sql`COUNT(*)::int`,
         activePlaces: sql`COUNT(CASE WHEN ${place.status} = 'active' THEN 1 END)::int`,
-        newPlaces: sql`COUNT(CASE WHEN ${place.createdAt} >= NOW() - INTERVAL '${daysAgo} days' THEN 1 END)::int`,
+        newPlaces: sql`COUNT(CASE WHEN ${place.createdAt} >= NOW() - INTERVAL '1 day' * ${daysAgo} THEN 1 END)::int`,
         totalViews: sql`SUM(${place.views})::int`,
         verifiedPlaces: sql`COUNT(CASE WHEN ${place.verified} = true THEN 1 END)::int`,
       })
@@ -38,10 +38,10 @@ app.get("/overview", async (c) => {
     const bookingStats = await db
       .select({
         totalBookings: sql`COUNT(*)::int`,
-        newBookings: sql`COUNT(CASE WHEN ${booking.createdAt} >= NOW() - INTERVAL '${daysAgo} days' THEN 1 END)::int`,
+        newBookings: sql`COUNT(CASE WHEN ${booking.createdAt} >= NOW() - INTERVAL '1 day' * ${daysAgo} THEN 1 END)::int`,
         confirmedBookings: sql`COUNT(CASE WHEN ${booking.status} = 'confirmed' THEN 1 END)::int`,
-        totalRevenue: sql`SUM(CASE WHEN ${booking.paymentStatus} = 'paid' THEN ${booking.totalPrice} ELSE 0 END)::decimal(10,2)`,
-        recentRevenue: sql`SUM(CASE WHEN ${booking.paymentStatus} = 'paid' AND ${booking.createdAt} >= NOW() - INTERVAL '${daysAgo} days' THEN ${booking.totalPrice} ELSE 0 END)::decimal(10,2)`,
+        totalRevenue: sql`SUM(CASE WHEN ${booking.paymentStatus} = 'success' THEN ${booking.totalPrice} ELSE 0 END)::decimal(10,2)`,
+        recentRevenue: sql`SUM(CASE WHEN ${booking.paymentStatus} = 'success' AND ${booking.createdAt} >= NOW() - INTERVAL '1 day' * ${daysAgo} THEN ${booking.totalPrice} ELSE 0 END)::decimal(10,2)`,
       })
       .from(booking);
 
@@ -49,7 +49,7 @@ app.get("/overview", async (c) => {
     const reviewStats = await db
       .select({
         totalReviews: sql`COUNT(*)::int`,
-        newReviews: sql`COUNT(CASE WHEN ${review.createdAt} >= NOW() - INTERVAL '${daysAgo} days' THEN 1 END)::int`,
+        newReviews: sql`COUNT(CASE WHEN ${review.createdAt} >= NOW() - INTERVAL '1 day' * ${daysAgo} THEN 1 END)::int`,
         averageRating: sql`AVG(${review.rating})::decimal(3,2)`,
         publishedReviews: sql`COUNT(CASE WHEN ${review.status} = 'published' THEN 1 END)::int`,
       })
@@ -59,7 +59,7 @@ app.get("/overview", async (c) => {
     const eventStats = await db
       .select({
         totalEvents: sql`COUNT(*)::int`,
-        recentEvents: sql`COUNT(CASE WHEN ${analyticsEvent.createdAt} >= NOW() - INTERVAL '${daysAgo} days' THEN 1 END)::int`,
+        recentEvents: sql`COUNT(CASE WHEN ${analyticsEvent.createdAt} >= NOW() - INTERVAL '1 day' * ${daysAgo} THEN 1 END)::int`,
         pageViews: sql`COUNT(CASE WHEN ${analyticsEvent.eventType} = 'view' THEN 1 END)::int`,
         searches: sql`COUNT(CASE WHEN ${analyticsEvent.eventType} = 'search' THEN 1 END)::int`,
         bookings: sql`COUNT(CASE WHEN ${analyticsEvent.eventType} = 'booking' THEN 1 END)::int`,
@@ -229,7 +229,7 @@ app.get("/daily-stats", async (c) => {
       .select({
         date: sql`DATE(${booking.createdAt})::date`,
         count: sql`COUNT(*)::int`,
-        revenue: sql`SUM(CASE WHEN ${booking.paymentStatus} = 'paid' THEN ${booking.totalPrice} ELSE 0 END)::decimal(10,2)`,
+        revenue: sql`SUM(CASE WHEN ${booking.paymentStatus} = 'success' THEN ${booking.totalPrice} ELSE 0 END)::decimal(10,2)`,
       })
       .from(booking)
       .where(sql`${booking.createdAt} >= NOW() - INTERVAL '${daysAgo} days'`)
@@ -355,7 +355,7 @@ app.get("/popular-places", async (c) => {
         placeName: place.name,
         placeType: place.type,
         bookings: sql`COUNT(${booking.id})::int`,
-        revenue: sql`SUM(CASE WHEN ${booking.paymentStatus} = 'paid' THEN ${booking.totalPrice} ELSE 0 END)::decimal(10,2)`,
+        revenue: sql`SUM(CASE WHEN ${booking.paymentStatus} = 'success' THEN ${booking.totalPrice} ELSE 0 END)::decimal(10,2)`,
       })
       .from(booking)
       .innerJoin(place, eq(booking.placeId, place.id))
