@@ -70,8 +70,8 @@ app.get("/", async (c) => {
       pagination: {
         page: parseInt(page),
         limit: limitInt,
-        total: count,
-        totalPages: Math.ceil(count / limitInt),
+        total: Number(count),
+        totalPages: Math.ceil(Number(count) / limitInt),
       },
     });
   } catch (error) {
@@ -350,14 +350,14 @@ app.get("/stats", async (c) => {
       .where(sql`${collection.createdAt} >= NOW() - INTERVAL '30 days'`);
 
     const stats = {
-      totalCollections: statusStats.reduce((sum, stat) => sum + stat.count, 0),
+      totalCollections: statusStats.reduce((sum, stat) => sum + Number(stat.count), 0),
       byStatus: statusStats.reduce((acc, stat) => {
-        acc[stat.status] = stat.count;
+        acc[stat.status] = Number(stat.count);
         return acc;
       }, {} as Record<string, number>),
-      totalItems: totalItems[0]?.totalItems || 0,
+      totalItems: Number(totalItems[0]?.totalItems || 0),
       averageItemsPerCollection: Number(totalItems[0]?.avgItems) || 0,
-      recentCollections: recentCollections[0]?.count || 0,
+      recentCollections: Number(recentCollections[0]?.count || 0),
     };
 
     return c.json({ stats });

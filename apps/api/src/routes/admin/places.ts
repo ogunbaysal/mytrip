@@ -121,8 +121,8 @@ app.get("/", async (c) => {
       pagination: {
         page: parseInt(page),
         limit: limitInt,
-        total: count,
-        totalPages: Math.ceil(count / limitInt),
+        total: Number(count),
+        totalPages: Math.ceil(Number(count) / limitInt),
       },
     });
   } catch (error) {
@@ -563,23 +563,23 @@ app.get("/stats", async (c) => {
       .from(place);
 
     const stats = {
-      totalPlaces: typeStats.reduce((sum, stat) => sum + stat.count, 0),
+      totalPlaces: typeStats.reduce((sum, stat) => sum + Number(stat.count), 0),
       byType: typeStats.reduce((acc, stat) => {
-        acc[stat.type] = stat.count;
+        acc[stat.type] = Number(stat.count);
         return acc;
       }, {} as Record<string, number>),
       byStatus: statusStats.reduce((acc, stat) => {
-        acc[stat.status] = stat.count;
+        acc[stat.status] = Number(stat.count);
         return acc;
       }, {} as Record<string, number>),
-      verified: verificationStats.find(s => s.verified)?.count || 0,
-      unverified: verificationStats.find(s => !s.verified)?.count || 0,
-      featured: featuredStats.find(s => s.featured)?.count || 0,
-      notFeatured: featuredStats.find(s => !s.featured)?.count || 0,
-      recentPlaces: recentPlaces[0]?.count || 0,
-      totalViews: engagementStats[0]?.totalViews || 0,
-      totalBookings: engagementStats[0]?.totalBookings || 0,
-      averageRating: engagementStats[0]?.avgRating || 0,
+      verified: Number(verificationStats.find(s => s.verified)?.count || 0),
+      unverified: Number(verificationStats.find(s => !s.verified)?.count || 0),
+      featured: Number(featuredStats.find(s => s.featured)?.count || 0),
+      notFeatured: Number(featuredStats.find(s => !s.featured)?.count || 0),
+      recentPlaces: Number(recentPlaces[0]?.count || 0),
+      totalViews: Number(engagementStats[0]?.totalViews || 0),
+      totalBookings: Number(engagementStats[0]?.totalBookings || 0),
+      averageRating: Number(engagementStats[0]?.avgRating || 0),
     };
 
     return c.json({ stats });

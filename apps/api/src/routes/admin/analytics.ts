@@ -151,11 +151,11 @@ app.get("/events", async (c) => {
     }
 
     if (dateFrom) {
-      conditions.push(gte(analyticsEvent.createdAt, dateFrom));
+      conditions.push(gte(analyticsEvent.createdAt, new Date(dateFrom)));
     }
 
     if (dateTo) {
-      conditions.push(lte(analyticsEvent.createdAt, dateTo));
+      conditions.push(lte(analyticsEvent.createdAt, new Date(dateTo)));
     }
 
     const whereClause = conditions.length > 0 ? and(...conditions) : sql`1=1`;
@@ -188,8 +188,8 @@ app.get("/events", async (c) => {
       pagination: {
         page: parseInt(page),
         limit: limitInt,
-        total: count,
-        totalPages: Math.ceil(count / limitInt),
+        total: Number(count),
+        totalPages: Math.ceil(Number(count) / limitInt),
       },
     });
   } catch (error) {

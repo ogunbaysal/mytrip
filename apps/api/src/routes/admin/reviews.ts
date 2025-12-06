@@ -118,8 +118,8 @@ app.get("/", async (c) => {
       pagination: {
         page: parseInt(page),
         limit: limitInt,
-        total: count,
-        totalPages: Math.ceil(count / limitInt),
+        total: Number(count),
+        totalPages: Math.ceil(Number(count) / limitInt),
       },
     });
   } catch (error) {
@@ -499,21 +499,21 @@ app.get("/stats", async (c) => {
       .where(sql`${review.createdAt} >= NOW() - INTERVAL '30 days'`);
 
     const stats = {
-      totalReviews: engagementStats[0]?.totalReviews || 0,
+      totalReviews: Number(engagementStats[0]?.totalReviews || 0),
       averageRating: Number(engagementStats[0]?.avgRating) || 0,
-      totalHelpfulVotes: engagementStats[0]?.totalHelpfulVotes || 0,
-      totalWithResponses: engagementStats[0]?.totalWithResponses || 0,
+      totalHelpfulVotes: Number(engagementStats[0]?.totalHelpfulVotes || 0),
+      totalWithResponses: Number(engagementStats[0]?.totalWithResponses || 0),
       byStatus: statusStats.reduce((acc, stat) => {
-        acc[stat.status] = stat.count;
+        acc[stat.status] = Number(stat.count);
         return acc;
       }, {} as Record<string, number>),
       ratingDistribution: ratingStats.reduce((acc, stat) => {
-        acc[stat.rating] = stat.count;
+        acc[stat.rating] = Number(stat.count);
         return acc;
       }, {} as Record<string, number>),
-      verifiedStays: verificationStats.find(s => s.verifiedStay)?.count || 0,
-      unverifiedStays: verificationStats.find(s => !s.verifiedStay)?.count || 0,
-      recentReviews: recentReviews[0]?.count || 0,
+      verifiedStays: Number(verificationStats.find(s => s.verifiedStay)?.count || 0),
+      unverifiedStays: Number(verificationStats.find(s => !s.verifiedStay)?.count || 0),
+      recentReviews: Number(recentReviews[0]?.count || 0),
       recentAverageRating: Number(recentReviews[0]?.avgRating) || 0,
     };
 

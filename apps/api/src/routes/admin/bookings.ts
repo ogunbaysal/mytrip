@@ -125,8 +125,8 @@ app.get("/", async (c) => {
       pagination: {
         page: parseInt(page),
         limit: limitInt,
-        total: count,
-        totalPages: Math.ceil(count / limitInt),
+        total: Number(count),
+        totalPages: Math.ceil(Number(count) / limitInt),
       },
     });
   } catch (error) {
@@ -503,29 +503,29 @@ app.get("/stats", async (c) => {
       .orderBy(sql`DATE_TRUNC('month', ${booking.createdAt}) DESC`);
 
     const stats = {
-      totalBookings: statusStats.reduce((sum, stat) => sum + stat.count, 0),
+      totalBookings: statusStats.reduce((sum, stat) => sum + Number(stat.count), 0),
       totalRevenue: statusStats.reduce((sum, stat) => sum + Number(stat.totalRevenue), 0),
       byStatus: statusStats.reduce((acc, stat) => {
         acc[stat.status] = {
-          count: stat.count,
+          count: Number(stat.count),
           revenue: Number(stat.totalRevenue),
         };
         return acc;
       }, {} as Record<string, { count: number; revenue: number }>),
       byPaymentStatus: paymentStats.reduce((acc, stat) => {
         acc[stat.paymentStatus] = {
-          count: stat.count,
+          count: Number(stat.count),
           revenue: Number(stat.totalRevenue),
         };
         return acc;
       }, {} as Record<string, { count: number; revenue: number }>),
-      recentBookings: recentBookings[0]?.count || 0,
+      recentBookings: Number(recentBookings[0]?.count || 0),
       recentRevenue: Number(recentBookings[0]?.totalRevenue) || 0,
-      upcomingBookings: upcomingBookings[0]?.count || 0,
+      upcomingBookings: Number(upcomingBookings[0]?.count || 0),
       upcomingRevenue: Number(upcomingBookings[0]?.totalRevenue) || 0,
       monthlyRevenue: monthlyRevenue.map(item => ({
         month: item.month,
-        count: item.count,
+        count: Number(item.count),
         revenue: Number(item.revenue),
       })),
     };

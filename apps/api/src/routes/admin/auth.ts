@@ -4,7 +4,12 @@ import { db } from "../../db";
 import { user, session as sessionTable } from "../../db/schemas";
 import { eq, desc, sql } from "drizzle-orm";
 
-const app = new Hono();
+type Variables = {
+  adminUser: typeof user.$inferSelect;
+  adminSession: typeof sessionTable.$inferSelect;
+}
+
+const app = new Hono<{ Variables: Variables }>();
 
 /**
  * Get current admin session

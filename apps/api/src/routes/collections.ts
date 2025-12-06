@@ -88,8 +88,8 @@ app.get("/", async (c) => {
       pagination: {
         page: parseInt(page),
         limit: limitInt,
-        total: count,
-        totalPages: Math.ceil(count / limitInt),
+        total: Number(count),
+        totalPages: Math.ceil(Number(count) / limitInt),
       },
       filters: {
         search,
@@ -180,6 +180,7 @@ app.get("/:slug", async (c) => {
         tips: collection.tips,
         featuredPlaces: collection.featuredPlaces,
         itemCount: collection.itemCount,
+        status: collection.status,
         createdAt: collection.createdAt,
         updatedAt: collection.updatedAt,
       })
@@ -198,7 +199,7 @@ app.get("/:slug", async (c) => {
     }
 
     // Get featured places details if any
-    let featuredPlacesDetails = [];
+    let featuredPlacesDetails: any[] = [];
     if (collectionData.featuredPlaces) {
       try {
         const featuredPlaceIds = JSON.parse(collectionData.featuredPlaces || "[]");
@@ -289,9 +290,9 @@ app.get("/seasons", async (c) => {
 
     return c.json({
       seasons: seasons.map(season => ({
-        name: season.season,
-        count: season.count,
-        slug: season.season.toLowerCase().replace(/\s+/g, '-'),
+        name: season.season!,
+        count: Number(season.count),
+        slug: season.season!.toLowerCase().replace(/\s+/g, '-'),
       })),
     });
   } catch (error) {

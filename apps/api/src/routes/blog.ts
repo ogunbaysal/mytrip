@@ -106,8 +106,8 @@ app.get("/", async (c) => {
       pagination: {
         page: parseInt(page),
         limit: limitInt,
-        total: count,
-        totalPages: Math.ceil(count / limitInt),
+        total: Number(count),
+        totalPages: Math.ceil(Number(count) / limitInt),
       },
       filters: {
         search,
@@ -371,7 +371,7 @@ app.get("/categories", async (c) => {
       categories: categories.map(cat => ({
         name: cat.category,
         displayName: categoryNames[cat.category as keyof typeof categoryNames] || cat.category,
-        count: cat.count,
+        count: Number(cat.count),
         slug: cat.category.toLowerCase(),
       })),
     });

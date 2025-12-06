@@ -83,7 +83,8 @@ export const adminOrOwnerAuth = async (c: Context, next: Next) => {
     }
 
     // Allow admin and owner roles
-    if (!["admin", "owner"].includes(session.user.role)) {
+    const userRole = session.user.role || "";
+    if (!["admin", "owner"].includes(userRole)) {
       return c.json(
         {
           error: "Insufficient permissions",

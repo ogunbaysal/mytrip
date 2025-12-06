@@ -126,8 +126,8 @@ app.get("/", async (c) => {
       pagination: {
         page: parseInt(page),
         limit: limitInt,
-        total: count,
-        totalPages: Math.ceil(count / limitInt),
+        total: Number(count),
+        totalPages: Math.ceil(Number(count) / limitInt),
       },
     });
   } catch (error) {
@@ -531,26 +531,26 @@ app.get("/stats", async (c) => {
       .where(eq(blogPost.status, "published"));
 
     const stats = {
-      totalPosts: statusStats.reduce((sum, stat) => sum + stat.count, 0),
+      totalPosts: statusStats.reduce((sum, stat) => sum + Number(stat.count), 0),
       byStatus: statusStats.reduce((acc, stat) => {
-        acc[stat.status] = stat.count;
+        acc[stat.status] = Number(stat.count);
         return acc;
       }, {} as Record<string, number>),
       byCategory: categoryStats.reduce((acc, stat) => {
-        acc[stat.category] = stat.count;
+        acc[stat.category] = Number(stat.count);
         return acc;
       }, {} as Record<string, number>),
       byLanguage: languageStats.reduce((acc, stat) => {
-        acc[stat.language] = stat.count;
+        acc[stat.language] = Number(stat.count);
         return acc;
       }, {} as Record<string, number>),
-      totalViews: engagementStats[0]?.totalViews || 0,
-      totalLikes: engagementStats[0]?.totalLikes || 0,
-      totalComments: engagementStats[0]?.totalComments || 0,
-      totalShares: engagementStats[0]?.totalShares || 0,
+      totalViews: Number(engagementStats[0]?.totalViews || 0),
+      totalLikes: Number(engagementStats[0]?.totalLikes || 0),
+      totalComments: Number(engagementStats[0]?.totalComments || 0),
+      totalShares: Number(engagementStats[0]?.totalShares || 0),
       averageReadTime: Number(engagementStats[0]?.avgReadTime) || 0,
-      recentPosts: recentPosts[0]?.count || 0,
-      publishedPosts: publishedPosts[0]?.count || 0,
+      recentPosts: Number(recentPosts[0]?.count || 0),
+      publishedPosts: Number(publishedPosts[0]?.count || 0),
     };
 
     return c.json({ stats });

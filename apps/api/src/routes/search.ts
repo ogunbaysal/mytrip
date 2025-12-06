@@ -92,7 +92,7 @@ app.get("/", async (c) => {
         .offset(offset);
 
       results.places = places;
-      totalItems += placeCount.count;
+      totalItems += Number(placeCount.count);
     }
 
     // Search collections
@@ -137,7 +137,7 @@ app.get("/", async (c) => {
         .offset(offset);
 
       results.collections = collections;
-      totalItems += collectionCount.count;
+      totalItems += Number(collectionCount.count);
     }
 
     // Search blog posts
@@ -182,7 +182,7 @@ app.get("/", async (c) => {
         .offset(offset);
 
       results.blog = blogPosts;
-      totalItems += blogCount.count;
+      totalItems += Number(blogCount.count);
     }
 
     results.total = totalItems;
@@ -408,9 +408,9 @@ app.get("/advanced", async (c) => {
       .offset(offset);
 
     results.places = places;
-    results.total = placeCount.count;
-    results.pagination.total = placeCount.count;
-    results.pagination.totalPages = Math.ceil(placeCount.count / limitInt);
+    results.total = Number(placeCount.count);
+    results.pagination.total = Number(placeCount.count);
+    results.pagination.totalPages = Math.ceil(Number(placeCount.count) / limitInt);
 
     return c.json(results);
   } catch (error) {

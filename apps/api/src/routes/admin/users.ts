@@ -89,8 +89,8 @@ app.get("/", async (c) => {
       pagination: {
         page: parseInt(page),
         limit: limitInt,
-        total: count,
-        totalPages: Math.ceil(count / limitInt),
+        total: Number(count),
+        totalPages: Math.ceil(Number(count) / limitInt),
       },
     });
   } catch (error) {
@@ -309,17 +309,17 @@ app.get("/stats", async (c) => {
       .where(sql`${user.placeCount} > 0`);
 
     const stats = {
-      totalUsers: roleStats.reduce((sum, stat) => sum + stat.count, 0),
+      totalUsers: roleStats.reduce((sum, stat) => sum + Number(stat.count), 0),
       byRole: roleStats.reduce((acc, stat) => {
-        acc[stat.role] = stat.count;
+        acc[stat.role] = Number(stat.count);
         return acc;
       }, {} as Record<string, number>),
       byStatus: statusStats.reduce((acc, stat) => {
-        acc[stat.status] = stat.count;
+        acc[stat.status] = Number(stat.count);
         return acc;
       }, {} as Record<string, number>),
-      recentUsers: recentUsers[0]?.count || 0,
-      usersWithPlaces: usersWithPlaces[0]?.count || 0,
+      recentUsers: Number(recentUsers[0]?.count || 0),
+      usersWithPlaces: Number(usersWithPlaces[0]?.count || 0),
     };
 
     return c.json({ stats });

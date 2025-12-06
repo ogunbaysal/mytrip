@@ -119,8 +119,8 @@ app.get("/", async (c) => {
       pagination: {
         page: parseInt(page),
         limit: limitInt,
-        total: count,
-        totalPages: Math.ceil(count / limitInt),
+        total: Number(count),
+        totalPages: Math.ceil(Number(count) / limitInt),
       },
       filters: {
         search,
@@ -360,7 +360,7 @@ app.get("/:slug", async (c) => {
         verified: place.verified,
       })
       .from(place)
-      .where(and(eq(place.city, placeData.city), eq(place.status, "active"), sql`${place.id} != ${placeData.id}`))
+      .where(and(eq(place.city, placeData.city || ""), eq(place.status, "active"), sql`${place.id} != ${placeData.id}`))
       .orderBy(desc(place.rating), desc(place.reviewCount))
       .limit(6);
 
@@ -403,7 +403,7 @@ app.get("/categories", async (c) => {
     return c.json({
       categories: categories.map(cat => ({
         name: cat.category,
-        count: cat.count,
+        count: Number(cat.count),
         slug: cat.category.toLowerCase().replace(/\s+/g, '-'),
       })),
     });
@@ -437,9 +437,9 @@ app.get("/cities", async (c) => {
 
     return c.json({
       cities: cities.map(city => ({
-        name: city.city,
-        count: city.count,
-        slug: city.city.toLowerCase().replace(/\s+/g, '-'),
+        name: city.city!,
+        count: Number(city.count),
+        slug: city.city!.toLowerCase().replace(/\s+/g, '-'),
       })),
     });
   } catch (error) {
@@ -483,7 +483,7 @@ app.get("/types", async (c) => {
       types: placeTypes.map(pt => ({
         type: pt.type,
         name: typeNames[pt.type as keyof typeof typeNames] || pt.type,
-        count: pt.count,
+        count: Number(pt.count),
         slug: pt.type.toLowerCase(),
       })),
     });

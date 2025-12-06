@@ -101,8 +101,8 @@ app.get("/", async (c) => {
       pagination: {
         page: parseInt(page),
         limit: limitInt,
-        total: count,
-        totalPages: Math.ceil(count / limitInt),
+        total: Number(count),
+        totalPages: Math.ceil(Number(count) / limitInt),
       },
       filters: {
         placeId,
@@ -226,15 +226,15 @@ app.get("/place/:placeId", async (c) => {
       pagination: {
         page: parseInt(page),
         limit: limitInt,
-        total: count,
-        totalPages: Math.ceil(count / limitInt),
+        total: Number(count),
+        totalPages: Math.ceil(Number(count) / limitInt),
       },
       stats: {
         averageRating: Number(placeStats?.averageRating) || 0,
-        totalReviews: placeStats?.totalReviews || 0,
-        verifiedReviews: placeStats?.verifiedReviews || 0,
+        totalReviews: Number(placeStats?.totalReviews || 0),
+        verifiedReviews: Number(placeStats?.verifiedReviews || 0),
         ratingDistribution: ratingDistribution.reduce((acc, stat) => {
-          acc[stat.rating] = stat.count;
+          acc[stat.rating] = Number(stat.count);
           return acc;
         }, {} as Record<number, number>),
       },

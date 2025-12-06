@@ -9,7 +9,16 @@ import { blogRoutes } from "./blog";
 import { reviewsRoutes } from "./reviews";
 import { analyticsRoutes } from "./analytics";
 
-const app = new Hono();
+const app = new Hono<{
+  Variables: {
+    adminUser: {
+      id: string;
+      name: string;
+      email: string;
+      role: string;
+    };
+  };
+}>();
 
 // Apply admin authentication to all admin routes
 app.use("/*", adminAuth);
