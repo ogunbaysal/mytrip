@@ -1,170 +1,54 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { usePlace, useTogglePlaceFeature, useTogglePlaceVerify, useUpdatePlaceStatus, Place } from "@/hooks/use-places"
 import { useParams, useRouter } from "next/navigation"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Separator } from "@/components/ui/separator"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { CalendarDays, MapPin, MoreHorizontal, CheckCircle2, Star, EyeIcon, BookOpen, User } from "lucide-react"
 import {
-  ArrowLeft,
-  MapPin,
-  Phone,
-  Mail,
-  Globe,
-  Calendar,
-  Star,
-  Edit,
-  Eye,
-  Image,
-  Users,
-  DollarSign,
-  Building
-} from "lucide-react"
-import { toast } from "sonner"
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Skeleton } from "@/components/ui/skeleton"
 import Link from "next/link"
-
-interface Place {
-  id: string
-  name: string
-  type: string
-  category: string
-  location: string
-  description: string
-  owner: {
-    id: string
-    name: string
-    email: string
-    avatar: string | null
-  }
-  status: "ACTIVE" | "INACTIVE" | "PENDING" | "SUSPENDED"
-  featured: boolean
-  rating: number
-  reviewCount: number
-  priceRange: string
-  contactInfo: {
-    phone: string
-    email: string
-    website: string | null
-  }
-  amenities: string[]
-  images: string[]
-  bookingCount: number
-  revenue: number
-  createdAt: string
-  updatedAt: string
-}
+import { formatDistanceToNow } from "date-fns"
+import { tr } from "date-fns/locale"
+import { toast } from "sonner"
 
 export default function PlaceDetailPage() {
   const params = useParams()
   const router = useRouter()
-  const [place, setPlace] = useState<Place | null>(null)
-  const [loading, setLoading] = useState(true)
+  const placeId = params.id as string
+  
+  const { data: place, isLoading, refetch } = usePlace(placeId)
+  const { mutate: updateStatus } = useUpdatePlaceStatus()
+  const { mutate: toggleVerify } = useTogglePlaceVerify()
+  const { mutate: toggleFeature } = useTogglePlaceFeature()
 
-  useEffect(() => {
-    const fetchPlace = async () => {
-      try {
-        setLoading(true)
-        // Simulate API call to fetch place details
-        await new Promise(resolve => setTimeout(resolve, 1000))
-
-        // Mock place data - in real app, this would be an API call
-        const mockPlace: Place = {
-          id: params.id as string,
-          name: "Bodrum Marina Otel",
-          type: "Otel",
-          category: "Lüks Konaklama",
-          location: "Bodrum, Muğla",
-          description: "Bodrum'un kalbinde, Ege Denizi'nin eşsiz manzarasına sahip lüks otelimiz. Modern tasarım ve Türk misafirperverliğini bir araya getiren tesisimiz, konuklarına unutulmaz bir konaklama deneyimi sunuyor. Özel plaj alanı, spa merkezi ve restoranlarımızla tatilinizi özel kılıyoruz.",
-          owner: {
-            id: "owner1",
-            name: "Mehmet Yılmaz",
-            email: "mehmet.yilmaz@example.com",
-            avatar: null,
-          },
-          status: "ACTIVE",
-          featured: true,
-          rating: 4.8,
-          reviewCount: 124,
-          priceRange: "₺₺₺₺",
-          contactInfo: {
-            phone: "+90 252 123 4567",
-            email: "info@bodrummarinaotel.com",
-            website: "https://bodrummarinaotel.com",
-          },
-          amenities: [
-            "Ücretsiz Wi-Fi",
-            "Spa & Wellness",
-            "Özel Plaj",
-            "Restoran",
-            "Otopark",
-            "Havuz",
-            "24/7 Oda Servisi",
-            "Fitness Merkezi"
-          ],
-          images: [
-            "/place-images/bodrum-marina-1.jpg",
-            "/place-images/bodrum-marina-2.jpg",
-            "/place-images/bodrum-marina-3.jpg",
-          ],
-          bookingCount: 342,
-          revenue: 856750,
-          createdAt: "2024-01-15T09:00:00Z",
-          updatedAt: "2024-11-14T10:30:00Z"
-        }
-
-        setPlace(mockPlace)
-      } catch (error) {
-        toast.error("Mekan bilgileri yüklenemedi")
-        router.push("/places")
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    if (params.id) {
-      fetchPlace()
-    }
-  }, [params.id, router])
-
-  const getStatusBadgeVariant = (status: string) => {
-    switch (status) {
-      case "ACTIVE": return "default"
-      case "INACTIVE": return "secondary"
-      case "PENDING": return "outline"
-      case "SUSPENDED": return "destructive"
-      default: return "outline"
-    }
+  const handleAction = (action: () => void, successMsg: string) => {
+      action();
+      setTimeout(() => {
+          refetch(); // Ensure data is fresh
+          toast.success(successMsg);
+      }, 500);
   }
 
-  if (loading) {
+  if (isLoading) {
     return (
-      <div className="space-y-6">
-        <div className="flex items-center gap-4">
-          <Button variant="outline" size="icon" disabled>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <h1 className="text-2xl font-bold">Mekan Detayı</h1>
+      <div className="flex-1 space-y-4 p-8 pt-6">
+        <div className="flex items-center justify-between">
+           <Skeleton className="h-8 w-64" />
+           <Skeleton className="h-10 w-32" />
         </div>
-        <div className="grid gap-6">
-          <Card>
-            <CardHeader>
-              <div className="animate-pulse space-y-2">
-                <div className="h-4 bg-gray-200 rounded w-1/3"></div>
-                <div className="h-3 bg-gray-200 rounded w-1/2"></div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="animate-pulse space-y-4">
-                <div className="h-48 bg-gray-200 rounded"></div>
-                <div className="space-y-2">
-                  <div className="h-3 bg-gray-200 rounded"></div>
-                  <div className="h-3 bg-gray-200 rounded w-3/4"></div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+         <Skeleton className="h-[200px]" />
+         <div className="grid gap-4 md:grid-cols-4">
+           {Array(4).fill(0).map((_, i) => <Skeleton key={i} className="h-32" />)}
         </div>
       </div>
     )
@@ -172,289 +56,190 @@ export default function PlaceDetailPage() {
 
   if (!place) {
     return (
-      <div className="space-y-6">
-        <div className="flex items-center gap-4">
-          <Button variant="outline" size="icon" asChild>
-            <Link href="/places">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-          </Button>
-          <h1 className="text-2xl font-bold">Mekan Detayı</h1>
-        </div>
-        <Card>
-          <CardContent className="py-8 text-center">
-            <p className="text-muted-foreground">Mekan bulunamadı.</p>
-          </CardContent>
-        </Card>
+      <div className="flex-1 p-8 pt-6 flex flex-col items-center justify-center h-[50vh]">
+        <h2 className="text-2xl font-bold mb-2">Mekan Bulunamadı</h2>
+        <Button onClick={() => router.push("/places")}>Listeye Dön</Button>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
+    <div className="flex-1 space-y-4 p-8 pt-6">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="outline" size="icon" asChild>
-            <Link href="/places">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-          </Button>
-          <h1 className="text-2xl font-bold">Mekan Detayı</h1>
+        <div className="flex flex-col space-y-1">
+             <div className="flex items-center space-x-2">
+                <h2 className="text-3xl font-bold tracking-tight">{place.name}</h2>
+                {place.verified && <CheckCircle2 className="h-6 w-6 text-blue-500" title="Doğrulanmış" />}
+                {place.featured && <Star className="h-6 w-6 fill-yellow-400 text-yellow-400" title="Öne Çıkan" />}
+             </div>
+             <p className="text-muted-foreground flex items-center">
+                 <MapPin className="h-4 w-4 mr-1" /> {place.city}, {place.district}
+             </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" asChild>
-            <Link href={`/places/${place.id}/edit`}>
-              <Edit className="h-4 w-4 mr-2" />
-              Düzenle
-            </Link>
-          </Button>
+        <div className="flex items-center space-x-2">
+           <Button variant="outline" onClick={() => router.push("/places")}>Geri Dön</Button>
+           <Button onClick={() => router.push(`/places/${place.id}/edit`)}>Düzenle</Button>
+           <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>İşlemler</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+               {place.status !== "active" && (
+                  <DropdownMenuItem 
+                    className="text-green-600"
+                    onClick={() => handleAction(() => updateStatus({ placeId: place.id, status: "active" }), "Mekan aktifleştirildi")}
+                  >
+                    Aktifleştir
+                  </DropdownMenuItem>
+                )}
+                {place.status === "active" && (
+                  <DropdownMenuItem 
+                    className="text-orange-600"
+                    onClick={() => handleAction(() => updateStatus({ placeId: place.id, status: "suspended" }), "Mekan askıya alındı")}
+                  >
+                    Askıya Al
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => handleAction(() => toggleVerify(placeId), place.verified ? "Doğrulama kaldırıldı" : "Mekan doğrulandı")}>
+                    {place.verified ? "Doğrulamayı Kaldır" : "Doğrula"}
+                </DropdownMenuItem>
+                 <DropdownMenuItem onClick={() => handleAction(() => toggleFeature(placeId), place.featured ? "Öne çıkarılanlardan kaldırıldı" : "Mekan öne çıkarıldı")}>
+                    {place.featured ? "Öne Çıkarılanlardan Kaldır" : "Öne Çıkar"}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+           </DropdownMenu>
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Main Content */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Place Info Card */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-start justify-between">
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 mb-2">
-                    <h2 className="text-xl font-semibold">{place.name}</h2>
-                    <Badge variant={getStatusBadgeVariant(place.status)}>
-                      {place.status}
-                    </Badge>
-                    {place.featured && (
-                      <Badge variant="secondary">Öne Çıkan</Badge>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                      <MapPin className="h-4 w-4" />
-                      {place.location}
-                    </span>
-                    <span>•</span>
-                    <span>{place.type}</span>
-                    <span>•</span>
-                    <span>{place.category}</span>
-                  </div>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Images */}
-              <div className="space-y-3">
-                <h3 className="font-medium flex items-center gap-2">
-                  <Image className="h-4 w-4" />
-                  Görseller
-                </h3>
-                <div className="grid gap-2 md:grid-cols-3">
-                  {place.images.map((image, index) => (
-                    <div key={index} className="aspect-video bg-gray-100 rounded-lg flex items-center justify-center">
-                      <Image className="h-8 w-8 text-gray-400" />
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Görüntülenme</CardTitle>
+            <EyeIcon className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{place.views || 0}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Puan</CardTitle>
+            <Star className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{place.rating} <span className="text-sm font-normal text-muted-foreground">/ 5</span></div>
+            <p className="text-xs text-muted-foreground">{place.reviewCount} değerlendirme</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Rezervasyonlar</CardTitle>
+            <BookOpen className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{place.bookingCount || 0}</div>
+          </CardContent>
+        </Card>
+        <Card>
+           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Durum</CardTitle>
+            <div className={`h-2 w-2 rounded-full ${place.status === "active" ? "bg-green-500" : "bg-gray-400"}`} />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold capitalize">{place.status}</div>
+            <p className="text-xs text-muted-foreground">
+               {formatDistanceToNow(new Date(place.createdAt), { addSuffix: true, locale: tr })} oluşturuldu
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="md:col-span-2 space-y-6">
+            <Card>
+                <CardHeader>
+                    <CardTitle>Genel Bakış</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div>
+                        <h4 className="font-semibold mb-1">Açıklama</h4>
+                        <p className="text-sm text-muted-foreground">{place.description}</p>
                     </div>
-                  ))}
-                </div>
-              </div>
-
-              <Separator />
-
-              {/* Description */}
-              <div>
-                <h3 className="font-medium mb-3">Açıklama</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  {place.description}
-                </p>
-              </div>
-
-              <Separator />
-
-              {/* Rating & Reviews */}
-              <div>
-                <h3 className="font-medium mb-3 flex items-center gap-2">
-                  <Star className="h-4 w-4" />
-                  Değerlendirme & İncelemeler
-                </h3>
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2">
-                    <div className="flex items-center">
-                      <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />
-                      <span className="text-lg font-semibold ml-1">{place.rating}</span>
+                    <div>
+                        <h4 className="font-semibold mb-1">Adres</h4>
+                        <p className="text-sm text-muted-foreground">{place.address}</p>
                     </div>
-                    <span className="text-sm text-muted-foreground">
-                      ({place.reviewCount} inceleme)
-                    </span>
-                  </div>
-                </div>
-              </div>
+                </CardContent>
+            </Card>
 
-              <Separator />
-
-              {/* Amenities */}
-              <div>
-                <h3 className="font-medium mb-3">Olanaklar</h3>
-                <div className="grid gap-2 md:grid-cols-2">
-                  {place.amenities.map((amenity, index) => (
-                    <div key={index} className="flex items-center gap-2 text-sm">
-                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                      {amenity}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <Separator />
-
-              {/* Contact Information */}
-              <div>
-                <h3 className="font-medium mb-3 flex items-center gap-2">
-                  <Phone className="h-4 w-4" />
-                  İletişim Bilgileri
-                </h3>
-                <div className="grid gap-2 text-sm">
-                  <div className="flex items-center gap-2">
-                    <Phone className="h-4 w-4 text-muted-foreground" />
-                    <span>{place.contactInfo.phone}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Mail className="h-4 w-4 text-muted-foreground" />
-                    <span>{place.contactInfo.email}</span>
-                  </div>
-                  {place.contactInfo.website && (
-                    <div className="flex items-center gap-2">
-                      <Globe className="h-4 w-4 text-muted-foreground" />
-                      <a
-                        href={place.contactInfo.website}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:underline"
-                      >
-                        {place.contactInfo.website}
-                      </a>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Booking Statistics */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="h-4 w-4" />
-                Rezervasyon İstatistikleri
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="bg-blue-50 p-4 rounded-lg">
-                  <div className="text-2xl font-bold text-blue-600">{place.bookingCount}</div>
-                  <div className="text-sm text-muted-foreground">Toplam Rezervasyon</div>
-                </div>
-                <div className="bg-green-50 p-4 rounded-lg">
-                  <div className="text-2xl font-bold text-green-600">
-                    ₺{place.revenue.toLocaleString("tr-TR")}
-                  </div>
-                  <div className="text-sm text-muted-foreground">Toplam Gelir</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+             <Card>
+                <CardHeader>
+                    <CardTitle>Mekan Sahibi</CardTitle>
+                </CardHeader>
+                <CardContent>
+                     {place.ownerName ? (
+                         <div className="flex items-center space-x-4">
+                             <div className="bg-primary/10 p-2 rounded-full">
+                                 <User className="h-6 w-6 text-primary" />
+                             </div>
+                             <div>
+                                 <div className="font-medium">{place.ownerName}</div>
+                                 <div className="text-sm text-muted-foreground">{place.ownerEmail}</div>
+                             </div>
+                             <Button variant="ghost" size="sm" asChild>
+                                 <Link href={`/users/${place.ownerId}`}>Profil</Link>
+                             </Button>
+                         </div>
+                     ) : (
+                         <div className="text-sm text-muted-foreground">Sahibi bulunamadı veya atanmamış.</div>
+                     )}
+                </CardContent>
+            </Card>
         </div>
 
-        {/* Sidebar */}
         <div className="space-y-6">
-          {/* Owner Info */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="h-4 w-4" />
-                Mekan Sahibi
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center gap-3">
-                <Avatar className="h-10 w-10">
-                  <AvatarImage src={place.owner.avatar || undefined} alt={place.owner.name} />
-                  <AvatarFallback>
-                    <Building className="h-5 w-5" />
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <div className="font-medium">{place.owner.name}</div>
-                  <div className="text-sm text-muted-foreground">{place.owner.email}</div>
-                </div>
-              </div>
-              <Button variant="outline" className="w-full" size="sm">
-                <Eye className="h-4 w-4 mr-2" />
-                Sahibi Görüntüle
-              </Button>
-            </CardContent>
-          </Card>
-
-          {/* Quick Info */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Hızlı Bilgiler</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="text-sm space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Mekan ID:</span>
-                  <span className="font-mono">#{place.id}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Fiyat Aralığı:</span>
-                  <span>{place.priceRange}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Durum:</span>
-                  <Badge variant={getStatusBadgeVariant(place.status)} className="text-xs">
-                    {place.status}
-                  </Badge>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Öne Çıkan:</span>
-                  <Badge variant={place.featured ? "default" : "secondary"} className="text-xs">
-                    {place.featured ? "Evet" : "Hayır"}
-                  </Badge>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Oluşturulma:</span>
-                  <span>{new Date(place.createdAt).toLocaleDateString("tr-TR")}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Güncelleme:</span>
-                  <span>{new Date(place.updatedAt).toLocaleDateString("tr-TR")}</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Quick Actions */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Hızlı İşlemler</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <Button className="w-full" asChild>
-                <Link href={`/places/${place.id}/edit`}>
-                  <Edit className="h-4 w-4 mr-2" />
-                  Mekanı Düzenle
-                </Link>
-              </Button>
-              <Button variant="outline" className="w-full">
-                <Eye className="h-4 w-4 mr-2" />
-                Site Görünümü
-              </Button>
-              <Button variant="outline" className="w-full">
-                <DollarSign className="h-4 w-4 mr-2" />
-                Finansal Rapor
-              </Button>
-            </CardContent>
-          </Card>
+            <Card>
+                <CardHeader>
+                    <CardTitle>Özellikler</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="grid grid-cols-2 gap-2">
+                        <div className="flex flex-col">
+                            <span className="text-xs text-muted-foreground">Tip</span>
+                            <span className="font-medium capitalize">{place.type}</span>
+                        </div>
+                        <div className="flex flex-col">
+                             <span className="text-xs text-muted-foreground">Kategori</span>
+                             <span className="font-medium capitalize">{place.category}</span>
+                        </div>
+                        <div className="flex flex-col">
+                             <span className="text-xs text-muted-foreground">Fiyat Seviyesi</span>
+                             <span className="font-medium">{"$".repeat(place.priceLevel)}</span>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+             {place.images && place.images.length > 0 && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Görseller</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid grid-cols-2 gap-2">
+                             {place.images.slice(0, 4).map((img, i) => (
+                                 <div key={i} className="aspect-square bg-gray-100 rounded-md overflow-hidden relative">
+                                     <img src={img} alt={`${place.name} ${i}`} className="object-cover w-full h-full" />
+                                 </div>
+                             ))}
+                        </div>
+                    </CardContent>
+                </Card>
+             )}
         </div>
       </div>
     </div>

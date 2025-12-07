@@ -13,9 +13,8 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table"
-import { ArrowUpDown, ChevronDown, MoreHorizontal, Search, Eye, Edit, MapPin, Star, Ban, Check, Camera } from "lucide-react"
+import { ArrowUpDown, ChevronDown, MoreHorizontal, Eye, Edit, Star, CheckCircle2, XCircle, Trash2 } from "lucide-react"
 import { toast } from "sonner"
-import Link from "next/link"
 import { useRouter } from "next/navigation"
 
 import { Button } from "@/components/ui/button"
@@ -38,99 +37,149 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Place, mockPlaces, placeTypes, placeStatuses, priceLevels } from "@/lib/mock-data/places"
+import { placeTypes, placeStatuses, priceLevels } from "@/lib/mock-data/places"
+import { Place } from "@/hooks/use-places"
+import { useDeletePlace, useTogglePlaceFeature, useTogglePlaceVerify, useUpdatePlaceStatus } from "@/hooks/use-places"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { Skeleton } from "@/components/ui/skeleton"
 
-export function PlacesTable() {
+// Helper functions defined outside component to remain static
+const getTypeLabel = (type: string) => {
+  const option = placeTypes.find(opt => opt.value === type)
+  return option?.label || type
+}
+
+const getStatusLabel = (status: string) => {
+  const option = placeStatuses.find(opt => opt.value === status)
+  return option?.label || status
+}
+
+const getPriceLevelLabel = (level: string) => {
+  const option = priceLevels.find(opt => opt.value === level)
+  return option?.label || level
+}
+
+const getPriceLevelColor = (level: string) => {
+  switch (level) {
+    case "budget": return "text-green-600"
+    case "moderate": return "text-blue-600"
+    case "expensive": return "text-orange-600"
+    case "luxury": return "text-purple-600"
+    default: return "text-gray-600"
+  }
+}
+
+const getStatusBadgeVariant = (status: string) => {
+  switch (status) {
+    case "active": return "default"
+    case "inactive": return "secondary"
+    case "pending": return "outline"
+    case "suspended": return "destructive"
+    default: return "outline"
+  }
+}
+
+// Separate ActionsCell component to handle hooks properly for each row
+const ActionsCell = ({ place }: { place: Place }) => {
   const router = useRouter()
-  const [data, setData] = React.useState<Place[]>(mockPlaces)
+  const [deleteId, setDeleteId] = React.useState<string | null>(null)
+  
+  const { mutate: updatePlaceStatus } = useUpdatePlaceStatus()
+  const { mutate: toggleVerify } = useTogglePlaceVerify()
+  const { mutate: toggleFeature } = useTogglePlaceFeature()
+  const { mutate: deletePlace, isPending: isDeleting } = useDeletePlace()
+
+  const handleDelete = () => {
+    if (deleteId) {
+      deletePlace(deleteId, {
+        onSuccess: () => {
+          setDeleteId(null)
+          toast.success("Mekan başarıyla silindi")
+        },
+        onError: (error: Error) => {
+          toast.error(error.message || "Silme işlemi başarısız")
+        }
+      })
+    }
+  }
+
+  return (
+    <>
+      <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Emin misiniz?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Bu işlem geri alınamaz. Bu mekanı silmek istediğinize emin misiniz?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>İptal</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
+              {isDeleting ? "Siliniyor..." : "Sil"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" className="h-8 w-8 p-0">
+            <span className="sr-only">Menüyü aç</span>
+            <MoreHorizontal className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuLabel>İşlemler</DropdownMenuLabel>
+          <DropdownMenuItem onClick={() => router.push(`/places/${place.id}`)}>
+            <Eye className="mr-2 h-4 w-4" /> Detayları Gör
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => router.push(`/places/${place.id}/edit`)}>
+            <Edit className="mr-2 h-4 w-4" /> Düzenle
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          {place.status !== "active" && (
+            <DropdownMenuItem onClick={() => updatePlaceStatus({ placeId: place.id, status: "active" })}>
+              <CheckCircle2 className="mr-2 h-4 w-4 text-green-600" /> Aktifleştir
+            </DropdownMenuItem>
+          )}
+          {place.status === "active" && (
+            <DropdownMenuItem onClick={() => updatePlaceStatus({ placeId: place.id, status: "suspended" })}>
+              <XCircle className="mr-2 h-4 w-4 text-orange-600" /> Askıya Al
+            </DropdownMenuItem>
+          )}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => toggleVerify(place.id)}>
+            {place.verified ? "Doğrulamayı Kaldır" : "Doğrula"}
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => toggleFeature(place.id)}>
+            {place.featured ? "Öne Çıkarılanlardan Kaldır" : "Öne Çıkar"}
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem className="text-red-600" onClick={() => setDeleteId(place.id)}>
+            <Trash2 className="mr-2 h-4 w-4" /> Sil
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </>
+  )
+}
+
+export function PlacesTable({ data, isLoading }: { data: Place[], isLoading: boolean }) {
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
   const [rowSelection, setRowSelection] = React.useState({})
-
-  const handlePlaceAction = (action: string, place: Place) => {
-    switch (action) {
-      case "view":
-        router.push(`/places/${place.id}`)
-        break
-      case "edit":
-        router.push(`/places/${place.id}/edit`)
-        break
-      case "toggle_featured":
-        setData(prev =>
-          prev.map(p => p.id === place.id ? { ...p, featured: !p.featured } : p)
-        )
-        toast.success(`Mekan ${place.featured ? 'öne çıkarılmaktan kaldırıldı' : 'öne çıkarıldı'}: ${place.name}`)
-        break
-      case "verify":
-        if (place.verified) {
-          toast.info(`Mekan zaten doğrulanmış: ${place.name}`)
-        } else {
-          setData(prev =>
-            prev.map(p => p.id === place.id ? { ...p, verified: true } : p)
-          )
-          toast.success(`Mekan doğrulandı: ${place.name}`)
-        }
-        break
-      case "suspend":
-        if (place.status === "suspended") {
-          toast.info(`Mekan zaten askıya alınmış: ${place.name}`)
-        } else {
-          setData(prev =>
-            prev.map(p => p.id === place.id ? { ...p, status: "suspended" as const } : p)
-          )
-          toast.success(`Mekan askıya alındı: ${place.name}`)
-        }
-        break
-      case "activate":
-        if (place.status === "active") {
-          toast.info(`Mekan zaten aktif: ${place.name}`)
-        } else {
-          setData(prev =>
-            prev.map(p => p.id === place.id ? { ...p, status: "active" as const } : p)
-          )
-          toast.success(`Mekan aktif edildi: ${place.name}`)
-        }
-        break
-    }
-  }
-
-  const getTypeLabel = (type: string) => {
-    const option = placeTypes.find(opt => opt.value === type)
-    return option?.label || type
-  }
-
-  const getStatusLabel = (status: string) => {
-    const option = placeStatuses.find(opt => opt.value === status)
-    return option?.label || status
-  }
-
-  const getPriceLevelLabel = (level: string) => {
-    const option = priceLevels.find(opt => opt.value === level)
-    return option?.label || level
-  }
-
-  const getPriceLevelColor = (level: string) => {
-    switch (level) {
-      case "budget": return "text-green-600"
-      case "moderate": return "text-blue-600"
-      case "expensive": return "text-orange-600"
-      case "luxury": return "text-purple-600"
-      default: return "text-gray-600"
-    }
-  }
-
-  const getStatusBadgeVariant = (status: string) => {
-    switch (status) {
-      case "active": return "default"
-      case "inactive": return "secondary"
-      case "pending": return "outline"
-      case "suspended": return "destructive"
-      default: return "outline"
-    }
-  }
 
   const columns: ColumnDef<Place>[] = [
     {
@@ -240,7 +289,7 @@ export function PlacesTable() {
         return (
           <div className="flex items-center space-x-1">
             <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-            <span className="font-medium">{rating.toFixed(1)}</span>
+            <span className="font-medium">{Number(rating || 0).toFixed(1)}</span>
             <span className="text-sm text-muted-foreground">({reviewCount})</span>
           </div>
         )
@@ -266,39 +315,42 @@ export function PlacesTable() {
             variant="ghost"
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
             className="h-8 px-2"
+            title="Görüntülenme Sayısı"
           >
-            Görüntülenme
+            <Eye className="h-4 w-4" />
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
         )
       },
       cell: ({ row }) => {
         const views = row.getValue("views") as number
-        const bookingCount = row.original.bookingCount
         return (
-          <div className="space-y-1">
-            <div className="font-medium">{views.toLocaleString("tr-TR")}</div>
-            {bookingCount && (
-              <div className="text-xs text-muted-foreground">
-                {bookingCount} rezervasyon
-              </div>
-            )}
+          <div className="font-medium">
+            {views.toLocaleString()}
           </div>
         )
       },
     },
     {
-      accessorKey: "contact.phone",
+      accessorKey: "contactInfo",
       header: "İletişim",
       cell: ({ row }) => {
         const place = row.original
+        let contact = place.contactInfo;
+        if (typeof contact === 'string') {
+            try {
+                contact = JSON.parse(contact);
+            } catch {
+                contact = {};
+            }
+        }
         return (
           <div className="space-y-1 text-sm">
-            {place.contact.phone && (
-              <div>{place.contact.phone}</div>
+            {contact?.phone && (
+              <div>{contact.phone}</div>
             )}
-            {place.contact.email && (
-              <div className="text-muted-foreground">{place.contact.email}</div>
+            {contact?.email && (
+              <div className="text-muted-foreground">{contact.email}</div>
             )}
           </div>
         )
@@ -319,84 +371,20 @@ export function PlacesTable() {
         )
       },
       cell: ({ row }) => {
-        const date = row.getValue("createdAt") as Date
+        const dateStr = row.getValue("createdAt") as string
+        const date = new Date(dateStr)
         return date.toLocaleDateString("tr-TR")
       },
     },
     {
       id: "actions",
       enableHiding: false,
-      cell: ({ row }) => {
-        const place = row.original
-
-        return (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-8 w-8 p-0">
-                <span className="sr-only">Menüyü aç</span>
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>İşlemler</DropdownMenuLabel>
-              <DropdownMenuItem
-                onClick={() => handlePlaceAction("view", place)}
-                className="cursor-pointer"
-              >
-                <Eye className="mr-2 h-4 w-4" />
-                Görüntüle
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => handlePlaceAction("edit", place)}
-                className="cursor-pointer"
-              >
-                <Edit className="mr-2 h-4 w-4" />
-                Düzenle
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => handlePlaceAction("toggle_featured", place)}
-                className="cursor-pointer"
-              >
-                <Star className="mr-2 h-4 w-4" />
-                {place.featured ? "Öne Çıkarımdan Kaldır" : "Öne Çıkar"}
-              </DropdownMenuItem>
-              {!place.verified && (
-                <DropdownMenuItem
-                  onClick={() => handlePlaceAction("verify", place)}
-                  className="cursor-pointer text-green-600"
-                >
-                  <Check className="mr-2 h-4 w-4" />
-                  Doğrula
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuSeparator />
-              {place.status === "active" ? (
-                <DropdownMenuItem
-                  onClick={() => handlePlaceAction("suspend", place)}
-                  className="cursor-pointer text-orange-600"
-                >
-                  <Ban className="mr-2 h-4 w-4" />
-                  Askıya Al
-                </DropdownMenuItem>
-              ) : (
-                <DropdownMenuItem
-                  onClick={() => handlePlaceAction("activate", place)}
-                  className="cursor-pointer text-green-600"
-                >
-                  <Check className="mr-2 h-4 w-4" />
-                  Aktif Et
-                </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )
-      },
+      cell: ({ row }) => <ActionsCell place={row.original} />,
     },
   ]
 
   const table = useReactTable({
-    data,
+    data: data || [],
     columns,
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
@@ -414,66 +402,54 @@ export function PlacesTable() {
     },
   })
 
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center space-x-2">
+            <Skeleton className="h-4 w-[250px]" />
+            <Skeleton className="h-4 w-[250px]" />
+        </div>
+        <div className="flex items-center space-x-2 py-4">
+            <Skeleton className="h-10 w-[200px]" />
+            <Skeleton className="h-10 w-[100px]" />
+        </div>
+        <Skeleton className="h-[400px] w-full" />
+      </div>
+    )
+  }
+
   return (
-    <div className="space-y-4">
-      {/* Card Header */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Mekan Yönetimi</CardTitle>
-              <CardDescription>
-                Sistemdeki tüm mekanları görüntüleyin ve yönetin. Toplam {data.length} mekan bulunmaktadır.
-              </CardDescription>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Button variant="outline">
-                <MapPin className="mr-2 h-4 w-4" />
-                Harita Görünümü
-              </Button>
-              <Button asChild>
-                <Link href="/places/create">Mekan Ekle</Link>
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {/* Filters and Search */}
-          <div className="flex items-center justify-between py-4">
-            <div className="flex items-center space-x-2">
-              <div className="relative">
-                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Mekan ara..."
-                  value={(table.getColumn("name")?.getFilterValue() as string) ?? ""}
-                  onChange={(event) =>
-                    table.getColumn("name")?.setFilterValue(event.target.value)
-                  }
-                  className="pl-8 w-[300px]"
-                />
-              </div>
-            </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="ml-auto">
-                  Sütunlar <ChevronDown className="ml-2 h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {table
-                  .getAllColumns()
-                  .filter((column) => column.getCanHide())
-                  .map((column) => {
-                    return (
-                      <DropdownMenuCheckboxItem
-                        key={column.id}
-                        className="capitalize"
-                        checked={column.getIsVisible()}
-                        onCheckedChange={(value) =>
-                          column.toggleVisibility(!!value)
-                        }
-                      >
-                        {column.id === "name" ? "Mekan" :
+    <div className="w-full">
+      <div className="flex items-center py-4">
+        <Input
+          placeholder="Mekan ara..."
+          value={(table.getColumn("name")?.getFilterValue() as string) ?? ""}
+          onChange={(event) =>
+            table.getColumn("name")?.setFilterValue(event.target.value)
+          }
+          className="max-w-sm"
+        />
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className="ml-auto">
+              Sütunlar <ChevronDown className="ml-2 h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {table
+              .getAllColumns()
+              .filter((column) => column.getCanHide())
+              .map((column) => {
+                return (
+                  <DropdownMenuCheckboxItem
+                    key={column.id}
+                    className="capitalize"
+                    checked={column.getIsVisible()}
+                    onCheckedChange={(value) =>
+                      column.toggleVisibility(!!value)
+                    }
+                  >
+                    {column.id === "name" ? "Mekan" :
                          column.id === "type" ? "Tür" :
                          column.id === "status" ? "Durum" :
                          column.id === "rating" ? "Değerlendirme" :
@@ -482,107 +458,94 @@ export function PlacesTable() {
                          column.id === "contact.phone" ? "İletişim" :
                          column.id === "createdAt" ? "Kayıt Tarihi" :
                          column.id === "actions" ? "İşlemler" :
+                         column.id === "ownerName" ? "Mekan Sahibi" :
+                         column.id === "category" ? "Kategori" :
+                         column.id === "flags" ? "Özellikler" :
                          column.id}
-                      </DropdownMenuCheckboxItem>
-                    )
-                  })}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+                  </DropdownMenuCheckboxItem>
+                )
+              })}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
 
-          {/* Selected Actions */}
-          {table.getFilteredSelectedRowModel().rows.length > 0 && (
-            <div className="flex items-center space-x-2 py-2">
-              <span className="text-sm text-muted-foreground">
-                {table.getFilteredSelectedRowModel().rows.length} mekan seçildi
-              </span>
-              <Button variant="outline" size="sm">
-                Toplu İşlemler
-              </Button>
-            </div>
-          )}
-
-          {/* Table */}
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                {table.getHeaderGroups().map((headerGroup) => (
-                  <TableRow key={headerGroup.id}>
-                    {headerGroup.headers.map((header) => {
-                      return (
-                        <TableHead key={header.id}>
-                          {header.isPlaceholder
-                            ? null
-                            : flexRender(
-                                header.column.columnDef.header,
-                                header.getContext()
-                              )}
-                        </TableHead>
-                      )
-                    })}
-                  </TableRow>
-                ))}
-              </TableHeader>
-              <TableBody>
-                {table.getRowModel().rows?.length ? (
-                  table.getRowModel().rows.map((row) => (
-                    <TableRow
-                      key={row.id}
-                      data-state={row.getIsSelected() && "selected"}
-                    >
-                      {row.getVisibleCells().map((cell) => (
-                        <TableCell key={cell.id}>
-                          {flexRender(
-                            cell.column.columnDef.cell,
-                            cell.getContext()
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id}>
+                {headerGroup.headers.map((header) => {
+                  return (
+                    <TableHead key={header.id}>
+                      {header.isPlaceholder
+                        ? null
+                        : flexRender(
+                            header.column.columnDef.header,
+                            header.getContext()
                           )}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell
-                      colSpan={columns.length}
-                      className="h-24 text-center"
-                    >
-                      Sonuç bulunamadı.
+                    </TableHead>
+                  )
+                })}
+              </TableRow>
+            ))}
+          </TableHeader>
+          <TableBody>
+            {table.getRowModel().rows?.length ? (
+              table.getRowModel().rows.map((row) => (
+                <TableRow
+                  key={row.id}
+                  data-state={row.getIsSelected() && "selected"}
+                >
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell key={cell.id}>
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext()
+                      )}
                     </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
+                  ))}
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell
+                  colSpan={columns.length}
+                  className="h-24 text-center"
+                >
+                  Sonuç bulunamadı.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
 
-          {/* Pagination */}
-          <div className="flex items-center justify-between space-x-2 py-4">
-            <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-              <span>
-                {table.getFilteredSelectedRowModel().rows.length} /{" "}
-                {table.getFilteredRowModel().rows.length} mekan seçildi
-              </span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => table.previousPage()}
-                disabled={!table.getCanPreviousPage()}
-              >
-                Önceki
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => table.nextPage()}
-                disabled={!table.getCanNextPage()}
-              >
-                Sonraki
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex items-center justify-between space-x-2 py-4">
+        <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+          <span>
+            {table.getFilteredSelectedRowModel().rows.length} /{" "}
+            {table.getFilteredRowModel().rows.length} mekan seçildi
+          </span>
+        </div>
+        <div className="space-x-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => table.previousPage()}
+            disabled={!table.getCanPreviousPage()}
+          >
+            Önceki
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => table.nextPage()}
+            disabled={!table.getCanNextPage()}
+          >
+            Sonraki
+          </Button>
+        </div>
+      </div>
     </div>
   )
 }

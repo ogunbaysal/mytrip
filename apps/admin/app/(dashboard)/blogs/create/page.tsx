@@ -1,613 +1,459 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useForm } from "react-hook-form"
+import * as z from "zod"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Switch } from "@/components/ui/switch"
-import { Separator } from "@/components/ui/separator"
-import { Badge } from "@/components/ui/badge"
 import {
-  ArrowLeft,
-  FileText,
-  Calendar,
-  User,
-  Tag,
-  Image,
-  Link,
-  Save,
-  Eye,
-  AlertCircle,
-  Upload,
-  Plus,
-  X
-} from "lucide-react"
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form"
+import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
 import { toast } from "sonner"
+import { useRouter } from "next/navigation"
+import { useCreateBlog } from "@/hooks/use-blogs"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Separator } from "@/components/ui/separator"
+import { useEffect } from "react"
+import { ImageUpload } from "@/components/ui/image-upload"
+import { TiptapEditor } from "@/components/ui/tiptap-editor"
+
+const CATEGORIES = ["travel", "food", "culture", "history", "activity", "lifestyle", "business"] as const
+const STATUSES = ["published", "draft", "pending_review", "archived"] as const
+const LANGUAGES = ["tr", "en"] as const
+const READING_LEVELS = ["easy", "medium", "hard"] as const
+const AUDIENCES = ["travelers", "locals", "business_owners", "all"] as const
+
+const blogFormSchema = z.object({
+  title: z.string().min(2, {
+    message: "Başlık en az 2 karakter olmalıdır.",
+  }),
+  slug: z.string().optional(),
+  excerpt: z.string().optional(),
+  content: z.string().min(10, {
+    message: "İçerik en az 10 karakter olmalıdır.",
+  }),
+  category: z.enum(CATEGORIES),
+  status: z.enum(STATUSES),
+  language: z.enum(LANGUAGES),
+  readingLevel: z.enum(READING_LEVELS),
+  targetAudience: z.enum(AUDIENCES),
+  heroImage: z.string().optional().or(z.literal("")),
+  featuredImage: z.string().optional().or(z.literal("")),
+  tags: z.string().optional(),
+  seoTitle: z.string().optional(),
+  seoDescription: z.string().optional(),
+  seoKeywords: z.string().optional(),
+})
+
+type BlogFormValues = z.infer<typeof blogFormSchema>
+
+const defaultValues: BlogFormValues = {
+  title: "",
+  slug: "",
+  excerpt: "",
+  content: "",
+  category: "travel",
+  status: "draft",
+  language: "tr",
+  readingLevel: "medium",
+  targetAudience: "travelers",
+  heroImage: "",
+  featuredImage: "",
+  tags: "",
+  seoTitle: "",
+  seoDescription: "",
+  seoKeywords: "",
+}
+
+// Slug generation utility
+const generateSlug = (text: string) => {
+    return text
+        .toString()
+        .toLowerCase()
+        .replace(/\s+/g, '-')           // Replace spaces with -
+        .replace(/[^\w\-]+/g, '')       // Remove all non-word chars
+        .replace(/\-\-+/g, '-')         // Replace multiple - with single -
+        .replace(/^-+/, '')             // Trim - from start of text
+        .replace(/-+$/, '');            // Trim - from end of text
+}
 
 export default function CreateBlogPage() {
   const router = useRouter()
-  const [isSaving, setIsSaving] = useState(false)
-  const [isPreview, setIsPreview] = useState(false)
+  const { mutate: createBlog, isPending } = useCreateBlog()
 
-  // Form state
-  const [formData, setFormData] = useState({
-    title: "",
-    slug: "",
-    content: "",
-    excerpt: "",
-    author: "",
-    category: "",
-    tags: [] as string[],
-    featuredImage: "",
-    images: [] as string[],
-    seoTitle: "",
-    seoDescription: "",
-    isPublished: false,
-    isFeatured: false,
-    publishDate: new Date().toISOString().split('T')[0]
+  const form = useForm<BlogFormValues>({
+    resolver: zodResolver(blogFormSchema) as any,
+    defaultValues,
   })
 
-  const [newTag, setNewTag] = useState("")
-  const [newImage, setNewImage] = useState("")
+  // Auto-generate slug from title
+  const title = form.watch("title");
+  useEffect(() => {
+      if (title) {
+          const slug = generateSlug(title);
+          form.setValue("slug", slug, { shouldValidate: true });
+      }
+  }, [title, form]);
 
-  const categories = [
-    { value: "travel-guide", label: "Seyahat Rehberi" },
-    { value: "destination", label: "Rota Önerileri" },
-    { value: "culture", label: "Kültür ve Tarih" },
-    { value: "food", label: "Yeme İçme" },
-    { value: "activity", label: "Aktiviteler" },
-    { value: "accommodation", label: "Konaklama" },
-    { value: "lifestyle", label: "Yaşam Tarzı" },
-    { value: "news", label: "Haberler" }
-  ]
-
-  const authors = [
-    { value: "admin", label: "Admin User" },
-    { value: "editor1", label: "Editor One" },
-    { value: "editor2", label: "Editor Two" },
-    { value: "guest1", label: "Guest Author" }
-  ]
-
-  const handleInputChange = (field: string, value: string | boolean) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
-  }
-
-  const generateSlug = (title: string) => {
-    return title
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/(^-|-$)/g, '')
-  }
-
-  const handleTitleChange = (title: string) => {
-    handleInputChange("title", title)
-    if (!formData.slug) {
-      handleInputChange("slug", generateSlug(title))
-    }
-  }
-
-  const addTag = () => {
-    if (newTag.trim() && !formData.tags.includes(newTag.trim())) {
-      setFormData(prev => ({
-        ...prev,
-        tags: [...prev.tags, newTag.trim()]
-      }))
-      setNewTag("")
-    }
-  }
-
-  const removeTag = (tag: string) => {
-    setFormData(prev => ({
-      ...prev,
-      tags: prev.tags.filter(t => t !== tag)
-    }))
-  }
-
-  const addImage = () => {
-    if (newImage.trim() && !formData.images.includes(newImage.trim())) {
-      setFormData(prev => ({
-        ...prev,
-        images: [...prev.images, newImage.trim()]
-      }))
-      setNewImage("")
-    }
-  }
-
-  const removeImage = (image: string) => {
-    setFormData(prev => ({
-      ...prev,
-      images: prev.images.filter(img => img !== image)
-    }))
-  }
-
-  const handleSave = async () => {
-    if (!formData.title || !formData.content || !formData.author) {
-      toast.error("Lütfen zorunlu alanları doldurun")
-      return
+  function onSubmit(data: BlogFormValues) {
+    const formattedData = {
+      ...data,
+      tags: data.tags ? data.tags.split(",").map(t => t.trim()) : [],
+      seoKeywords: data.seoKeywords ? data.seoKeywords.split(",").map(t => t.trim()) : [],
     }
 
-    setIsSaving(true)
-    try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500))
-      toast.success("Blog yazısı başarıyla oluşturuldu")
-      router.push("/blogs")
-    } catch (error) {
-      toast.error("Blog yazısı oluşturulurken bir hata oluştu")
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
-  const handlePublish = async () => {
-    if (!formData.title || !formData.content || !formData.author) {
-      toast.error("Lütfen zorunlu alanları doldurun")
-      return
-    }
-
-    setIsSaving(true)
-    try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500))
-      handleInputChange("isPublished", true)
-      toast.success("Blog yazısı yayınlandı")
-      router.push("/blogs")
-    } catch (error) {
-      toast.error("Blog yazısı yayınlanırken bir hata oluştu")
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
-  const handlePreview = () => {
-    setIsPreview(!isPreview)
-  }
-
-  if (isPreview) {
-    return (
-      <div className="flex-1 space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <Button variant="outline" size="sm" onClick={() => setIsPreview(false)}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Düzenlemeye Dön
-            </Button>
-            <div>
-              <h2 className="text-2xl font-bold tracking-tight">Blog Önizleme</h2>
-              <p className="text-muted-foreground">
-                Oluşturduğunuz blog yazısının nasıl görüneceğini kontrol edin.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <Card>
-          <CardHeader>
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <div className="flex items-center space-x-2 mb-2">
-                  {formData.isFeatured && (
-                    <Badge variant="secondary">Öne Çıkan</Badge>
-                  )}
-                  {formData.isPublished ? (
-                    <Badge className="bg-green-100 text-green-800">Yayında</Badge>
-                  ) : (
-                    <Badge variant="outline">Taslak</Badge>
-                  )}
-                </div>
-                <CardTitle className="text-3xl mb-2">{formData.title || "Başlık"}</CardTitle>
-                <CardDescription className="flex items-center space-x-4">
-                  <div className="flex items-center">
-                    <User className="h-4 w-4 mr-1" />
-                    {formData.author || "Yazar"}
-                  </div>
-                  <div className="flex items-center">
-                    <Calendar className="h-4 w-4 mr-1" />
-                    {formData.publishDate ? new Date(formData.publishDate).toLocaleDateString('tr-TR') : new Date().toLocaleDateString('tr-TR')}
-                  </div>
-                  <div className="flex items-center">
-                    <FileText className="h-4 w-4 mr-1" />
-                    {Math.ceil(formData.content.length / 1000)} dk okuma süresi
-                  </div>
-                </CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {formData.featuredImage && (
-              <div className="aspect-video bg-gray-100 rounded-lg flex items-center justify-center">
-                <Image className="h-8 w-8 text-gray-400" />
-                <span className="ml-2 text-sm text-gray-500">{formData.featuredImage}</span>
-              </div>
-            )}
-
-            {formData.excerpt && (
-              <div className="text-lg text-muted-foreground border-l-4 border-gray-200 pl-4">
-                {formData.excerpt}
-              </div>
-            )}
-
-            <div>
-              <h3 className="font-semibold mb-4">İçerik</h3>
-              <div className="prose max-w-none">
-                {formData.content ? (
-                  <div className="whitespace-pre-wrap">{formData.content}</div>
-                ) : (
-                  <p className="text-muted-foreground">Blog içeriği eklenmemiş.</p>
-                )}
-              </div>
-            </div>
-
-            {formData.tags.length > 0 && (
-              <div>
-                <h3 className="font-semibold mb-3">Etiketler</h3>
-                <div className="flex flex-wrap gap-2">
-                  {formData.tags.map((tag, index) => (
-                    <Badge key={index} variant="outline">
-                      <Tag className="h-3 w-3 mr-1" />
-                      {tag}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {formData.images.length > 0 && (
-              <div>
-                <h3 className="font-semibold mb-3">Görseller</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {formData.images.map((image, index) => (
-                    <div key={index} className="aspect-video bg-gray-100 rounded-lg flex items-center justify-center">
-                      <Image className="h-8 w-8 text-gray-400" />
-                      <span className="ml-2 text-sm text-gray-500">{image}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-    )
+    createBlog(formattedData, {
+      onSuccess: () => {
+        toast.success("Blog yazısı başarıyla oluşturuldu")
+        router.push("/blogs")
+      },
+      onError: (error) => {
+        toast.error("Blog yazısı oluşturulurken bir hata oluştu: " + error.message)
+      },
+    })
   }
 
   return (
-    <div className="flex-1 space-y-4">
+    <div className="flex-1 space-y-4 p-8 pt-6">
       <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <Button variant="outline" size="sm" onClick={() => router.back()}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Geri
-          </Button>
-          <div>
-            <h2 className="text-2xl font-bold tracking-tight">Yeni Blog Yazısı</h2>
-            <p className="text-muted-foreground">
-              Platforma yeni bir blog yazısı ekleyin.
-            </p>
+        <h2 className="text-3xl font-bold tracking-tight">Yeni Blog Yazısı</h2>
+      </div>
+      <Separator />
+      
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="md:col-span-2 space-y-4">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Genel Bilgiler</CardTitle>
+                        <CardDescription>Blog yazısının temel içeriğini giriniz.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <FormField
+                            control={form.control}
+                            name="title"
+                            render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Başlık</FormLabel>
+                                <FormControl>
+                                <Input placeholder="Blog yazısı başlığı..." {...field} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="slug"
+                            render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>URL Yolu (Slug)</FormLabel>
+                                <FormControl>
+                                <Input placeholder="ornek-blog-yazisi" {...field} />
+                                </FormControl>
+                                <FormDescription>Başlığa göre otomatik oluşturulur.</FormDescription>
+                                <FormMessage />
+                            </FormItem>
+                            )}
+                        />
+                         <FormField
+                            control={form.control}
+                            name="excerpt"
+                            render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Özet</FormLabel>
+                                <FormControl>
+                                <Textarea className="min-h-[100px]" placeholder="Kısa özet..." {...field} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="content"
+                            render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>İçerik</FormLabel>
+                                <FormControl>
+                                    <TiptapEditor
+                                        value={field.value}
+                                        onChange={(val) => field.onChange(val)}
+                                    />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                            )}
+                        />
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Görseller</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                         <FormField
+                            control={form.control}
+                            name="heroImage"
+                            render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Kapak Görseli</FormLabel>
+                                <FormControl>
+                                    <ImageUpload 
+                                        value={field.value} 
+                                        onChange={field.onChange}
+                                        onRemove={() => field.onChange("")}
+                                    />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                            )}
+                        />
+                         <FormField
+                            control={form.control}
+                            name="featuredImage"
+                            render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Öne Çıkan Görsel</FormLabel>
+                                <FormControl>
+                                     <ImageUpload 
+                                        value={field.value} 
+                                        onChange={field.onChange}
+                                        onRemove={() => field.onChange("")}
+                                        label="Öne Çıkan Görsel Yükle"
+                                    />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                            )}
+                        />
+                    </CardContent>
+                </Card>
+
+                 <Card>
+                    <CardHeader>
+                        <CardTitle>SEO Ayarları</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                         <FormField
+                            control={form.control}
+                            name="seoTitle"
+                            render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>SEO Başlığı</FormLabel>
+                                <FormControl>
+                                <Input placeholder="Meta title..." {...field} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                            )}
+                        />
+                         <FormField
+                            control={form.control}
+                            name="seoDescription"
+                            render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>SEO Açıklaması</FormLabel>
+                                <FormControl>
+                                <Textarea placeholder="Meta description..." {...field} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                            )}
+                        />
+                         <FormField
+                            control={form.control}
+                            name="seoKeywords"
+                            render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>SEO Anahtar Kelimeler</FormLabel>
+                                <FormControl>
+                                <Input placeholder="virgül ile ayırın: seyahat, tatil, otel" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                            )}
+                        />
+                    </CardContent>
+                </Card>
+            </div>
+
+            <div className="space-y-4">
+                 <Card>
+                    <CardHeader>
+                        <CardTitle>Yayın Ayarları</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <FormField
+                            control={form.control}
+                            name="status"
+                            render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Durum</FormLabel>
+                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <FormControl>
+                                    <SelectTrigger>
+                                    <SelectValue placeholder="Durum seçiniz" />
+                                    </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                    <SelectItem value="draft">Taslak</SelectItem>
+                                    <SelectItem value="published">Yayında</SelectItem>
+                                    <SelectItem value="pending_review">İncelemede</SelectItem>
+                                    <SelectItem value="archived">Arşivlendi</SelectItem>
+                                </SelectContent>
+                                </Select>
+                                <FormMessage />
+                            </FormItem>
+                            )}
+                        />
+                         <FormField
+                            control={form.control}
+                            name="category"
+                            render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Kategori</FormLabel>
+                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <FormControl>
+                                    <SelectTrigger>
+                                    <SelectValue placeholder="Kategori seçiniz" />
+                                    </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                    <SelectItem value="travel">Seyahat</SelectItem>
+                                    <SelectItem value="food">Yeme & İçme</SelectItem>
+                                    <SelectItem value="culture">Kültür</SelectItem>
+                                    <SelectItem value="history">Tarih</SelectItem>
+                                    <SelectItem value="activity">Aktivite</SelectItem>
+                                    <SelectItem value="lifestyle">Yaşam Tarzı</SelectItem>
+                                    <SelectItem value="business">İş Dünyası</SelectItem>
+                                </SelectContent>
+                                </Select>
+                                <FormMessage />
+                            </FormItem>
+                            )}
+                        />
+                         <FormField
+                            control={form.control}
+                            name="language"
+                            render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Dil</FormLabel>
+                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <FormControl>
+                                    <SelectTrigger>
+                                    <SelectValue placeholder="Dil seçiniz" />
+                                    </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                    <SelectItem value="tr">Türkçe</SelectItem>
+                                    <SelectItem value="en">İngilizce</SelectItem>
+                                </SelectContent>
+                                </Select>
+                                <FormMessage />
+                            </FormItem>
+                            )}
+                        />
+                         <FormField
+                            control={form.control}
+                            name="tags"
+                            render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Etiketler</FormLabel>
+                                <FormControl>
+                                <Input placeholder="virgül ile ayırın: gezi, istanbul" {...field} />
+                                </FormControl>
+                                <FormDescription>
+                                    İçerikle ilgili etiketler.
+                                </FormDescription>
+                                <FormMessage />
+                            </FormItem>
+                            )}
+                        />
+                    </CardContent>
+                </Card>
+
+                 <Card>
+                    <CardHeader>
+                        <CardTitle>Hedefleme</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                         <FormField
+                            control={form.control}
+                            name="readingLevel"
+                            render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Okuma Seviyesi</FormLabel>
+                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <FormControl>
+                                    <SelectTrigger>
+                                    <SelectValue placeholder="Seviye seçiniz" />
+                                    </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                    <SelectItem value="easy">Kolay</SelectItem>
+                                    <SelectItem value="medium">Orta</SelectItem>
+                                    <SelectItem value="hard">Zor</SelectItem>
+                                </SelectContent>
+                                </Select>
+                                <FormMessage />
+                            </FormItem>
+                            )}
+                        />
+                         <FormField
+                            control={form.control}
+                            name="targetAudience"
+                            render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Hedef Kitle</FormLabel>
+                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <FormControl>
+                                    <SelectTrigger>
+                                    <SelectValue placeholder="Kitle seçiniz" />
+                                    </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                    <SelectItem value="travelers">Gezginler</SelectItem>
+                                    <SelectItem value="locals">Yerel Halk</SelectItem>
+                                    <SelectItem value="business_owners">İşletme Sahipleri</SelectItem>
+                                    <SelectItem value="all">Herkes</SelectItem>
+                                </SelectContent>
+                                </Select>
+                                <FormMessage />
+                            </FormItem>
+                            )}
+                        />
+                    </CardContent>
+                </Card>
+            </div>
           </div>
-        </div>
-        <div className="flex space-x-2">
-          <Button variant="outline" onClick={handlePreview}>
-            <Eye className="h-4 w-4 mr-2" />
-            Önizle
-          </Button>
-          <Button variant="outline" onClick={handleSave} disabled={isSaving}>
-            <Save className="h-4 w-4 mr-2" />
-            {isSaving ? "Kaydediliyor..." : "Taslak Olarak Kaydet"}
-          </Button>
-          <Button onClick={handlePublish} disabled={isSaving}>
-            <Save className="h-4 w-4 mr-2" />
-            {isSaving ? "Yayınlanıyor..." : "Yayınla"}
-          </Button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Temel Bilgiler</CardTitle>
-              <CardDescription>
-                Blog yazısının temel bilgilerini girin.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="title">Başlık *</Label>
-                <Input
-                  id="title"
-                  value={formData.title}
-                  onChange={(e) => handleTitleChange(e.target.value)}
-                  placeholder="Blog yazısının başlığını girin"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="slug">URL (Slug)</Label>
-                <Input
-                  id="slug"
-                  value={formData.slug}
-                  onChange={(e) => handleInputChange("slug", e.target.value)}
-                  placeholder="url-slug"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="author">Yazar *</Label>
-                  <Select value={formData.author} onValueChange={(value) => handleInputChange("author", value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Yazar seçin" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {authors.map(author => (
-                        <SelectItem key={author.value} value={author.value}>
-                          {author.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="category">Kategori</Label>
-                  <Select value={formData.category} onValueChange={(value) => handleInputChange("category", value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Kategori seçin" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories.map(cat => (
-                        <SelectItem key={cat.value} value={cat.value}>
-                          {cat.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="excerpt">Özet</Label>
-                <Textarea
-                  id="excerpt"
-                  value={formData.excerpt}
-                  onChange={(e) => handleInputChange("excerpt", e.target.value)}
-                  rows={3}
-                  placeholder="Blog yazısının kısa özetini girin..."
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="content">İçerik *</Label>
-                <Textarea
-                  id="content"
-                  value={formData.content}
-                  onChange={(e) => handleInputChange("content", e.target.value)}
-                  rows={15}
-                  placeholder="Blog yazısının içeriğini buraya yazın..."
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Medya</CardTitle>
-              <CardDescription>
-                Blog yazısına görseller ekleyin.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="featuredImage">Öne Çıkan Görsel</Label>
-                <Input
-                  id="featuredImage"
-                  value={formData.featuredImage}
-                  onChange={(e) => handleInputChange("featuredImage", e.target.value)}
-                  placeholder="Öne çıkan görselin URL'i"
-                />
-              </div>
-
-              <Separator />
-
-              <div className="space-y-2">
-                <Label>Ek Görseller</Label>
-                <div className="flex space-x-2">
-                  <Input
-                    value={newImage}
-                    onChange={(e) => setNewImage(e.target.value)}
-                    placeholder="Görsel URL'i veya adı"
-                    onKeyPress={(e) => e.key === "Enter" && addImage()}
-                  />
-                  <Button onClick={addImage} size="sm">
-                    <Upload className="h-4 w-4 mr-1" />
-                    Ekle
-                  </Button>
-                </div>
-
-                {formData.images.length > 0 && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {formData.images.map((image, index) => (
-                      <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                        <div className="flex items-center space-x-2">
-                          <Image className="h-4 w-4 text-gray-400" />
-                          <span className="text-sm">{image}</span>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeImage(image)}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>SEO Ayarları</CardTitle>
-              <CardDescription>
-                Arama motoru optimizasyonu ayarları.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="seoTitle">SEO Başlığı</Label>
-                <Input
-                  id="seoTitle"
-                  value={formData.seoTitle}
-                  onChange={(e) => handleInputChange("seoTitle", e.target.value)}
-                  placeholder="Arama sonuçlarında görünecek başlık"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="seoDescription">SEO Açıklaması</Label>
-                <Textarea
-                  id="seoDescription"
-                  value={formData.seoDescription}
-                  onChange={(e) => handleInputChange("seoDescription", e.target.value)}
-                  rows={3}
-                  placeholder="Arama sonuçlarında görünecek açıklama"
-                />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Yayın Durumu</CardTitle>
-              <CardDescription>
-                Blog yazısının yayın ayarlarını yapılandırın.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="publishDate">Yayın Tarihi</Label>
-                <Input
-                  id="publishDate"
-                  type="date"
-                  value={formData.publishDate}
-                  onChange={(e) => handleInputChange("publishDate", e.target.value)}
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Yayınla</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Yazıyı hemen yayınla
-                  </p>
-                </div>
-                <Switch
-                  checked={formData.isPublished}
-                  onCheckedChange={(checked) => handleInputChange("isPublished", checked)}
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Öne Çıkan</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Ana sayfada görünsün
-                  </p>
-                </div>
-                <Switch
-                  checked={formData.isFeatured}
-                  onCheckedChange={(checked) => handleInputChange("isFeatured", checked)}
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Etiketler</CardTitle>
-              <CardDescription>
-                Blog yazısına etiketler ekleyin.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex space-x-2">
-                <Input
-                  value={newTag}
-                  onChange={(e) => setNewTag(e.target.value)}
-                  placeholder="Etiket ekleyin"
-                  onKeyPress={(e) => e.key === "Enter" && addTag()}
-                />
-                <Button onClick={addTag} size="sm">
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
-
-              {formData.tags.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {formData.tags.map((tag, index) => (
-                    <Badge key={index} variant="secondary" className="flex items-center">
-                      <Tag className="h-3 w-3 mr-1" />
-                      {tag}
-                      <X
-                        className="h-3 w-3 ml-1 cursor-pointer"
-                        onClick={() => removeTag(tag)}
-                      />
-                    </Badge>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <AlertCircle className="h-5 w-5 text-blue-500" />
-                <span>İpuçları</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm text-muted-foreground">
-              <p>• Başlık SEO uyumlu olmalıdır.</p>
-              <p>• Özet okuyucunun ilgisini çekmelidir.</p>
-              <p>• İçerik özgün ve değerli olmalıdır.</p>
-              <p>• Etiketler keşfedilebilirliği artırır.</p>
-              <p>• Görseller içerikle uyumlu olmalıdır.</p>
-              <p>• SEO başlığı 60 karakterden kısa olmalıdır.</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>İstatistikler</CardTitle>
-              <CardDescription>
-                Yazı bilgileri
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm">
-              <div className="flex justify-between">
-                <span>Karakter sayısı:</span>
-                <span className="font-medium">{formData.content.length}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Kelime sayısı:</span>
-                <span className="font-medium">{formData.content.split(/\s+/).filter(w => w).length}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Tahmini okuma süresi:</span>
-                <span className="font-medium">{Math.max(1, Math.ceil(formData.content.length / 1000))} dk</span>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+          
+          <div className="flex justify-end">
+            <Button type="button" variant="outline" className="mr-4" onClick={() => router.back()}>
+              İptal
+            </Button>
+            <Button type="submit" disabled={isPending}>
+              {isPending ? "Oluşturuluyor..." : "Oluştur"}
+            </Button>
+          </div>
+        </form>
+      </Form>
     </div>
   )
 }

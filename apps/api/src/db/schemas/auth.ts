@@ -22,6 +22,7 @@ export const user = pgTable("user", {
   // Enhanced user fields for travel booking
   role: userRoleEnum("role").notNull().default("traveler"),
   phone: text("phone"),
+  bio: text("bio"), // User biography
   avatar: text("avatar"), // Profile image URL
   status: userStatusEnum("status").notNull().default("active"),
   lastLoginAt: timestamp("last_login_at", { withTimezone: true }),

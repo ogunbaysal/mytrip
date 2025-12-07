@@ -1,34 +1,24 @@
 "use client"
 
-import * as React from "react"
 import {
   ColumnDef,
-  ColumnFiltersState,
-  SortingState,
-  VisibilityState,
   flexRender,
   getCoreRowModel,
   getFilteredRowModel,
   getPaginationRowModel,
-  getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table"
-import { ArrowUpDown, ChevronDown, MoreHorizontal, Search, Eye, Edit, Ban, Check } from "lucide-react"
-import { toast } from "sonner"
-import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { MoreHorizontal, ArrowUpDown } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
-  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Input } from "@/components/ui/input"
 import {
   Table,
   TableBody,
@@ -39,135 +29,37 @@ import {
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { User, mockUsers, roleOptions, statusOptions } from "@/lib/mock-data/users"
+import { User, useUpdateUserStatus } from "@/hooks/use-users"
+import { useRouter } from "next/navigation"
+import { useState } from "react"
 
-export function UsersTable() {
+interface UsersTableProps {
+  data: User[];
+  isLoading: boolean;
+}
+
+export function UsersTable({ data, isLoading }: UsersTableProps) {
   const router = useRouter()
-  const [data, setData] = React.useState<User[]>(mockUsers)
-  const [sorting, setSorting] = React.useState<SortingState>([])
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
-  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
-  const [rowSelection, setRowSelection] = React.useState({})
+  const [rowSelection, setRowSelection] = useState({})
+  
+  const { mutate: updateStatus } = useUpdateUserStatus()
 
-  const handleUserAction = (action: string, user: User) => {
-    switch (action) {
-      case "view":
-        router.push(`/users/${user.id}`)
-        break
-      case "edit":
-        router.push(`/users/${user.id}/edit`)
-        break
-      case "suspend":
-        if (user.status === "suspended") {
-          toast.info(`Kullanıcı zaten askıya alınmış: ${user.name}`)
-        } else {
-          setData(prev =>
-            prev.map(u => u.id === user.id ? { ...u, status: "suspended" as const } : u)
-          )
-          toast.success(`Kullanıcı askıya alındı: ${user.name}`)
-        }
-        break
-      case "activate":
-        if (user.status === "active") {
-          toast.info(`Kullanıcı zaten aktif: ${user.name}`)
-        } else {
-          setData(prev =>
-            prev.map(u => u.id === user.id ? { ...u, status: "active" as const } : u)
-          )
-          toast.success(`Kullanıcı aktif edildi: ${user.name}`)
-        }
-        break
-    }
-  }
-
-  const getRoleBadgeVariant = (role: string) => {
-    switch (role) {
-      case "admin":
-        return "destructive"
-      case "owner":
-        return "default"
-      case "traveler":
-        return "secondary"
-      default:
-        return "outline"
-    }
-  }
-
-  const getStatusBadgeVariant = (status: string) => {
-    switch (status) {
-      case "active":
-        return "default"
-      case "suspended":
-        return "destructive"
-      case "pending":
-        return "secondary"
-      default:
-        return "outline"
-    }
-  }
-
-  const getRoleLabel = (role: string) => {
-    const option = roleOptions.find(opt => opt.value === role)
-    return option?.label || role
-  }
-
-  const getStatusLabel = (status: string) => {
-    const option = statusOptions.find(opt => opt.value === status)
-    return option?.label || status
-  }
-
+  // Define columns
   const columns: ColumnDef<User>[] = [
     {
-      id: "select",
-      header: ({ table }) => (
-        <Checkbox
-          checked={
-            table.getIsAllPageRowsSelected() ||
-            (table.getIsSomePageRowsSelected() && "indeterminate")
-          }
-          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-          aria-label="Tümünü seç"
-        />
-      ),
-      cell: ({ row }) => (
-        <Checkbox
-          checked={row.getIsSelected()}
-          onCheckedChange={(value) => row.toggleSelected(!!value)}
-          aria-label="Satır seç"
-        />
-      ),
-      enableSorting: false,
-      enableHiding: false,
-    },
-    {
       accessorKey: "name",
-      header: ({ column }) => {
-        return (
-          <Button
-            variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-            className="h-8 px-2"
-          >
-            Kullanıcı
-            <ArrowUpDown className="ml-2 h-4 w-4" />
-          </Button>
-        )
-      },
+      header: "Kullanıcı",
       cell: ({ row }) => {
         const user = row.original
         return (
-          <div className="flex items-center space-x-3">
-            <Avatar className="h-8 w-8">
-              <AvatarImage src={user.avatar} alt={user.name} />
-              <AvatarFallback>
-                {user.name.split(" ").map(n => n[0]).join("").toUpperCase()}
-              </AvatarFallback>
+          <div className="flex items-center gap-3">
+            <Avatar className="h-9 w-9">
+              <AvatarImage src={user.avatar || ""} alt={user.name} />
+              <AvatarFallback>{user.name.charAt(0).toUpperCase()}</AvatarFallback>
             </Avatar>
-            <div>
-              <div className="font-medium">{user.name}</div>
-              <div className="text-sm text-muted-foreground">{user.email}</div>
+            <div className="flex flex-col">
+              <span className="text-sm font-medium">{user.name}</span>
+              <span className="text-xs text-muted-foreground">{user.email}</span>
             </div>
           </div>
         )
@@ -179,8 +71,8 @@ export function UsersTable() {
       cell: ({ row }) => {
         const role = row.getValue("role") as string
         return (
-          <Badge variant={getRoleBadgeVariant(role)}>
-            {getRoleLabel(role)}
+          <Badge variant={role === "admin" ? "default" : role === "owner" ? "secondary" : "outline"}>
+            {role === "admin" ? "Yönetici" : role === "owner" ? "Mekan Sahibi" : "Gezgin"}
           </Badge>
         )
       },
@@ -191,34 +83,8 @@ export function UsersTable() {
       cell: ({ row }) => {
         const status = row.getValue("status") as string
         return (
-          <Badge variant={getStatusBadgeVariant(status)}>
-            {getStatusLabel(status)}
-          </Badge>
-        )
-      },
-    },
-    {
-      accessorKey: "phone",
-      header: "Telefon",
-      cell: ({ row }) => row.getValue("phone") || "-",
-    },
-    {
-      accessorKey: "placeCount",
-      header: "Mekan Sayısı",
-      cell: ({ row }) => {
-        const count = row.getValue("placeCount") as number
-        return count || "-"
-      },
-    },
-    {
-      accessorKey: "subscriptionStatus",
-      header: "Abonelik",
-      cell: ({ row }) => {
-        const status = row.getValue("subscriptionStatus") as string
-        if (!status) return "-"
-        return (
-          <Badge variant={status === "active" ? "default" : "secondary"}>
-            {status === "active" ? "Aktif" : status === "expired" ? "Süresi Doldu" : "İptal"}
+          <Badge variant={status === "active" ? "outline" : "destructive"} className={status === "active" ? "border-green-500 text-green-600" : ""}>
+            {status === "active" ? "Aktif" : status === "suspended" ? "Askıya Alındı" : "Beklemede"}
           </Badge>
         )
       },
@@ -230,7 +96,6 @@ export function UsersTable() {
           <Button
             variant="ghost"
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-            className="h-8 px-2"
           >
             Kayıt Tarihi
             <ArrowUpDown className="ml-2 h-4 w-4" />
@@ -238,64 +103,40 @@ export function UsersTable() {
         )
       },
       cell: ({ row }) => {
-        const date = row.getValue("createdAt") as Date
-        return date.toLocaleDateString("tr-TR")
-      },
-    },
-    {
-      accessorKey: "lastLoginAt",
-      header: "Son Giriş",
-      cell: ({ row }) => {
-        const date = row.getValue("lastLoginAt") as Date | null
-        return date ? date.toLocaleString("tr-TR") : "Hiç giriş yapmadı"
+        return <div className="ml-4">{new Date(row.getValue("createdAt")).toLocaleDateString("tr-TR")}</div>
       },
     },
     {
       id: "actions",
-      enableHiding: false,
       cell: ({ row }) => {
         const user = row.original
-
         return (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="h-8 w-8 p-0">
-                <span className="sr-only">Menüyü aç</span>
+                <span className="sr-only">Menü</span>
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>İşlemler</DropdownMenuLabel>
-              <DropdownMenuItem
-                onClick={() => handleUserAction("view", user)}
-                className="cursor-pointer"
-              >
-                <Eye className="mr-2 h-4 w-4" />
-                Görüntüle
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => handleUserAction("edit", user)}
-                className="cursor-pointer"
-              >
-                <Edit className="mr-2 h-4 w-4" />
-                Düzenle
+              <DropdownMenuItem onClick={() => router.push(`/users/${user.id}`)}>
+                Detayları Gör
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               {user.status === "active" ? (
-                <DropdownMenuItem
-                  onClick={() => handleUserAction("suspend", user)}
-                  className="cursor-pointer text-orange-600"
+                <DropdownMenuItem 
+                  className="text-red-600"
+                  onClick={() => updateStatus({ userId: user.id, status: "suspended" })}
                 >
-                  <Ban className="mr-2 h-4 w-4" />
-                  Askıya Al
+                  Kullanıcıyı Askıya Al
                 </DropdownMenuItem>
               ) : (
-                <DropdownMenuItem
-                  onClick={() => handleUserAction("activate", user)}
-                  className="cursor-pointer text-green-600"
+                <DropdownMenuItem 
+                  className="text-green-600"
+                  onClick={() => updateStatus({ userId: user.id, status: "active" })}
                 >
-                  <Check className="mr-2 h-4 w-4" />
-                  Aktif Et
+                  Kullanıcıyı Aktifleştir
                 </DropdownMenuItem>
               )}
             </DropdownMenuContent>
@@ -308,187 +149,76 @@ export function UsersTable() {
   const table = useReactTable({
     data,
     columns,
-    onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
-    getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
-    onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
     state: {
-      sorting,
-      columnFilters,
-      columnVisibility,
       rowSelection,
     },
   })
 
+  // Basic Loading State
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        <div className="rounded-md border p-4 space-y-4">
+          {Array(5).fill(0).map((_, i) => (
+             <div key={i} className="flex items-center space-x-4">
+                 <div className="h-10 w-10 rounded-full bg-gray-100 animate-pulse" />
+                 <div className="h-4 w-1/4 bg-gray-100 animate-pulse rounded" />
+                 <div className="h-4 w-1/4 bg-gray-100 animate-pulse rounded" />
+             </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className="space-y-4">
-      {/* Card Header */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Kullanıcı Yönetimi</CardTitle>
-              <CardDescription>
-                Sistemdeki tüm kullanıcıları görüntüleyin ve yönetin. Toplam {data.length} kullanıcı bulunmaktadır.
-              </CardDescription>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Button asChild>
-                <Link href="/users/create">Kullanıcı Ekle</Link>
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {/* Filters and Search */}
-          <div className="flex items-center justify-between py-4">
-            <div className="flex items-center space-x-2">
-              <div className="relative">
-                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Kullanıcı ara..."
-                  value={(table.getColumn("name")?.getFilterValue() as string) ?? ""}
-                  onChange={(event) =>
-                    table.getColumn("name")?.setFilterValue(event.target.value)
-                  }
-                  className="pl-8 w-[300px]"
-                />
-              </div>
-            </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="ml-auto">
-                  Sütunlar <ChevronDown className="ml-2 h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {table
-                  .getAllColumns()
-                  .filter((column) => column.getCanHide())
-                  .map((column) => {
-                    return (
-                      <DropdownMenuCheckboxItem
-                        key={column.id}
-                        className="capitalize"
-                        checked={column.getIsVisible()}
-                        onCheckedChange={(value) =>
-                          column.toggleVisibility(!!value)
-                        }
-                      >
-                        {column.id === "name" ? "Kullanıcı" :
-                         column.id === "role" ? "Rol" :
-                         column.id === "status" ? "Durum" :
-                         column.id === "phone" ? "Telefon" :
-                         column.id === "placeCount" ? "Mekan Sayısı" :
-                         column.id === "subscriptionStatus" ? "Abonelik" :
-                         column.id === "createdAt" ? "Kayıt Tarihi" :
-                         column.id === "lastLoginAt" ? "Son Giriş" :
-                         column.id === "actions" ? "İşlemler" :
-                         column.id}
-                      </DropdownMenuCheckboxItem>
-                    )
-                  })}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-
-          {/* Selected Actions */}
-          {table.getFilteredSelectedRowModel().rows.length > 0 && (
-            <div className="flex items-center space-x-2 py-2">
-              <span className="text-sm text-muted-foreground">
-                {table.getFilteredSelectedRowModel().rows.length} kullanıcı seçildi
-              </span>
-              <Button variant="outline" size="sm">
-                Toplu İşlemler
-              </Button>
-            </div>
-          )}
-
-          {/* Table */}
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                {table.getHeaderGroups().map((headerGroup) => (
-                  <TableRow key={headerGroup.id}>
-                    {headerGroup.headers.map((header) => {
-                      return (
-                        <TableHead key={header.id}>
-                          {header.isPlaceholder
-                            ? null
-                            : flexRender(
-                                header.column.columnDef.header,
-                                header.getContext()
-                              )}
-                        </TableHead>
-                      )
-                    })}
-                  </TableRow>
+    <div className="rounded-md border">
+      <Table>
+        <TableHeader>
+          {table.getHeaderGroups().map((headerGroup) => (
+            <TableRow key={headerGroup.id}>
+              {headerGroup.headers.map((header) => {
+                return (
+                  <TableHead key={header.id}>
+                    {header.isPlaceholder
+                      ? null
+                      : flexRender(
+                          header.column.columnDef.header,
+                          header.getContext()
+                        )}
+                  </TableHead>
+                )
+              })}
+            </TableRow>
+          ))}
+        </TableHeader>
+        <TableBody>
+          {table.getRowModel().rows?.length ? (
+            table.getRowModel().rows.map((row) => (
+              <TableRow
+                key={row.id}
+                data-state={row.getIsSelected() && "selected"}
+              >
+                {row.getVisibleCells().map((cell) => (
+                  <TableCell key={cell.id}>
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </TableCell>
                 ))}
-              </TableHeader>
-              <TableBody>
-                {table.getRowModel().rows?.length ? (
-                  table.getRowModel().rows.map((row) => (
-                    <TableRow
-                      key={row.id}
-                      data-state={row.getIsSelected() && "selected"}
-                    >
-                      {row.getVisibleCells().map((cell) => (
-                        <TableCell key={cell.id}>
-                          {flexRender(
-                            cell.column.columnDef.cell,
-                            cell.getContext()
-                          )}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell
-                      colSpan={columns.length}
-                      className="h-24 text-center"
-                    >
-                      Sonuç bulunamadı.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
-
-          {/* Pagination */}
-          <div className="flex items-center justify-between space-x-2 py-4">
-            <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-              <span>
-                {table.getFilteredSelectedRowModel().rows.length} /{" "}
-                {table.getFilteredRowModel().rows.length} kullanıcı seçildi
-              </span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => table.previousPage()}
-                disabled={!table.getCanPreviousPage()}
-              >
-                Önceki
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => table.nextPage()}
-                disabled={!table.getCanNextPage()}
-              >
-                Sonraki
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+              </TableRow>
+            ))
+          ) : (
+            <TableRow>
+              <TableCell colSpan={columns.length} className="h-24 text-center">
+                Sonuç bulunamadı.
+              </TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
     </div>
   )
 }

@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { db } from "../../db";
+import { auth } from "../../lib/auth";
 import { user } from "../../db/schemas";
 import { eq, desc, ilike, sql } from "drizzle-orm";
 
@@ -136,6 +137,95 @@ app.get("/:userId", async (c) => {
       {
         error: "Failed to fetch user",
         message: "Unable to retrieve user details"
+      },
+      500
+    );
+  }
+});
+
+/**
+ * Create a new user
+ * POST /admin/users
+ */
+app.post("/", async (c) => {
+  try {
+    const { name, email, password, role, status } = await c.req.json();
+
+    // Validate required fields
+    if (!name || !email || !password || !role) {
+      return c.json(
+        {
+          error: "Missing required fields",
+          message: "Name, email, password, and role are required"
+        },
+        400
+      );
+    }
+
+    // Validate role
+    if (!["admin", "owner", "traveler"].includes(role)) {
+      return c.json(
+        {
+          error: "Invalid role",
+          message: "Role must be one of: admin, owner, traveler"
+        },
+        400
+      );
+    }
+
+    // Create user using Better Auth
+    // limiting the type of response we expect or handling potential errors internal to better-auth
+    let newUser;
+    try {
+      const res = await auth.api.signUpEmail({
+        body: {
+          email,
+          password,
+          name,
+        },
+        asResponse: false
+      });
+      newUser = res.user;
+    } catch (e: any) {
+       // Better auth throws on error usually
+       return c.json({
+         error: "Failed to create user",
+         message: e.message || "User already exists or invalid data"
+       }, 400);
+    }
+    
+    if (!newUser) {
+       return c.json({
+         error: "Failed to create user",
+         message: "User creation failed"
+       }, 500);
+    }
+
+    // Update role and status if different from default
+    // Default from signUp is likely 'user' or 'traveler' and 'active' depending on config
+    // We force update to match admin request
+    const [updatedUser] = await db
+      .update(user)
+      .set({
+        role,
+        status: status || "active",
+        updatedAt: new Date(),
+      })
+      .where(eq(user.id, newUser.id))
+      .returning();
+
+    return c.json({
+      success: true,
+      message: "User created successfully",
+      user: updatedUser,
+    }, 201);
+
+  } catch (error) {
+    console.error("Failed to create user:", error);
+    return c.json(
+      {
+        error: "Failed to create user",
+        message: "Unable to create user"
       },
       500
     );

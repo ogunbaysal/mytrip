@@ -5,7 +5,11 @@ import { auth } from "./lib/auth";
 import { adminRoutes } from "./routes/admin";
 import { routes } from "./routes";
 
+import { serveStatic } from "hono/bun";
+
 const app = new Hono()
+
+app.use("/uploads/*", serveStatic({ root: "./apps/api/public" }));
 
 const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",").map((origin) => origin.trim()).filter(Boolean) ?? [
     "http://localhost:3000",

@@ -8,6 +8,8 @@ import { collectionsRoutes } from "./collections";
 import { blogRoutes } from "./blog";
 import { reviewsRoutes } from "./reviews";
 import { analyticsRoutes } from "./analytics";
+import { uploadRoutes } from "./upload";
+import settings from "./settings";
 
 const app = new Hono<{
   Variables: {
@@ -47,5 +49,7 @@ app.route("/collections", collectionsRoutes);
 app.route("/blog", blogRoutes);
 app.route("/reviews", reviewsRoutes);
 app.route("/analytics", analyticsRoutes);
+app.route("/upload", uploadRoutes);
+app.route("/settings", settings);
 
 export { app as adminRoutes };
