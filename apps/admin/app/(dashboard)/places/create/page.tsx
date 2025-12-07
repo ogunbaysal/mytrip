@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { TiptapEditor } from "@/components/ui/tiptap-editor"
 import {
   Select,
   SelectContent,
@@ -23,16 +24,22 @@ import {
 } from "@/components/ui/select"
 import { toast } from "sonner"
 import { useCreatePlace } from "@/hooks/use-places"
+import { useCategories } from "@/hooks/use-categories"
+import { useCities, useDistricts } from "@/hooks/use-locations"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ArrowLeft } from "lucide-react"
 import Link from "next/link"
 // For a real app, we would want a map picker here, but for now we'll use text inputs for lat/lng
 
+import { GalleryUpload } from "@/components/ui/gallery-upload"
+
 const formSchema = z.object({
+  images: z.array(z.string()).optional(),
   name: z.string().min(2, "Mekan adı en az 2 karakter olmalıdır"),
   type: z.string().min(1, "Tip seçimi zorunludur"),
-  category: z.string().min(1, "Kategori seçimi zorunludur"),
+  category: z.string().optional(), // Make optional string
+  categoryId: z.string().min(1, "Kategori seçimi zorunludur"),
   description: z.string().min(10, "Açıklama en az 10 karakter olmalıdır"),
   shortDescription: z.string().max(160, "Kısa açıklama 160 karakteri geçemez").optional(),
   address: z.string().min(5, "Adres zorunludur"),
@@ -47,26 +54,37 @@ const formSchema = z.object({
 export default function CreatePlacePage() {
   const router = useRouter()
   const { mutate: createPlace, isPending } = useCreatePlace()
-
+  const { data: categories } = useCategories()
+  const { data: cities } = useCities()
+  
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      images: [],
       name: "",
       type: "hotel",
-      category: "general",
+      category: "", // Legacy
+      categoryId: "",
       description: "",
       shortDescription: "",
       address: "",
       city: "",
       district: "",
       priceLevel: "moderate",
+      latitude: "",
+      longitude: "",
+      nightlyPrice: "",
     },
   })
+
+  const watchedCity = form.watch("city")
+  const { data: districts } = useDistricts(watchedCity)
 
   function onSubmit(values: z.infer<typeof formSchema>) {
     // Transform values for API
     const apiData = {
         ...values,
+        category: categories?.find(c => c.id === values.categoryId)?.name || values.category || "", // Fallback
         location: values.latitude && values.longitude ? { type: "Point", coordinates: [parseFloat(values.longitude), parseFloat(values.latitude)] } : undefined,
         priceLevel: values.priceLevel || undefined,
         // In a real app we would pick an owner. For this MVP we might need to handle owner assignment differently or set current admin as owner?
@@ -85,7 +103,7 @@ export default function CreatePlacePage() {
         toast.success("Mekan başarıyla oluşturuldu")
         router.push("/places")
       },
-      onError: (error: any) => {
+      onError: (error: Error) => {
         toast.error(error.message || "Mekan oluşturulurken bir hata oluştu")
       }
     })
@@ -105,12 +123,36 @@ export default function CreatePlacePage() {
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
             <div className="grid gap-4 md:grid-cols-2">
-                <Card>
+                <div className="space-y-4">
+                  <Card>
                     <CardHeader>
-                        <CardTitle>Temel Bilgiler</CardTitle>
-                        <CardDescription>Mekanın adı, tipi ve açıklaması.</CardDescription>
+                      <CardTitle>Mekan Görselleri</CardTitle>
+                      <CardDescription>Mekanınıza ait görselleri yükleyin. İlk görsel ana görsel olacaktır.</CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-4">
+                    <CardContent>
+                      <FormField
+                        control={form.control}
+                        name="images"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormControl>
+                              <GalleryUpload
+                                value={field.value?.map((image) => image) || []}
+                                onChange={(newImages) => field.onChange(newImages)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </CardContent>
+                  </Card>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Temel Bilgiler</CardTitle>
+                            <CardDescription>Mekanın adı, tipi ve açıklaması.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
                         <FormField
                             control={form.control}
                             name="name"
@@ -142,13 +184,20 @@ export default function CreatePlacePage() {
                                     </FormItem>
                                 )}
                             />
-                            <FormField
+                             <FormField
                                 control={form.control}
-                                name="category"
+                                name="categoryId"
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>Kategori</FormLabel>
-                                        <FormControl><Input placeholder="Örn: Butik Otel, İtalyan Mutfağı" {...field} /></FormControl>
+                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                            <FormControl><SelectTrigger><SelectValue placeholder="Kategori Seçiniz" /></SelectTrigger></FormControl>
+                                            <SelectContent>
+                                                {categories?.map((cat) => (
+                                                    <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
                                         <FormMessage />
                                     </FormItem>
                                 )}
@@ -171,13 +220,19 @@ export default function CreatePlacePage() {
                             render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Detaylı Açıklama</FormLabel>
-                                    <FormControl><Textarea className="min-h-[100px]" placeholder="Mekanı detaylıca anlatın..." {...field} /></FormControl>
+                                    <FormControl>
+                                        <TiptapEditor
+                                            value={field.value}
+                                            onChange={field.onChange}
+                                        />
+                                    </FormControl>
                                     <FormMessage />
                                 </FormItem>
                             )}
                         />
                     </CardContent>
                 </Card>
+                </div>
 
                 <div className="space-y-4">
                     <Card>
@@ -203,7 +258,23 @@ export default function CreatePlacePage() {
                                     render={({ field }) => (
                                         <FormItem>
                                             <FormLabel>Şehir</FormLabel>
-                                            <FormControl><Input placeholder="İstanbul" {...field} /></FormControl>
+                                            <Select onValueChange={(val) => {
+                                                field.onChange(val)
+                                                form.setValue("district", "") // Reset district when city changes
+                                            }} value={field.value}>
+                                                <FormControl>
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder="Şehir seçin" />
+                                                    </SelectTrigger>
+                                                </FormControl>
+                                                <SelectContent>
+                                                    {cities?.map((city) => (
+                                                        <SelectItem key={city.id} value={city.name}>
+                                                            {city.name}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
                                             <FormMessage />
                                         </FormItem>
                                     )}
@@ -214,7 +285,20 @@ export default function CreatePlacePage() {
                                     render={({ field }) => (
                                         <FormItem>
                                             <FormLabel>İlçe</FormLabel>
-                                            <FormControl><Input placeholder="Beşiktaş" {...field} /></FormControl>
+                                            <Select onValueChange={field.onChange} value={field.value} disabled={!watchedCity}>
+                                                <FormControl>
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder={watchedCity ? "İlçe seçin" : "Önce şehir seçin"} />
+                                                    </SelectTrigger>
+                                                </FormControl>
+                                                <SelectContent>
+                                                    {districts?.map((district) => (
+                                                        <SelectItem key={district} value={district}>
+                                                            {district}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
                                             <FormMessage />
                                         </FormItem>
                                     )}

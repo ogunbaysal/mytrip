@@ -7,6 +7,9 @@ export type Place = {
   name: string;
   type: string;
   category: string;
+  categoryId?: string;
+  categoryName?: string;
+  categorySlug?: string;
   description: string;
   shortDescription: string;
   address: string;

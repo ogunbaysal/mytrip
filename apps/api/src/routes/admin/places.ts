@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { db } from "../../db";
-import { place, user } from "../../db/schemas";
+import { place, user, placeCategory } from "../../db/schemas";
 import { eq, desc, ilike, sql, and } from "drizzle-orm";
 import { nanoid } from "nanoid";
 
@@ -108,9 +108,12 @@ app.get("/", async (c) => {
         updatedAt: place.updatedAt,
         ownerName: user.name,
         ownerEmail: user.email,
+        categoryName: placeCategory.name,
+        categorySlug: placeCategory.slug,
       })
       .from(place)
       .leftJoin(user, eq(place.ownerId, user.id))
+      .leftJoin(placeCategory, eq(place.categoryId, placeCategory.id))
       .where(whereClause)
       .orderBy(sql`${orderByColumn} ${orderDirection}`)
       .limit(limitInt)
@@ -178,9 +181,13 @@ app.get("/:placeId", async (c) => {
         updatedAt: place.updatedAt,
         ownerName: user.name,
         ownerEmail: user.email,
+        categoryName: placeCategory.name,
+        categorySlug: placeCategory.slug,
+        categoryId: place.categoryId,
       })
       .from(place)
       .leftJoin(user, eq(place.ownerId, user.id))
+      .leftJoin(placeCategory, eq(place.categoryId, placeCategory.id))
       .where(eq(place.id, placeId))
       .limit(1);
 
@@ -220,6 +227,7 @@ app.post("/", async (c) => {
       slug: placeData.slug || `${placeData.name.toLowerCase().replace(/\s+/g, '-')}-${nanoid(6)}`,
       name: placeData.name,
       type: placeData.type,
+      categoryId: placeData.categoryId,
       category: placeData.category,
       description: placeData.description,
       shortDescription: placeData.shortDescription,

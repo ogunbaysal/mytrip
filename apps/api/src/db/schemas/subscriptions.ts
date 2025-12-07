@@ -37,19 +37,24 @@ export const paymentStatusEnum = pgEnum("payment_status", [
 
 export const currencyEnum = pgEnum("currency", ["TRY", "USD", "EUR"]);
 
-// ============================================================================
-// SUBSCRIPTION PLANS TABLE
-// ============================================================================
+export const providerEnum = pgEnum("provider", [
+  "iyzico",
+  "paytr",
+  "stripe",
+  "mock"
+]);
+
+// ... (keep usage of currencyEnum)
 
 export const subscriptionPlan = pgTable("subscription_plan", {
   id: text("id").primaryKey(),
-  name: text("name").notNull(), // e.g., "Temel Paket", "Premium Paket"
+  name: text("name").notNull(), 
   description: text("description"),
   price: numeric("price", { precision: 10, scale: 2 }).notNull(),
   currency: currencyEnum("currency").notNull().default("TRY"),
   billingCycle: billingCycleEnum("billing_cycle").notNull(),
-  features: text("features"), // JSON array of feature descriptions
-  limits: text("limits"), // JSON object for usage limits
+  features: text("features"), 
+  limits: text("limits"), 
   active: boolean("active").notNull().default(true),
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true })
@@ -60,10 +65,6 @@ export const subscriptionPlan = pgTable("subscription_plan", {
     .defaultNow(),
 });
 
-// ============================================================================
-// SUBSCRIPTIONS TABLE
-// ============================================================================
-
 export const subscription = pgTable("subscription", {
   id: text("id").primaryKey(),
   userId: text("user_id")
@@ -73,6 +74,8 @@ export const subscription = pgTable("subscription", {
     .notNull()
     .references(() => subscriptionPlan.id, { onDelete: "cascade" }),
   status: subscriptionStatusEnum("status").notNull().default("pending"),
+  provider: providerEnum("provider").notNull().default("iyzico"),
+  providerSubscriptionId: text("provider_subscription_id"),
   price: numeric("price", { precision: 10, scale: 2 }).notNull(),
   currency: currencyEnum("currency").notNull().default("TRY"),
   billingCycle: billingCycleEnum("billing_cycle").notNull(),
@@ -81,8 +84,8 @@ export const subscription = pgTable("subscription", {
   nextBillingDate: date("next_billing_date"),
   cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
   trialEndsAt: timestamp("trial_ends_at", { withTimezone: true }),
-  usage: text("usage"), // JSON object for current usage tracking
-  paymentMethod: text("payment_method"), // JSON object for payment method details
+  usage: text("usage"),
+  paymentMethod: text("payment_method"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -91,22 +94,20 @@ export const subscription = pgTable("subscription", {
     .defaultNow(),
 });
 
-// ============================================================================
-// PAYMENTS TABLE
-// ============================================================================
-
 export const payment = pgTable("payment", {
   id: text("id").primaryKey(),
   subscriptionId: text("subscription_id").references(() => subscription.id, { onDelete: "cascade" }),
   userId: text("user_id")
     .notNull()
     .references(() => user.id, { onDelete: "cascade" }),
+  provider: providerEnum("provider").notNull().default("iyzico"),
+  providerTransactionId: text("provider_transaction_id"),
   amount: numeric("amount", { precision: 10, scale: 2 }).notNull(),
   currency: currencyEnum("currency").notNull().default("TRY"),
   status: paymentStatusEnum("status").notNull().default("pending"),
-  paymentMethod: text("payment_method"), // JSON object for payment method used
-  gatewayResponse: text("gateway_response"), // JSON object for payment gateway response
-  invoiceId: text("invoice_id"), // Invoice identifier
+  paymentMethod: text("payment_method"),
+  gatewayResponse: text("gateway_response"),
+  invoiceId: text("invoice_id"),
   paidAt: timestamp("paid_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()

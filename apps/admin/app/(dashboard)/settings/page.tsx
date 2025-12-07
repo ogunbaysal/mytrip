@@ -34,7 +34,14 @@ import { toast } from "sonner"
 import { useSettings, useUpdateSettings, useUpdateProfile } from "@/hooks/use-settings"
 import { useAuth } from "@/hooks/use-auth"
 
+import { useSearchParams, useRouter, usePathname } from "next/navigation"
+
 export default function SettingsPage() {
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const currentTab = searchParams.get("tab") || "general"
+
   const { data: settings, isLoading: isLoadingSettings } = useSettings()
   const { mutate: updateSettings, isPending: isSavingSettings } = useUpdateSettings()
   const { mutate: updateProfile, isPending: isSavingProfile } = useUpdateProfile()
@@ -87,6 +94,12 @@ export default function SettingsPage() {
     updateProfile(profileForm)
   }
 
+  const onTabChange = (value: string) => {
+      const params = new URLSearchParams(searchParams)
+      params.set("tab", value)
+      router.push(`${pathname}?${params.toString()}`)
+  }
+
   if (isLoadingSettings) return <div>Yükleniyor...</div>
 
   return (
@@ -100,7 +113,7 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      <Tabs defaultValue="general" className="space-y-4">
+      <Tabs defaultValue="general" value={currentTab} onValueChange={onTabChange} className="space-y-4">
         <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="general">Genel</TabsTrigger>
           <TabsTrigger value="user">Kullanıcı</TabsTrigger>

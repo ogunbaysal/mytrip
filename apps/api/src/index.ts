@@ -4,6 +4,7 @@ import { cors } from "hono/cors";
 import { auth } from "./lib/auth";
 import { adminRoutes } from "./routes/admin";
 import { routes } from "./routes";
+import { locationsRoutes } from "./routes/locations";
 
 import { serveStatic } from "hono/bun";
 
@@ -55,7 +56,8 @@ app.route("/api", routes)
 // Admin routes
 app.route("/api/admin", adminRoutes)
 
-
+// Locations routes
+app.route("/api/locations", locationsRoutes)
 
 
 const port = Number(process.env.PORT ?? 3002)

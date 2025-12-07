@@ -9,6 +9,7 @@ import {
   jsonb
 } from "drizzle-orm/pg-core";
 import { user } from "./auth";
+import { placeCategory } from "./categories";
 
 // ============================================================================
 // ENUMS
@@ -46,7 +47,10 @@ export const place = pgTable("place", {
   slug: text("slug").notNull().unique(),
   name: text("name").notNull(),
   type: placeTypeEnum("type").notNull(),
-  category: text("category").notNull(), // e.g., "Lüks Oteller", "Deniz Kafeleri"
+  categoryId: text("category_id").references(() => placeCategory.id),
+  category: text("category"), // Keeping for backward compatibility or direct text override, but optional now? Or can be populated from relation.
+  // Actually, let's make it optional if we enforce categoryId, or keep it as text for now and migrate data.
+  // Plan said: "Add categoryId FK referencing place_category.id".
   description: text("description"),
   shortDescription: text("short_description"),
   address: text("address"),

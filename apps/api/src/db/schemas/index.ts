@@ -26,4 +26,5 @@ export {
   type NewPayment
 } from "./subscriptions";
 export * from "./settings";
+export * from "./categories";
 export * from "./analytics";

@@ -1,6 +1,6 @@
 "use client"
 
-import { Hotel, Users, MapPin, FileText, CreditCard, BarChart3, Settings, LogOut, ChevronDown } from "lucide-react"
+import { Hotel, Users, MapPin, FileText, CreditCard, BarChart3, Settings, LogOut, ChevronDown, List } from "lucide-react"
 import { useAuth } from "@/hooks/use-auth"
 import { useRouter } from "next/navigation"
 
@@ -48,61 +48,33 @@ const adminMenuItems: MenuItem[] = [
     url: "/users",
     icon: Users,
     badge: "12",
-    subItems: [
-      { title: "Tüm Kullanıcılar", url: "/users" },
-      { title: "Mekan Sahipleri", url: "/users/owners" },
-      { title: "Seyahatçiler", url: "/users/travelers" },
-      { title: "Adminler", url: "/users/admins" },
-    ],
   },
   {
     title: "Mekanlar",
     url: "/places",
     icon: MapPin,
     badge: "8",
-    subItems: [
-      { title: "Tüm Mekanlar", url: "/places" },
-      { title: "Onay Bekleyen", url: "/places/pending" },
-      { title: "Oteller", url: "/places/hotels" },
-      { title: "Restoranlar", url: "/places/restaurants" },
-      { title: "Villalar", url: "/places/villas" },
-      { title: "Aktiviteler", url: "/places/activities" },
-    ],
+  },
+  {
+    title: "Kategoriler",
+    url: "/categories",
+    icon: List,
   },
   {
     title: "Bloglar",
     url: "/blogs",
     icon: FileText,
     badge: "3",
-    subItems: [
-      { title: "Tüm Bloglar", url: "/blogs" },
-      { title: "Onay Bekleyen", url: "/blogs/pending" },
-      { title: "Yayınlanan", url: "/blogs/published" },
-      { title: "Taslaklar", url: "/blogs/drafts" },
-    ],
   },
   {
     title: "Abonelikler",
     url: "/subscriptions",
     icon: CreditCard,
-      subItems: [
-      { title: "Tüm Abonelikler", url: "/subscriptions" },
-      { title: "Aktif Abonelikler", url: "/subscriptions/active" },
-      { title: "Pasif Abonelikler", url: "/subscriptions/inactive" },
-      { title: "Plan Yönetimi", url: "/subscriptions/plans" },
-      { title: "Ödemeler", url: "/subscriptions/payments" },
-    ],
   },
   {
     title: "Ayarlar",
     url: "/settings",
     icon: Settings,
-      subItems: [
-      { title: "Genel Ayarlar", url: "/settings/general" },
-      { title: "E-posta Şablonları", url: "/settings/email-templates" },
-      { title: "Sistem Bildirimleri", url: "/settings/notifications" },
-      { title: "Yedekleme", url: "/settings/backup" },
-    ],
   },
 ]
 
