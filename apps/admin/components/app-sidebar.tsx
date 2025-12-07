@@ -1,6 +1,6 @@
 "use client"
 
-import { Hotel, Users, MapPin, FileText, CreditCard, BarChart3, Settings, LogOut, ChevronDown, List, Package, Receipt } from "lucide-react"
+import { Hotel, Users, MapPin, FileText, CreditCard, BarChart3, Settings, LogOut, ChevronDown, List, Package, Receipt, ShieldCheck } from "lucide-react"
 import { useAuth } from "@/hooks/use-auth"
 import { useRouter } from "next/navigation"
 
@@ -42,6 +42,11 @@ const adminMenuItems: MenuItem[] = [
     title: "Panel",
     url: "/dashboard",
     icon: BarChart3,
+  },
+  {
+    title: "Yöneticiler",
+    url: "/admins",
+    icon: ShieldCheck,
   },
   {
     title: "Kullanıcılar",
