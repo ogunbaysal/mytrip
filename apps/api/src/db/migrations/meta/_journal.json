@@ -5,22 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1764423948776,
-      "tag": "0000_red_klaw",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1764424963370,
-      "tag": "0001_shallow_patch",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1765113331017,
-      "tag": "0002_nappy_captain_cross",
+      "when": 1765115040163,
+      "tag": "0000_conscious_shiver_man",
       "breakpoints": true
     }
   ]

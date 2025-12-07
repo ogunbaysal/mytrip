@@ -4,6 +4,7 @@ import { db } from "../db";
 import * as schema from "../db/schemas";
 
 export const auth = betterAuth({
+  appName: "Admin Panel",
   trustedOrigins: [
     "http://localhost:3000",
     "http://localhost:3001",
@@ -12,15 +13,15 @@ export const auth = betterAuth({
   database: drizzleAdapter(db, {
     provider: "pg",
     schema: {
-      user: schema.user,
-      session: schema.session,
-      account: schema.account,
-      verification: schema.verification,
+      user: schema.admin,
+      session: schema.adminSession,
+      account: schema.adminAccount,
+      verification: schema.adminVerification,
     },
   }),
   emailAndPassword: {
     enabled: true,
-    requireEmailVerification: false, // Can be enabled later
+    requireEmailVerification: false,
   },
   session: {
     expiresIn: 60 * 60 * 24 * 7, // 7 days
@@ -32,54 +33,28 @@ export const auth = betterAuth({
   },
   account: {
     accountLinking: {
-      enabled: false, // Can be enabled for social logins
+      enabled: false,
     },
   },
   socialProviders: {
-    // Add social providers later if needed
-    // google: { enabled: false },
-    // github: { enabled: false },
   },
   advanced: {
     crossSubDomainCookies: {
-      enabled: false, // Enable if using subdomains
+      enabled: false,
     },
     generateId: false, // Use our own UUID generation
   },
-  // Custom user fields mapping
   user: {
     additionalFields: {
-      role: {
+      roleId: {
         type: "string",
         required: false,
-        defaultValue: "traveler",
-        input: false, // Not input from user, set by admin
-      },
-      phone: {
-        type: "string",
-        required: false,
-        input: true,
-      },
-      avatar: {
-        type: "string",
-        required: false,
-        input: true,
+        input: false,
       },
       status: {
         type: "string",
         required: false,
         defaultValue: "active",
-        input: false,
-      },
-      placeCount: {
-        type: "number",
-        required: false,
-        defaultValue: 0,
-        input: false,
-      },
-      subscriptionStatus: {
-        type: "string",
-        required: false,
         input: false,
       },
     },

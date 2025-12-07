@@ -3,7 +3,7 @@ import { auth } from "../lib/auth";
 
 /**
  * Middleware to protect admin routes
- * Ensures user is authenticated and has admin role
+ * Ensures user is authenticated and is an admin (exists in admin table)
  */
 export const adminAuth = async (c: Context, next: Next) => {
   try {
@@ -20,17 +20,6 @@ export const adminAuth = async (c: Context, next: Next) => {
           message: "Please sign in to access this resource"
         },
         401
-      );
-    }
-
-    // Check if user has admin role
-    if (session.user.role !== "admin") {
-      return c.json(
-        {
-          error: "Insufficient permissions",
-          message: "Admin access required for this resource"
-        },
-        403
       );
     }
 
@@ -64,7 +53,8 @@ export const adminAuth = async (c: Context, next: Next) => {
 
 /**
  * Middleware to check for admin or owner role
- * Used for routes where both admin and resource owners can access
+ * WARNING: Currently only supports Admin check as Owner auth is separate.
+ * TODO: Implement cross-check for Owner (Web User) session.
  */
 export const adminOrOwnerAuth = async (c: Context, next: Next) => {
   try {
@@ -73,6 +63,7 @@ export const adminOrOwnerAuth = async (c: Context, next: Next) => {
     });
 
     if (!session || !session.user) {
+      // TODO: Try to check Web User session here if needed
       return c.json(
         {
           error: "Authentication required",
@@ -82,18 +73,8 @@ export const adminOrOwnerAuth = async (c: Context, next: Next) => {
       );
     }
 
-    // Allow admin and owner roles
-    const userRole = session.user.role || "";
-    if (!["admin", "owner"].includes(userRole)) {
-      return c.json(
-        {
-          error: "Insufficient permissions",
-          message: "Admin or owner access required for this resource"
-        },
-        403
-      );
-    }
-
+    // If session exists in Admin Auth, they are an admin.
+    // Check status
     if (session.user.status !== "active") {
       return c.json(
         {

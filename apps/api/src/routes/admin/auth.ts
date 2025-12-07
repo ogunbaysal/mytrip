@@ -1,12 +1,12 @@
 import { Hono } from "hono";
 import { auth } from "../../lib/auth";
 import { db } from "../../db";
-import { user, session as sessionTable } from "../../db/schemas";
-import { eq, desc, sql } from "drizzle-orm";
+import { admin, adminSession, adminRoles, adminPermissions, adminRolePermissions } from "../../db/schemas";
+import { eq, desc, sql, and } from "drizzle-orm";
 
 type Variables = {
-  adminUser: typeof user.$inferSelect;
-  adminSession: typeof sessionTable.$inferSelect;
+  adminUser: typeof admin.$inferSelect;
+  adminSession: typeof adminSession.$inferSelect;
 }
 
 const app = new Hono<{ Variables: Variables }>();
@@ -17,11 +17,11 @@ const app = new Hono<{ Variables: Variables }>();
  */
 app.get("/session", async (c) => {
   const adminUser = c.get("adminUser");
-  const adminSession = c.get("adminSession");
+  const session = c.get("adminSession");
 
   return c.json({
-    user: adminUser,
-    session: adminSession,
+    user: adminUser, // Frontend expects 'user' key often, but contains admin data
+    session: session,
   });
 });
 
@@ -33,18 +33,18 @@ app.get("/admins", async (c) => {
   try {
     const admins = await db
       .select({
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        status: user.status,
-        createdAt: user.createdAt,
-        lastLoginAt: user.lastLoginAt,
-        placeCount: user.placeCount,
+        id: admin.id,
+        name: admin.name,
+        email: admin.email,
+        role: adminRoles.name, // Return role name
+        roleId: admin.roleId,
+        status: admin.status,
+        createdAt: admin.createdAt,
+        lastLoginAt: admin.lastLoginAt,
       })
-      .from(user)
-      .where(eq(user.role, "admin"))
-      .orderBy(desc(user.createdAt));
+      .from(admin)
+      .leftJoin(adminRoles, eq(admin.roleId, adminRoles.id))
+      .orderBy(desc(admin.createdAt));
 
     return c.json({ admins });
   } catch (error) {
@@ -60,12 +60,38 @@ app.get("/admins", async (c) => {
 });
 
 /**
- * Create new admin user (super admin only)
+ * Create new admin user (super admin only / permission restricted)
  * POST /admin/auth/admins
  */
 app.post("/admins", async (c) => {
   try {
-    const { name, email, password } = await c.req.json();
+    const adminUser = c.get("adminUser");
+    
+    // Check permission
+    const hasPermission = await db
+        .select()
+        .from(adminRolePermissions)
+        .innerJoin(adminPermissions, eq(adminRolePermissions.permissionId, adminPermissions.id))
+        .where(
+            and(
+                eq(adminRolePermissions.roleId, adminUser.roleId || ""),
+                eq(adminPermissions.slug, "create:admin")
+            )
+        )
+        .limit(1);
+
+    if (hasPermission.length === 0) {
+        return c.json(
+            {
+                error: "Insufficient permissions",
+                message: "You do not have permission to create admin accounts"
+            },
+            403
+        );
+    }
+
+    const { name, email, password, roleId } = await c.req.json();
+    // ... rest of logic
 
     if (!name || !email || !password) {
       return c.json(
@@ -80,8 +106,8 @@ app.post("/admins", async (c) => {
     // Check if user already exists
     const existingUser = await db
       .select()
-      .from(user)
-      .where(eq(user.email, email))
+      .from(admin)
+      .where(eq(admin.email, email))
       .limit(1);
 
     if (existingUser.length > 0) {
@@ -103,12 +129,12 @@ app.post("/admins", async (c) => {
       },
     });
 
-    // Update user role to admin in database
-    if (result.user) {
+    // Manually assign role in DB since it's restricted in auth config
+    if (result.user && roleId) {
       await db
-        .update(user)
-        .set({ role: "admin" })
-        .where(eq(user.id, result.user.id));
+        .update(admin)
+        .set({ roleId })
+        .where(eq(admin.id, result.user.id));
     }
 
     return c.json({
@@ -118,7 +144,7 @@ app.post("/admins", async (c) => {
         id: result.user?.id,
         name: result.user?.name,
         email: result.user?.email,
-        role: "admin",
+        roleId: roleId,
       },
     });
   } catch (error) {
@@ -141,23 +167,23 @@ app.get("/sessions", async (c) => {
   try {
     const sessions = await db
       .select({
-        id: sessionTable.id,
-        userId: sessionTable.userId,
-        ipAddress: sessionTable.ipAddress,
-        userAgent: sessionTable.userAgent,
-        createdAt: sessionTable.createdAt,
-        updatedAt: sessionTable.updatedAt,
-        expiresAt: sessionTable.expiresAt,
-        userName: user.name,
-        userEmail: user.email,
-        userRole: user.role,
+        id: adminSession.id,
+        userId: adminSession.userId,
+        ipAddress: adminSession.ipAddress,
+        userAgent: adminSession.userAgent,
+        createdAt: adminSession.createdAt,
+        updatedAt: adminSession.updatedAt,
+        expiresAt: adminSession.expiresAt,
+        userName: admin.name,
+        userEmail: admin.email,
+        // userRole: admin.role, // role is now roleId or relation
       })
-      .from(sessionTable)
-      .leftJoin(user, eq(sessionTable.userId, user.id))
+      .from(adminSession)
+      .leftJoin(admin, eq(adminSession.userId, admin.id))
       .where(
-        sql`${sessionTable.expiresAt} > NOW()` // Only active sessions
+        sql`${adminSession.expiresAt} > NOW()` // Only active sessions
       )
-      .orderBy(desc(sessionTable.updatedAt));
+      .orderBy(desc(adminSession.updatedAt));
 
     return c.json({ sessions });
   } catch (error) {
@@ -182,8 +208,8 @@ app.delete("/sessions/:sessionId", async (c) => {
 
     // Delete the session
     const result = await db
-      .delete(sessionTable)
-      .where(eq(sessionTable.id, sessionId))
+      .delete(adminSession)
+      .where(eq(adminSession.id, sessionId))
       .returning();
 
     if (result.length === 0) {
