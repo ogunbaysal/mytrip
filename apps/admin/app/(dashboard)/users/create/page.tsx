@@ -38,12 +38,8 @@ const formSchema = z.object({
   password: z.string().min(6, {
     message: "Şifre en az 6 karakter olmalıdır.",
   }),
-  role: z.enum(["admin", "owner", "traveler"], {
-    required_error: "Lütfen bir rol seçiniz.",
-  }),
-  status: z.enum(["active", "suspended", "pending"], {
-    required_error: "Lütfen bir durum seçiniz.",
-  }),
+  role: z.enum(["admin", "owner", "traveler"]),
+  status: z.enum(["active", "suspended", "pending"]),
 })
 
 export default function CreateUserPage() {

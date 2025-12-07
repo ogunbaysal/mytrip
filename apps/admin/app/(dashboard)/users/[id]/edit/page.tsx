@@ -34,12 +34,8 @@ const formSchema = z.object({
   name: z.string().min(2, {
     message: "İsim en az 2 karakter olmalıdır.",
   }),
-  role: z.enum(["admin", "owner", "traveler"], {
-    required_error: "Lütfen bir rol seçiniz.",
-  }),
-  status: z.enum(["active", "suspended", "pending"], {
-    required_error: "Lütfen bir durum seçiniz.",
-  }),
+  role: z.enum(["admin", "owner", "traveler"]),
+  status: z.enum(["active", "suspended", "pending"]),
   phone: z.string().optional(),
 })
 

@@ -15,7 +15,7 @@ const planSchema = z.object({
   currency: z.enum(["TRY", "USD", "EUR"]).default("TRY"),
   billingCycle: z.enum(["monthly", "quarterly", "yearly"]),
   features: z.array(z.string()).optional(), // Expecting array of strings from frontend
-  limits: z.record(z.any()).optional(),
+  limits: z.record(z.string(), z.any()).optional(),
   active: z.boolean().default(true),
   sortOrder: z.number().int().default(0),
 });

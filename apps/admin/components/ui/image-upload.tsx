@@ -4,7 +4,7 @@ import * as React from "react"
 import { Button } from "@/components/ui/button"
 import { ImagePlus, X, Loader2 } from "lucide-react"
 import { toast } from "sonner"
-import { client } from "@/lib/auth-client" 
+ 
 
 interface ImageUploadProps {
   value?: string

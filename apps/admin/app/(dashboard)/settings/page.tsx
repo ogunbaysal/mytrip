@@ -71,9 +71,9 @@ export default function SettingsPage() {
     if (user) {
       setProfileForm({
         name: user.name || "",
-        bio: user.bio || "",
-        phone: user.phone || "",
-        avatar: user.image || user.avatar || ""
+        bio: (user as any).bio || "",
+        phone: (user as any).phone || "",
+        avatar: user.image || (user as any).avatar || ""
       })
     }
   }, [user])

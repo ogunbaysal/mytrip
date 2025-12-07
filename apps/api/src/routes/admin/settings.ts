@@ -27,7 +27,7 @@ router.patch(
   zValidator(
     "json",
     z.object({
-      value: z.record(z.any()),
+      value: z.record(z.string(), z.any()),
     })
   ) as any,
   async (c) => {

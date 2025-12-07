@@ -52,7 +52,7 @@ export const PlanForm: React.FC<PlanFormProps> = ({ initialData }) => {
   const defaultValues: PlanFormValues = initialData ? {
     name: initialData.name,
     description: initialData.description || "",
-    price: parseFloat(initialData.price),
+    price: parseFloat(initialData.price.toString()),
     currency: initialData.currency as "TRY" | "USD" | "EUR",
     billingCycle: initialData.billingCycle,
     active: initialData.active,

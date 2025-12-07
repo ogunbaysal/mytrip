@@ -69,8 +69,8 @@ export default function PlaceDetailPage() {
         <div className="flex flex-col space-y-1">
              <div className="flex items-center space-x-2">
                 <h2 className="text-3xl font-bold tracking-tight">{place.name}</h2>
-                {place.verified && <CheckCircle2 className="h-6 w-6 text-blue-500" title="Doğrulanmış" />}
-                {place.featured && <Star className="h-6 w-6 fill-yellow-400 text-yellow-400" title="Öne Çıkan" />}
+                {place.verified && <CheckCircle2 className="h-6 w-6 text-blue-500" />}
+                {place.featured && <Star className="h-6 w-6 fill-yellow-400 text-yellow-400" />}
              </div>
              <p className="text-muted-foreground flex items-center">
                  <MapPin className="h-4 w-4 mr-1" /> {place.city}, {place.district}
@@ -219,7 +219,7 @@ export default function PlaceDetailPage() {
                         </div>
                         <div className="flex flex-col">
                              <span className="text-xs text-muted-foreground">Fiyat Seviyesi</span>
-                             <span className="font-medium">{"$".repeat(place.priceLevel)}</span>
+                             <span className="font-medium">{"$".repeat(Number(place.priceLevel))}</span>
                         </div>
                     </div>
                 </CardContent>

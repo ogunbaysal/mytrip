@@ -18,7 +18,7 @@ export default function SubscriptionsPage() {
         
         const data = await res.json();
         if (data.subscriptions) {
-           const mappedSubs: Subscription[] = data.subscriptions.map((sub) => ({
+           const mappedSubs: Subscription[] = data.subscriptions.map((sub: any) => ({
              id: sub.id,
              userId: sub.user?.id || "",
              planId: sub.plan?.id || "",

@@ -12,6 +12,8 @@ export type User = {
   placeCount: number;
   lastLoginAt: string | null;
   createdAt: string;
+  emailVerified: boolean;
+  subscriptionStatus: string | null;
 };
 
 type Params = {

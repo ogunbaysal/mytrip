@@ -404,7 +404,7 @@ app.get("/categories", async (c) => {
       categories: categories.map(cat => ({
         name: cat.category,
         count: Number(cat.count),
-        slug: cat.category.toLowerCase().replace(/\s+/g, '-'),
+        slug: (cat.category || "").toLowerCase().replace(/\s+/g, '-'),
       })),
     });
   } catch (error) {
