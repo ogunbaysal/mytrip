@@ -39,3 +39,29 @@ export function useCreateAdmin() {
     },
   });
 }
+
+export function useAdmin(id: string) {
+  return useQuery({
+    queryKey: ["admins", id],
+    queryFn: async () => {
+      return apiFetch<{ admin: Admin }>(`/api/admin/auth/admins/${id}`).then(res => res.admin);
+    },
+    enabled: !!id,
+  });
+}
+
+export function useUpdateAdmin() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<Admin> }) => {
+      return apiFetch(`/api/admin/auth/admins/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      });
+    },
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["admins"] });
+      queryClient.invalidateQueries({ queryKey: ["admins", variables.id] });
+    },
+  });
+}

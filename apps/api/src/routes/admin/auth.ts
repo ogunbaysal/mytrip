@@ -60,6 +60,71 @@ app.get("/admins", async (c) => {
 });
 
 /**
+ * Get specific admin detail
+ * GET /admin/auth/admins/:id
+ */
+app.get("/admins/:id", async (c) => {
+  try {
+    const { id } = c.req.param();
+    const adminUser = await db
+      .select({
+        id: admin.id,
+        name: admin.name,
+        email: admin.email,
+        role: adminRoles.name,
+        roleId: admin.roleId,
+        status: admin.status,
+        createdAt: admin.createdAt,
+        lastLoginAt: admin.lastLoginAt,
+      })
+      .from(admin)
+      .leftJoin(adminRoles, eq(admin.roleId, adminRoles.id))
+      .where(eq(admin.id, id))
+      .limit(1);
+
+    if (adminUser.length === 0) {
+      return c.json({ error: "Admin not found" }, 404);
+    }
+
+    return c.json({ admin: adminUser[0] });
+  } catch (error) {
+    console.error("Failed to fetch admin:", error);
+    return c.json({ error: "Failed to fetch admin" }, 500);
+  }
+});
+
+/**
+ * Update admin user
+ * PUT /admin/auth/admins/:id
+ */
+app.put("/admins/:id", async (c) => {
+  try {
+    const { id } = c.req.param();
+    const { name, email, roleId, status } = await c.req.json();
+    const currentAdmin = c.get("adminUser");
+
+    // TODO: Add permission check for 'manage:admins' or similar
+
+    // Update logic
+    await db
+      .update(admin)
+      .set({
+        name,
+        email, // Note: Changing email might require re-verification or auth system update depending on config
+        roleId,
+        status,
+        updatedAt: new Date(),
+      })
+      .where(eq(admin.id, id));
+
+    return c.json({ success: true, message: "Admin updated successfully" });
+  } catch (error) {
+    console.error("Failed to update admin:", error);
+    return c.json({ error: "Failed to update admin" }, 500);
+  }
+});
+
+/**
  * Create new admin user (super admin only / permission restricted)
  * POST /admin/auth/admins
  */
