@@ -11,6 +11,9 @@ import { analyticsRoutes } from "./analytics";
 import { uploadRoutes } from "./upload";
 import settings from "./settings";
 import categories from "./categories";
+import { plansRoutes } from "./plans";
+import { subscriptionsRoutes } from "./subscriptions";
+import { paymentsRoutes } from "./payments";
 
 const app = new Hono<{
   Variables: {
@@ -53,5 +56,8 @@ app.route("/analytics", analyticsRoutes);
 app.route("/upload", uploadRoutes);
 app.route("/settings", settings);
 app.route("/categories", categories);
+app.route("/plans", plansRoutes);
+app.route("/subscriptions", subscriptionsRoutes);
+app.route("/payments", paymentsRoutes);
 
 export { app as adminRoutes };

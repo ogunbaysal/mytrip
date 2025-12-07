@@ -7,7 +7,7 @@ export interface Subscription {
   ownerEmail: string
   placeId?: string
   placeName?: string
-  status: "active" | "expired" | "cancelled" | "pending" | "trial"
+  status: "active" | "expired" | "cancelled" | "pending" | "trial" | "past_due"
   price: number
   currency: "TRY" | "USD" | "EUR"
   billingCycle: "monthly" | "quarterly" | "yearly"

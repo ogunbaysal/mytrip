@@ -4,9 +4,8 @@ import { useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
-import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Eye, EyeOff, Lock, Mail, Shield } from "lucide-react"
+import { Eye, EyeOff, Lock, Shield } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -14,7 +13,6 @@ import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
@@ -27,7 +25,6 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
-import { Separator } from "@/components/ui/separator"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useAuth } from "@/hooks/use-auth"
 
@@ -186,45 +183,11 @@ export default function LoginPage() {
               </form>
             </Form>
 
-            <Separator className="my-4" />
 
-            <div className="space-y-3">
-              <div className="text-center text-sm">
-                <Link
-                  href="/forgot-password"
-                  className="text-primary hover:underline"
-                >
-                  Şifrenizi mi unuttunuz?
-                </Link>
-              </div>
-
-              <div className="text-center text-sm text-muted-foreground">
-                Henüz hesabınız yok mu?{" "}
-                <Link
-                  href="/register"
-                  className="text-primary hover:underline"
-                >
-                  Kayıt olun
-                </Link>
-              </div>
-            </div>
           </CardContent>
         </Card>
 
-        {/* Demo Account Info */}
-        <Card className="border-dashed">
-          <CardContent className="pt-6">
-            <div className="text-center space-y-2">
-              <h4 className="text-sm font-medium text-muted-foreground">
-                Demo Hesabı
-              </h4>
-              <p className="text-xs text-muted-foreground">
-                E-posta: demo@mytrip.com<br />
-                Şifre: demo123
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+
 
         {/* Footer */}
         <div className="text-center text-xs text-muted-foreground">

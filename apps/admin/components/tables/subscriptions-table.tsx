@@ -41,16 +41,25 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Progress } from "@/components/ui/progress"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Subscription, mockSubscriptions, subscriptionStatuses, billingCycles } from "@/lib/mock-data/subscriptions"
+import { subscriptionStatuses, billingCycles } from "@/lib/mock-data/subscriptions"
+import { Subscription } from "@/types/subscriptions"
 
-export function SubscriptionsTable() {
+interface SubscriptionsTableProps {
+  initialData: Subscription[];
+}
+
+export function SubscriptionsTable({ initialData }: SubscriptionsTableProps) {
   const router = useRouter()
-  const [data, setData] = React.useState<Subscription[]>(mockSubscriptions)
+  const [data, setData] = React.useState<Subscription[]>(initialData)
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
   const [rowSelection, setRowSelection] = React.useState({})
+
+  // Update data if initialData changes (optional, depending on if we want full sync)
+  React.useEffect(() => {
+    setData(initialData);
+  }, [initialData]);
 
   const handleSubscriptionAction = (action: string, subscription: Subscription) => {
     switch (action) {

@@ -1,6 +1,6 @@
 "use client"
 
-import { Hotel, Users, MapPin, FileText, CreditCard, BarChart3, Settings, LogOut, ChevronDown, List } from "lucide-react"
+import { Hotel, Users, MapPin, FileText, CreditCard, BarChart3, Settings, LogOut, ChevronDown, List, Package, Receipt } from "lucide-react"
 import { useAuth } from "@/hooks/use-auth"
 import { useRouter } from "next/navigation"
 
@@ -70,6 +70,16 @@ const adminMenuItems: MenuItem[] = [
     title: "Abonelikler",
     url: "/subscriptions",
     icon: CreditCard,
+  },
+  {
+    title: "Paketler",
+    url: "/subscriptions/plans",
+    icon: Package,
+  },
+  {
+    title: "Ödemeler",
+    url: "/subscriptions/payments",
+    icon: Receipt,
   },
   {
     title: "Ayarlar",

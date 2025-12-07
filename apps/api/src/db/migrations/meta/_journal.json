@@ -15,6 +15,13 @@
       "when": 1764424963370,
       "tag": "0001_shallow_patch",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1765113331017,
+      "tag": "0002_nappy_captain_cross",
+      "breakpoints": true
     }
   ]
 }
