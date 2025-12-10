@@ -1,15 +1,15 @@
+import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
-import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { Button } from "@/components/ui/button";
-import { PlacesMap } from "@/components/places/places-map";
 import { CollectionCard } from "@/components/collections/collection-card";
 import { PlaceCard } from "@/components/places/place-card";
+import { PlacesMap } from "@/components/places/places-map";
 import { PriceCard } from "@/components/places/price-card";
 import { ReservationCalendar } from "@/components/places/reservation-calendar";
-import { PLACE_DETAILS, PLACE_DETAILS_BY_SLUG } from "@/lib/data/place-details";
+import { Button } from "@/components/ui/button";
+import { api } from "@/lib/api";
 
 const priceFormatter = new Intl.NumberFormat("tr-TR", {
   style: "currency",
@@ -17,19 +17,13 @@ const priceFormatter = new Intl.NumberFormat("tr-TR", {
   minimumFractionDigits: 0,
 });
 
-export const dynamic = "force-static";
-
-export function generateStaticParams() {
-  return PLACE_DETAILS.map((detail) => ({ slug: detail.slug }));
-}
-
 export async function generateMetadata({
   params,
 }: {
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const detail = PLACE_DETAILS_BY_SLUG.get(slug);
+  const detail = await api.places.getBySlug(slug);
 
   if (!detail) {
     notFound();
@@ -47,7 +41,7 @@ export default async function PlaceDetailPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const detail = PLACE_DETAILS_BY_SLUG.get(slug);
+  const detail = await api.places.getBySlug(slug);
 
   if (!detail) {
     notFound();

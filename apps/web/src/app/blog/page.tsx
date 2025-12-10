@@ -1,31 +1,41 @@
 "use client";
 
 import Image from "next/image";
-import { useMemo, useState } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 import { BlogPostCard } from "@/components/blog/blog-post-card";
-import { BLOG_POSTS } from "@/lib/data/blog-posts";
-import type { BlogCategory } from "@/types";
+import { api } from "@/lib/api";
 
 const HERO_IMAGE =
   "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1600&q=80";
 
-const CATEGORY_FILTERS: { value: BlogCategory | "tum"; label: string }[] = [
-  { value: "tum", label: "Tümü" },
-  { value: "rehber", label: "Rehber" },
-  { value: "deneyim", label: "Deneyim" },
-  { value: "gurme", label: "Gurme" },
-  { value: "mikrotrend", label: "Mikro Trend" },
-];
-
 export default function BlogPage() {
-  const [activeCategory, setActiveCategory] = useState<(typeof CATEGORY_FILTERS)[number]["value"]>("tum");
+  const [activeCategory, setActiveCategory] = useState("tum");
 
-  const posts = useMemo(() => {
-    const sorted = [...BLOG_POSTS].sort((a, b) => (a.publishedAt < b.publishedAt ? 1 : -1));
-    if (activeCategory === "tum") return sorted;
-    return sorted.filter((post) => post.category === activeCategory);
-  }, [activeCategory]);
+  const { data: postsData, isLoading } = useQuery({
+    queryKey: ["blog-posts", activeCategory],
+    queryFn: async () => {
+      const res = await api.blog.list({
+        category: activeCategory === "tum" ? undefined : activeCategory,
+        limit: 50,
+      });
+      return res.blogPosts;
+    },
+  });
+
+  const { data: categoriesData } = useQuery({
+    queryKey: ["blog-categories"],
+    queryFn: api.blog.listCategories,
+  });
+
+  const filters = [
+    { value: "tum", label: "Tümü" },
+    ...(categoriesData?.map((c) => ({
+      value: c.slug,
+      label: c.displayName || c.name,
+    })) || []),
+  ];
 
   return (
     <div className="space-y-14 pb-24 pt-10 md:space-y-16 md:pt-14">
@@ -57,7 +67,7 @@ export default function BlogPage() {
 
       <section className="mx-auto w-full max-w-[1100px] space-y-6 px-4 md:px-6">
         <div className="flex flex-wrap gap-2">
-          {CATEGORY_FILTERS.map((category) => (
+          {filters.map((category) => (
             <button
               key={category.value}
               type="button"
@@ -76,15 +86,20 @@ export default function BlogPage() {
         <div className="space-y-4">
           <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
             <h2 className="text-xl font-semibold text-foreground">Son yazılar</h2>
-            <span className="text-sm text-muted-foreground">{posts.length} içerik</span>
+            <span className="text-sm text-muted-foreground">
+                {postsData?.length ?? 0} içerik
+            </span>
           </div>
-          {posts.length === 0 ? (
+          
+          {isLoading ? (
+             <div className="py-20 text-center text-muted-foreground">Yükleniyor...</div>
+          ) : !postsData || postsData.length === 0 ? (
             <div className="rounded-3xl border border-dashed border-border/70 bg-white p-8 text-center text-sm text-muted-foreground">
               Bu kategoride henüz içerik bulunmuyor.
             </div>
           ) : (
             <div className="grid gap-5">
-              {posts.map((post) => (
+              {postsData.map((post) => (
                 <BlogPostCard key={post.id} post={post} />
               ))}
             </div>

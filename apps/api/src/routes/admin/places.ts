@@ -6,6 +6,26 @@ import { nanoid } from "nanoid";
 
 const app = new Hono();
 
+// Helper to safely parse JSON
+const safeParse = (str: any) => {
+  if (typeof str === 'string') {
+    try {
+      return JSON.parse(str);
+    } catch (e) {
+      return null;
+    }
+  }
+  return str; // Already object or null
+};
+
+// Helper to safely stringify
+const safeStringify = (val: any) => {
+  if (typeof val === 'object' && val !== null) {
+      return JSON.stringify(val);
+  }
+  return val;
+}
+
 /**
  * Get all places with pagination and filtering
  * GET /admin/places
@@ -99,7 +119,7 @@ app.get("/", async (c) => {
         priceLevel: place.priceLevel,
         nightlyPrice: place.nightlyPrice,
         status: place.status,
-        verified: place.featured,
+        verified: place.verified,
         featured: place.featured,
         views: place.views,
         bookingCount: place.bookingCount,
@@ -108,6 +128,7 @@ app.get("/", async (c) => {
         updatedAt: place.updatedAt,
         ownerName: user.name,
         ownerEmail: user.email,
+        categoryId: place.categoryId,
         categoryName: placeCategory.name,
         categorySlug: placeCategory.slug,
       })
@@ -118,9 +139,15 @@ app.get("/", async (c) => {
       .orderBy(sql`${orderByColumn} ${orderDirection}`)
       .limit(limitInt)
       .offset(offset);
+    
+    // Process places to parse JSON fields if necessary (for list view, usually we don't need deep JSON details but valid JSON types are good)
+    const processedPlaces = places.map(p => ({
+        ...p,
+        location: safeParse(p.location),
+    }));
 
     return c.json({
-      places,
+      places: processedPlaces,
       pagination: {
         page: parseInt(page),
         limit: limitInt,
@@ -181,9 +208,9 @@ app.get("/:placeId", async (c) => {
         updatedAt: place.updatedAt,
         ownerName: user.name,
         ownerEmail: user.email,
+        categoryId: place.categoryId,
         categoryName: placeCategory.name,
         categorySlug: placeCategory.slug,
-        categoryId: place.categoryId,
       })
       .from(place)
       .leftJoin(user, eq(place.ownerId, user.id))
@@ -200,8 +227,20 @@ app.get("/:placeId", async (c) => {
         404
       );
     }
+    
+    // Parse JSON fields
+    const parsedPlace = {
+        ...placeData,
+        location: safeParse(placeData.location),
+        contactInfo: safeParse(placeData.contactInfo),
+        features: safeParse(placeData.features) || [],
+        images: safeParse(placeData.images) || [],
+        openingHours: safeParse(placeData.openingHours),
+        checkInInfo: safeParse(placeData.checkInInfo),
+        checkOutInfo: safeParse(placeData.checkOutInfo),
+    };
 
-    return c.json({ place: placeData });
+    return c.json({ place: parsedPlace });
   } catch (error) {
     console.error("Failed to fetch place:", error);
     return c.json(
@@ -234,15 +273,15 @@ app.post("/", async (c) => {
       address: placeData.address,
       city: placeData.city,
       district: placeData.district,
-      location: placeData.location,
-      contactInfo: placeData.contactInfo,
+      location: safeStringify(placeData.location),
+      contactInfo: safeStringify(placeData.contactInfo),
       priceLevel: placeData.priceLevel,
       nightlyPrice: placeData.nightlyPrice,
-      features: placeData.features,
-      images: placeData.images,
-      openingHours: placeData.openingHours,
-      checkInInfo: placeData.checkInInfo,
-      checkOutInfo: placeData.checkOutInfo,
+      features: safeStringify(placeData.features),
+      images: safeStringify(placeData.images),
+      openingHours: safeStringify(placeData.openingHours),
+      checkInInfo: safeStringify(placeData.checkInInfo),
+      checkOutInfo: safeStringify(placeData.checkOutInfo),
       ownerId: placeData.ownerId,
       status: placeData.status || "pending",
       verified: placeData.verified || false,
@@ -251,10 +290,22 @@ app.post("/", async (c) => {
 
     const [createdPlace] = await db.insert(place).values(newPlace).returning();
 
+    // Parse back for response
+    const parsedPlace = {
+        ...createdPlace,
+        location: safeParse(createdPlace.location),
+        contactInfo: safeParse(createdPlace.contactInfo),
+        features: safeParse(createdPlace.features) || [],
+        images: safeParse(createdPlace.images) || [],
+        openingHours: safeParse(createdPlace.openingHours),
+        checkInInfo: safeParse(createdPlace.checkInInfo),
+        checkOutInfo: safeParse(createdPlace.checkOutInfo),
+    };
+
     return c.json({
       success: true,
       message: "Place created successfully",
-      place: createdPlace,
+      place: parsedPlace,
     });
   } catch (error) {
     console.error("Failed to create place:", error);
@@ -278,14 +329,25 @@ app.put("/:placeId", async (c) => {
     const updates = await c.req.json();
 
     // Remove fields that shouldn't be updated directly
-    const { id, createdAt, updatedAt, ownerName, ownerEmail, ...allowedUpdates } = updates;
+    const { id, createdAt, updatedAt, ownerName, ownerEmail, categoryName, categorySlug, ...allowedUpdates } = updates;
+    
+    // Stringify JSON fields
+    const dbUpdates = {
+        ...allowedUpdates,
+        updatedAt: new Date(),
+    };
+    
+    if (dbUpdates.location) dbUpdates.location = safeStringify(dbUpdates.location);
+    if (dbUpdates.contactInfo) dbUpdates.contactInfo = safeStringify(dbUpdates.contactInfo);
+    if (dbUpdates.features) dbUpdates.features = safeStringify(dbUpdates.features);
+    if (dbUpdates.images) dbUpdates.images = safeStringify(dbUpdates.images);
+    if (dbUpdates.openingHours) dbUpdates.openingHours = safeStringify(dbUpdates.openingHours);
+    if (dbUpdates.checkInInfo) dbUpdates.checkInInfo = safeStringify(dbUpdates.checkInInfo);
+    if (dbUpdates.checkOutInfo) dbUpdates.checkOutInfo = safeStringify(dbUpdates.checkOutInfo);
 
     const [updatedPlace] = await db
       .update(place)
-      .set({
-        ...allowedUpdates,
-        updatedAt: new Date(),
-      })
+      .set(dbUpdates)
       .where(eq(place.id, placeId))
       .returning();
 
@@ -299,10 +361,22 @@ app.put("/:placeId", async (c) => {
       );
     }
 
+    // Parse back for response
+    const parsedPlace = {
+        ...updatedPlace,
+        location: safeParse(updatedPlace.location),
+        contactInfo: safeParse(updatedPlace.contactInfo),
+        features: safeParse(updatedPlace.features) || [],
+        images: safeParse(updatedPlace.images) || [],
+        openingHours: safeParse(updatedPlace.openingHours),
+        checkInInfo: safeParse(updatedPlace.checkInInfo),
+        checkOutInfo: safeParse(updatedPlace.checkOutInfo),
+    };
+
     return c.json({
       success: true,
       message: "Place updated successfully",
-      place: updatedPlace,
+      place: parsedPlace,
     });
   } catch (error) {
     console.error("Failed to update place:", error);

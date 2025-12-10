@@ -1,16 +1,24 @@
 "use client";
 
 import Image from "next/image";
+import { useQuery } from "@tanstack/react-query";
 
 import { CollectionCard } from "@/components/collections/collection-card";
-import { useFeaturedCollections } from "@/hooks/use-featured-content";
+import { api } from "@/lib/api";
 
 const HERO_IMAGE =
   "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1600&q=80";
 
 export default function CollectionsPage() {
-  const { data, isLoading } = useFeaturedCollections();
-  const collections = data ?? [];
+  const { data: collections, isLoading } = useQuery({
+    queryKey: ["collections"],
+    queryFn: async () => {
+      const res = await api.collections.list({ limit: 100 });
+      return res.collections;
+    },
+  });
+
+  const items = collections ?? [];
 
   return (
     <div className="space-y-14 pb-24 pt-10 md:space-y-16 md:pt-14">
@@ -44,20 +52,20 @@ export default function CollectionsPage() {
         <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
           <h2 className="text-xl font-semibold text-foreground">Tüm koleksiyonlar</h2>
           <span className="text-sm text-muted-foreground">
-            {isLoading ? "Yükleniyor..." : `${collections.length} koleksiyon`}
+            {isLoading ? "Yükleniyor..." : `${items.length} koleksiyon`}
           </span>
         </div>
         {isLoading ? (
           <div className="rounded-3xl border border-dashed border-border/70 bg-white p-8 text-center text-sm text-muted-foreground">
             İçerik yükleniyor, lütfen bekleyin.
           </div>
-        ) : collections.length === 0 ? (
+        ) : items.length === 0 ? (
           <div className="rounded-3xl border border-dashed border-border/70 bg-white p-8 text-center text-sm text-muted-foreground">
             Şu anda görüntülenecek koleksiyon bulunamadı.
           </div>
         ) : (
           <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-            {collections.map((collection) => (
+            {items.map((collection) => (
               <CollectionCard key={collection.id} collection={collection} />
             ))}
           </div>

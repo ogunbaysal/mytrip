@@ -49,8 +49,32 @@ const formSchema = z.object({
   longitude: z.string().optional(),
   priceLevel: z.string().optional(),
   nightlyPrice: z.string().optional(),
-  status: z.enum(["active", "inactive", "pending", "suspended"])
+  status: z.enum(["active", "inactive", "pending", "suspended"]),
+  contactInfo: z.object({
+      phone: z.string().optional(),
+      email: z.string().email("Geçerli bir e-posta giriniz").optional().or(z.literal("")),
+      website: z.string().url("Geçerli bir URL giriniz").optional().or(z.literal("")),
+  }).optional(),
+  features: z.array(z.string()).optional(),
 })
+
+const COMMON_FEATURES = [
+    { id: "wifi", label: "Wi-Fi" },
+    { id: "parking", label: "Otopark" },
+    { id: "pool", label: "Havuz" },
+    { id: "spa", label: "Spa & Wellness" },
+    { id: "gym", label: "Spor Salonu" },
+    { id: "restaurant", label: "Restoran" },
+    { id: "bar", label: "Bar" },
+    { id: "room_service", label: "Oda Servisi" },
+    { id: "air_conditioning", label: "Klima" },
+    { id: "heating", label: "Isıtma" },
+    { id: "sea_view", label: "Deniz Manzarası" },
+    { id: "beach_access", label: "Plaja Erişim" },
+    { id: "pet_friendly", label: "Evcil Hayvan Dostu" },
+    { id: "wheelchair_accessible", label: "Engelli Erişimi" },
+    { id: "family_friendly", label: "Aile Dostu" },
+];
 
 export default function EditPlacePage() {
   const router = useRouter()
@@ -80,6 +104,12 @@ export default function EditPlacePage() {
       longitude: "",
       nightlyPrice: "",
       status: "pending",
+      contactInfo: {
+          phone: "",
+          email: "",
+          website: "",
+      },
+      features: [],
     },
   })
 
@@ -105,6 +135,12 @@ export default function EditPlacePage() {
         nightlyPrice: place.nightlyPrice || "",
         status: place.status,
         images: place.images || [],
+        contactInfo: {
+            phone: place.contactInfo?.phone || "",
+            email: place.contactInfo?.email || "",
+            website: place.contactInfo?.website || "",
+        },
+        features: place.features || [],
       })
     }
   }, [place, form])
@@ -293,6 +329,47 @@ export default function EditPlacePage() {
                 <div className="space-y-4">
                     <Card>
                         <CardHeader>
+                            <CardTitle>İletişim Bilgileri</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <FormField
+                                control={form.control}
+                                name="contactInfo.phone"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Telefon</FormLabel>
+                                        <FormControl><Input placeholder="+90 555 ..." {...field} /></FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="contactInfo.email"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>E-posta</FormLabel>
+                                        <FormControl><Input placeholder="info@..." {...field} /></FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                             <FormField
+                                control={form.control}
+                                name="contactInfo.website"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Web Sitesi</FormLabel>
+                                        <FormControl><Input placeholder="https://..." {...field} /></FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader>
                             <CardTitle>Konum Bilgileri</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
@@ -425,6 +502,61 @@ export default function EditPlacePage() {
                                 />
                             </div>
                          </CardContent>
+                    </Card>
+
+                     <Card>
+                        <CardHeader>
+                            <CardTitle>Özellikler</CardTitle>
+                            <CardDescription>Mekanınızda bulunan olanakları seçin.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                             <FormField
+                                control={form.control}
+                                name="features"
+                                render={() => (
+                                    <FormItem>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            {COMMON_FEATURES.map((feature) => (
+                                                <FormField
+                                                    key={feature.id}
+                                                    control={form.control}
+                                                    name="features"
+                                                    render={({ field }) => {
+                                                        return (
+                                                            <FormItem
+                                                                key={feature.id}
+                                                                className="flex flex-row items-start space-x-3 space-y-0"
+                                                            >
+                                                                <FormControl>
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                                                        checked={field.value?.includes(feature.id)}
+                                                                        onChange={(checked) => {
+                                                                            return checked.target.checked
+                                                                                ? field.onChange([...(field.value || []), feature.id])
+                                                                                : field.onChange(
+                                                                                    field.value?.filter(
+                                                                                        (value) => value !== feature.id
+                                                                                    )
+                                                                                )
+                                                                        }}
+                                                                    />
+                                                                </FormControl>
+                                                                <FormLabel className="font-normal">
+                                                                    {feature.label}
+                                                                </FormLabel>
+                                                            </FormItem>
+                                                        )
+                                                    }}
+                                                />
+                                            ))}
+                                        </div>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        </CardContent>
                     </Card>
                 </div>
             </div>

@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { db } from "../db";
-import { place, user, review } from "../db/schemas";
+import { place, user, review, placeCategory } from "../db/schemas";
 import { eq, desc, ilike, sql, and, gt } from "drizzle-orm";
 
 const app = new Hono();
@@ -18,6 +18,7 @@ app.get("/", async (c) => {
       type = "",
       category = "",
       city = "",
+      district = "",
       priceLevel = "",
       featured = "",
       verified = "",
@@ -47,6 +48,10 @@ app.get("/", async (c) => {
 
     if (city) {
       conditions.push(ilike(place.city, `%${city}%`));
+    }
+
+    if (district) {
+      conditions.push(ilike(place.district, `%${district}%`));
     }
 
     if (priceLevel) {
@@ -266,6 +271,131 @@ app.get("/popular", async (c) => {
   }
 });
 
+
+/**
+ * Get place categories
+ * GET /places/categories
+ */
+/**
+ * Get place categories
+ * GET /places/categories
+ */
+app.get("/categories", async (c) => {
+  try {
+    const categories = await db
+      .select({
+        id: placeCategory.id,
+        name: placeCategory.name,
+        slug: placeCategory.slug,
+        description: placeCategory.description,
+        icon: placeCategory.icon,
+        count: sql`COUNT(${place.id})::int`,
+      })
+      .from(placeCategory)
+      .leftJoin(place, and(eq(place.categoryId, placeCategory.id), eq(place.status, "active")))
+      .groupBy(placeCategory.id)
+      .orderBy(sql`COUNT(${place.id}) DESC`);
+
+    return c.json({
+      categories: categories.map(cat => ({
+        id: cat.slug, 
+        title: cat.name,
+        description: cat.description || `${cat.count} seçenek`,
+        count: Number(cat.count),
+      })),
+    });
+  } catch (error) {
+    console.error("Failed to fetch categories:", error);
+    return c.json(
+      {
+        error: "Failed to fetch categories",
+        message: "Unable to retrieve place categories"
+      },
+      500
+    );
+  }
+});
+
+/**
+ * Get places by city
+ * GET /places/cities
+ */
+app.get("/cities", async (c) => {
+  try {
+    const cities = await db
+      .select({
+        city: place.city,
+        count: sql`COUNT(*)::int`,
+      })
+      .from(place)
+      .where(and(eq(place.status, "active"), sql`${place.city} IS NOT NULL`))
+      .groupBy(place.city)
+      .orderBy(sql`COUNT(*) DESC`);
+
+    return c.json({
+      cities: cities.map(city => ({
+        name: city.city!,
+        count: Number(city.count),
+        slug: city.city!.toLowerCase().replace(/\s+/g, '-'),
+      })),
+    });
+  } catch (error) {
+    console.error("Failed to fetch cities:", error);
+    return c.json(
+      {
+        error: "Failed to fetch cities",
+        message: "Unable to retrieve cities"
+      },
+      500
+    );
+  }
+});
+
+/**
+ * Get place types
+ * GET /places/types
+ */
+app.get("/types", async (c) => {
+  try {
+    const placeTypes = await db
+      .select({
+        type: place.type,
+        count: sql`COUNT(*)::int`,
+      })
+      .from(place)
+      .where(eq(place.status, "active"))
+      .groupBy(place.type)
+      .orderBy(sql`COUNT(*) DESC`);
+
+    const typeNames = {
+      hotel: "Hotels",
+      restaurant: "Restaurants",
+      cafe: "Cafes",
+      activity: "Activities",
+      attraction: "Attractions",
+      transport: "Transportation",
+    };
+
+    return c.json({
+      types: placeTypes.map(pt => ({
+        type: pt.type,
+        name: typeNames[pt.type as keyof typeof typeNames] || pt.type,
+        count: Number(pt.count),
+        slug: pt.type.toLowerCase(),
+      })),
+    });
+  } catch (error) {
+    console.error("Failed to fetch place types:", error);
+    return c.json(
+      {
+        error: "Failed to fetch place types",
+        message: "Unable to retrieve place types"
+      },
+      500
+    );
+  }
+});
+
 /**
  * Get place by slug
  * GET /places/:slug
@@ -378,121 +508,6 @@ app.get("/:slug", async (c) => {
       {
         error: "Failed to fetch place",
         message: "Unable to retrieve place details"
-      },
-      500
-    );
-  }
-});
-
-/**
- * Get place categories
- * GET /places/categories
- */
-app.get("/categories", async (c) => {
-  try {
-    const categories = await db
-      .select({
-        category: place.category,
-        count: sql`COUNT(*)::int`,
-      })
-      .from(place)
-      .where(eq(place.status, "active"))
-      .groupBy(place.category)
-      .orderBy(sql`COUNT(*) DESC`);
-
-    return c.json({
-      categories: categories.map(cat => ({
-        name: cat.category,
-        count: Number(cat.count),
-        slug: (cat.category || "").toLowerCase().replace(/\s+/g, '-'),
-      })),
-    });
-  } catch (error) {
-    console.error("Failed to fetch categories:", error);
-    return c.json(
-      {
-        error: "Failed to fetch categories",
-        message: "Unable to retrieve place categories"
-      },
-      500
-    );
-  }
-});
-
-/**
- * Get places by city
- * GET /places/cities
- */
-app.get("/cities", async (c) => {
-  try {
-    const cities = await db
-      .select({
-        city: place.city,
-        count: sql`COUNT(*)::int`,
-      })
-      .from(place)
-      .where(and(eq(place.status, "active"), sql`${place.city} IS NOT NULL`))
-      .groupBy(place.city)
-      .orderBy(sql`COUNT(*) DESC`);
-
-    return c.json({
-      cities: cities.map(city => ({
-        name: city.city!,
-        count: Number(city.count),
-        slug: city.city!.toLowerCase().replace(/\s+/g, '-'),
-      })),
-    });
-  } catch (error) {
-    console.error("Failed to fetch cities:", error);
-    return c.json(
-      {
-        error: "Failed to fetch cities",
-        message: "Unable to retrieve cities"
-      },
-      500
-    );
-  }
-});
-
-/**
- * Get place types
- * GET /places/types
- */
-app.get("/types", async (c) => {
-  try {
-    const placeTypes = await db
-      .select({
-        type: place.type,
-        count: sql`COUNT(*)::int`,
-      })
-      .from(place)
-      .where(eq(place.status, "active"))
-      .groupBy(place.type)
-      .orderBy(sql`COUNT(*) DESC`);
-
-    const typeNames = {
-      hotel: "Hotels",
-      restaurant: "Restaurants",
-      cafe: "Cafes",
-      activity: "Activities",
-      attraction: "Attractions",
-      transport: "Transportation",
-    };
-
-    return c.json({
-      types: placeTypes.map(pt => ({
-        type: pt.type,
-        name: typeNames[pt.type as keyof typeof typeNames] || pt.type,
-        count: Number(pt.count),
-        slug: pt.type.toLowerCase(),
-      })),
-    });
-  } catch (error) {
-    console.error("Failed to fetch place types:", error);
-    return c.json(
-      {
-        error: "Failed to fetch place types",
-        message: "Unable to retrieve place types"
       },
       500
     );

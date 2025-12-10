@@ -19,3 +19,10 @@ export function useFeaturedCollections() {
     queryFn: () => api.collections.listFeatured(),
   });
 }
+
+export function usePlaceTypes() {
+  return useQuery({
+    queryKey: ["places", "types", DEFAULT_LOCALE],
+    queryFn: () => api.places.listTypes(),
+  });
+}

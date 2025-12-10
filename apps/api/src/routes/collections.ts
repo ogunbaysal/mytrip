@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { db } from "../db";
 import { collection, place } from "../db/schemas";
-import { eq, desc, ilike, sql, and } from "drizzle-orm";
+import { eq, desc, ilike, sql, and, inArray, ne } from "drizzle-orm";
 
 const app = new Hono();
 
@@ -204,7 +204,7 @@ app.get("/:slug", async (c) => {
       try {
         const featuredPlaceIds = JSON.parse(collectionData.featuredPlaces || "[]");
         if (featuredPlaceIds.length > 0) {
-          featuredPlacesDetails = await db
+          const fetchedPlaces = await db
             .select({
               id: place.id,
               slug: place.slug,
@@ -224,17 +224,21 @@ app.get("/:slug", async (c) => {
             })
             .from(place)
             .where(and(
-              sql`${place.id} = ANY(${featuredPlaceIds})`,
+              inArray(place.id, featuredPlaceIds),
               eq(place.status, "active")
-            ))
-            .orderBy(sql`array_position(${featuredPlaceIds}, ${place.id})`);
+            ));
+
+          // Sort by order in featuredPlaceIds
+          featuredPlacesDetails = featuredPlaceIds
+            .map((id: string) => fetchedPlaces.find((p) => p.id === id))
+            .filter((p: any) => !!p);
         }
       } catch (error) {
         console.error("Failed to parse featured places:", error);
       }
     }
 
-    // Get related collections (same season or category)
+    // Get related collections (same season)
     const relatedCollections = await db
       .select({
         id: collection.id,
@@ -249,8 +253,8 @@ app.get("/:slug", async (c) => {
       .from(collection)
       .where(and(
         eq(collection.status, "published"),
-        sql`${collection.id} != ${collectionData.id}`,
-        sql`(${collection.season} = ${collectionData.season} OR ${collection.bestFor} && ${collectionData.bestFor})`
+        ne(collection.id, collectionData.id),
+        collectionData.season ? eq(collection.season, collectionData.season) : undefined
       ))
       .orderBy(desc(collection.createdAt))
       .limit(4);

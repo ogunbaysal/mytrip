@@ -1,6 +1,5 @@
-"use client";
-
 import { useEffect, useState, type ComponentType, type ReactNode } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -14,6 +13,7 @@ import {
 import { Controller, useForm } from "react-hook-form";
 import { format, isValid, parseISO } from "date-fns";
 
+import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
@@ -22,10 +22,10 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { STAY_TYPES, useAppStore } from "@/stores/app-store";
+import { useAppStore } from "@/stores/app-store";
 import { searchFormSchema, type SearchFormValues } from "@/lib/validations";
 import { cn } from "@/lib/utils";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 const LABELS = {
   location: "Lokasyon",
@@ -36,26 +36,47 @@ const LABELS = {
   submit: "Ara",
 };
 
-const STAY_TYPE_LABELS: Record<(typeof STAY_TYPES)[number], string> = {
-  all: "Tümü",
-  stay: "Konaklama",
-  experience: "Deneyim",
-  restaurant: "Yeme-içme",
-};
-
-export function PlaceSearchForm() {
+export function PlaceSearchForm({ onSubmitSuccess }: { onSubmitSuccess?: () => void }) {
 
   const router = useRouter();
-  const { searchFilters, setSearchFilters } = useAppStore((state) => ({
-    searchFilters: state.searchFilters,
-    setSearchFilters: state.setSearchFilters,
-  }));
+  const searchParams = useSearchParams();
+
+  // Fetch dynamic data
+  const { data: cities } = useQuery({
+    queryKey: ["cities"],
+    queryFn: api.places.listCities,
+  });
+
+  const { data: placeTypes } = useQuery({
+    queryKey: ["place-types"],
+    queryFn: api.places.listPlaceTypes,
+  });
+
+  const defaultValues: SearchFormValues = {
+    location: searchParams.get("city") || searchParams.get("search") || "",
+    checkIn: searchParams.get("checkIn") || "",
+    checkOut: searchParams.get("checkOut") || "",
+    guests: parseInt(searchParams.get("guests") || "1"),
+    stayType: (searchParams.get("type") as any) || "all",
+  };
 
   const form = useForm<SearchFormValues>({
     resolver: zodResolver(searchFormSchema),
     mode: "onSubmit",
-    defaultValues: searchFilters,
+    defaultValues,
   });
+
+  // Sync form with URL parameters when they change
+  useEffect(() => {
+    const newValues = {
+      location: searchParams.get("city") || searchParams.get("search") || "",
+      checkIn: searchParams.get("checkIn") || "",
+      checkOut: searchParams.get("checkOut") || "",
+      guests: parseInt(searchParams.get("guests") || "1"),
+      stayType: (searchParams.get("type") as any) || "all",
+    };
+    form.reset(newValues);
+  }, [searchParams, form]);
 
   const checkInValue = form.watch("checkIn");
 
@@ -69,12 +90,19 @@ export function PlaceSearchForm() {
     }
   }, [checkInValue, form]);
 
-  useEffect(() => {
-    form.reset(searchFilters);
-  }, [form, searchFilters]);
-
   const onSubmit = (values: SearchFormValues) => {
-    setSearchFilters(values);
+    const params = new URLSearchParams();
+    if (values.location && values.location !== "all") {
+        // Since we are using a City selector now, we map this to 'city'
+        params.set("city", values.location); 
+    }
+    if (values.checkIn) params.set("checkIn", values.checkIn);
+    if (values.checkOut) params.set("checkOut", values.checkOut);
+    if (values.guests) params.set("guests", values.guests.toString());
+    if (values.stayType && values.stayType !== "all") params.set("type", values.stayType);
+
+    router.push(`/places?${params.toString()}`);
+    onSubmitSuccess?.();
   };
 
   return (
@@ -88,12 +116,21 @@ export function PlaceSearchForm() {
           icon={MapPin}
           error={form.formState.errors.location?.message}
         >
-          <Input
-            id="location"
-            placeholder="Örn. Bodrum"
-            {...form.register("location")}
-            className="h-auto border-none bg-transparent p-0 text-sm font-medium text-foreground placeholder:text-muted-foreground focus-visible:ring-0 focus-visible:outline-none"
-          />
+          <div className="relative">
+            <select
+              id="location"
+              className="w-full appearance-none border-none bg-transparent pr-6 text-sm font-medium text-foreground outline-none focus-visible:ring-0"
+              {...form.register("location")}
+            >
+              <option value="">Tümü</option>
+              {cities?.map((city) => (
+                <option key={city.slug} value={city.name}>
+                  {city.name}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-0 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          </div>
         </FieldGroup>
 
         <FieldGroup label={LABELS.stayType} icon={Sparkles}>
@@ -103,9 +140,10 @@ export function PlaceSearchForm() {
               className="w-full appearance-none border-none bg-transparent pr-6 text-sm font-medium text-foreground outline-none focus-visible:ring-0"
               {...form.register("stayType")}
             >
-              {STAY_TYPES.map((type) => (
-                <option key={type} value={type}>
-                  {STAY_TYPE_LABELS[type]}
+              <option value="all">Tümü</option>
+              {placeTypes?.map((pt) => (
+                <option key={pt.type} value={pt.type}>
+                  {pt.name}
                 </option>
               ))}
             </select>
@@ -169,10 +207,9 @@ export function PlaceSearchForm() {
       </div>
 
       <Button
-        type="button"
+        type="submit"
         size="lg"
         className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl px-6 text-sm font-semibold sm:w-auto"
-        onClick={() => router.push(`/places`)}
       >
         <Search className="size-4" />
         {LABELS.submit}

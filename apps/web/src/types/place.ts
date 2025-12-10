@@ -73,3 +73,9 @@ export type CollectionDetail = CollectionSummary & {
   tips: string[];
   featuredPlaces: PlaceSummary[];
 };
+export type PlaceTypeSummary = {
+  id: string;
+  title: string;
+  description: string;
+  count: number;
+};

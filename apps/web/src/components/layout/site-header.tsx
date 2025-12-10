@@ -1,12 +1,15 @@
-"use client";
 
+"use client";
+import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { Route } from "next";
 import { Search } from "lucide-react";
 
+import { PlaceSearchForm } from "@/components/places/place-search-form";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { useRouter } from "next/navigation";
 
 type NavItem =
   | {
@@ -32,6 +35,9 @@ const LIST_PLACE = "Yerini listele";
 
 export function SiteHeader() {
   const router = useRouter();
+  const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
+  const [isDesktopSearchOpen, setIsDesktopSearchOpen] = useState(false);
+
   return (
     <header className="sticky top-0 z-40 border-b border-transparent bg-page/80 backdrop-blur">
       <div className="mx-auto flex w-full max-w-[1200px] items-center gap-4 px-4 py-4 md:px-6">
@@ -40,35 +46,47 @@ export function SiteHeader() {
         </Link>
 
         <div className="flex flex-1 lg:hidden">
-          <button
-            type="button"
-            className="flex h-11 w-full max-w-xs items-center justify-between rounded-full border border-border bg-white px-4 text-left text-sm font-medium shadow-sm transition hover:shadow-lg"
-            onClick={() => router.push(`/places`)}
-          >
-            <span className="truncate text-foreground/90">{HERO_EYEBROW}</span>
-            <span className="inline-flex size-8 items-center justify-center rounded-full bg-primary text-white">
-              <Search className="size-4" aria-hidden />
-            </span>
-          </button>
+          <Dialog open={isMobileSearchOpen} onOpenChange={setIsMobileSearchOpen}>
+            <DialogTrigger asChild>
+              <button
+                type="button"
+                className="flex h-11 w-full max-w-xs items-center justify-between rounded-full border border-border bg-white px-4 text-left text-sm font-medium shadow-sm transition hover:shadow-lg"
+              >
+                <span className="truncate text-foreground/90">{HERO_EYEBROW}</span>
+                <span className="inline-flex size-8 items-center justify-center rounded-full bg-primary text-white">
+                  <Search className="size-4" aria-hidden />
+                </span>
+              </button>
+            </DialogTrigger>
+            <DialogContent className="border-none bg-transparent p-0 shadow-none sm:max-w-2xl">
+              <PlaceSearchForm onSubmitSuccess={() => setIsMobileSearchOpen(false)} />
+            </DialogContent>
+          </Dialog>
         </div>
 
         <div className="hidden flex-1 justify-center lg:flex">
-          <button
-            type="button"
-            className={cn(
-              "flex h-12 w-full max-w-xl items-center rounded-full border border-border bg-white px-5 shadow-sm transition hover:shadow-lg",
-            )}
-            onClick={() => router.push(`/places`)}
-          >
-            <div className="flex flex-1 items-center gap-3 text-left">
-              <span className="text-sm font-semibold text-foreground">{HERO_EYEBROW}</span>
-              <span className="h-5 w-px bg-border" aria-hidden />
-              <span className="text-sm text-muted-foreground">{GUESTS_HELPER}</span>
-            </div>
-            <span className="inline-flex size-9 items-center justify-center rounded-full bg-primary text-white">
-              <Search className="size-4" aria-hidden />
-            </span>
-          </button>
+          <Dialog open={isDesktopSearchOpen} onOpenChange={setIsDesktopSearchOpen}>
+            <DialogTrigger asChild>
+              <button
+                type="button"
+                className={cn(
+                  "flex h-12 w-full max-w-xl items-center rounded-full border border-border bg-white px-5 shadow-sm transition hover:shadow-lg",
+                )}
+              >
+                <div className="flex flex-1 items-center gap-3 text-left">
+                  <span className="text-sm font-semibold text-foreground">{HERO_EYEBROW}</span>
+                  <span className="h-5 w-px bg-border" aria-hidden />
+                  <span className="text-sm text-muted-foreground">{GUESTS_HELPER}</span>
+                </div>
+                <span className="inline-flex size-9 items-center justify-center rounded-full bg-primary text-white">
+                  <Search className="size-4" aria-hidden />
+                </span>
+              </button>
+            </DialogTrigger>
+            <DialogContent className="border-none bg-transparent p-0 shadow-none sm:max-w-4xl">
+              <PlaceSearchForm onSubmitSuccess={() => setIsDesktopSearchOpen(false)} />
+            </DialogContent>
+          </Dialog>
         </div>
 
         <nav className="ml-auto hidden items-center gap-1 xl:flex">

@@ -2,25 +2,31 @@ import Image from "next/image";
 import { notFound } from "next/navigation";
 
 import { PlaceCard } from "@/components/places/place-card";
-import { COLLECTION_DETAILS, COLLECTION_DETAILS_BY_SLUG } from "@/lib/data/collection-details";
+import { api } from "@/lib/api";
 
 const CONTAINER_CLASS = "mx-auto w-full max-w-[1100px] px-4 md:px-6";
 
 type PageParams = Promise<{ slug: string }>;
 
 export const dynamic = "force-static";
+export const revalidate = 3600;
 
-export function generateStaticParams() {
-  return COLLECTION_DETAILS.map((collection) => ({ slug: collection.slug }));
+export async function generateStaticParams() {
+  const { collections } = await api.collections.list({ limit: 100 });
+  return collections.map((collection) => ({ slug: collection.slug }));
 }
 
 export async function generateMetadata({ params }: { params: PageParams }) {
   const { slug } = await params;
-  const collection = COLLECTION_DETAILS_BY_SLUG.get(slug);
+  const data = await api.collections.getBySlug(slug);
 
-  if (!collection) {
-    notFound();
+  if (!data) {
+    return {
+        title: "Koleksiyon | MyTrip",
+    };
   }
+  
+  const { collection } = data;
 
   return {
     title: `${collection.name} | MyTrip`,
@@ -30,18 +36,20 @@ export async function generateMetadata({ params }: { params: PageParams }) {
 
 export default async function CollectionDetailPage({ params }: { params: PageParams }) {
   const { slug } = await params;
-  const collection = COLLECTION_DETAILS_BY_SLUG.get(slug);
+  const data = await api.collections.getBySlug(slug);
 
-  if (!collection) {
+  if (!data) {
     notFound();
   }
+
+  const { collection } = data;
 
   return (
     <div className="space-y-16 pb-24 pt-10 md:pt-14">
       <section className={`${CONTAINER_CLASS}`}>
         <div className="relative overflow-hidden rounded-3xl bg-black/40">
           <Image
-            src={collection.heroImage}
+            src={collection.heroImage || collection.coverImage}
             alt={collection.name}
             fill
             className="object-cover"
@@ -146,7 +154,7 @@ export default async function CollectionDetailPage({ params }: { params: PagePar
         </ul>
       </section>
 
-      {collection.featuredPlaces.length > 0 && (
+      {collection.featuredPlaces && collection.featuredPlaces.length > 0 && (
         <section className={`${CONTAINER_CLASS} space-y-4`}>
           <div className="space-y-2">
             <h2 className="text-2xl font-semibold tracking-tight text-foreground">Öne çıkan konaklamalar</h2>
