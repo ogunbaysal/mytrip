@@ -3,9 +3,7 @@
   "compilerOptions": {
     "baseUrl": ".",
     "lib": ["esnext"],
-    "types": ["bun-types"],
-    "moduleResolution": "bundler",
-    "module": "esnext",
+    "types": ["bun-types"]
   },
   "include": ["src/**/*.ts", "drizzle.config.ts"],
 }
