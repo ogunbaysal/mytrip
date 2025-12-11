@@ -2,17 +2,17 @@
 // AUTHENTICATION SCHEMAS
 // ============================================================================
 
-export * from "./auth";
+export * from "./auth.ts";
 
 // ============================================================================
 // BUSINESS LOGIC SCHEMAS
 // ============================================================================
 
-export * from "./places";
-export * from "./bookings";
-export * from "./collections";
-export * from "./blog";
-export * from "./reviews";
+export * from "./places.ts";
+export * from "./bookings.ts";
+export * from "./collections.ts";
+export * from "./blog.ts";
+export * from "./reviews.ts";
 export {
   billingCycleEnum,
   subscriptionPlan,
@@ -24,7 +24,7 @@ export {
   type NewSubscription,
   type Payment,
   type NewPayment
-} from "./subscriptions";
-export * from "./settings";
-export * from "./categories";
-export * from "./analytics";
+} from "./subscriptions.ts";
+export * from "./settings.ts";
+export * from "./categories.ts";
+export * from "./analytics.ts";

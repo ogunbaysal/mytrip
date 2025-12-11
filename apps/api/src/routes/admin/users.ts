@@ -1,7 +1,7 @@
 import { Hono } from "hono";
-import { db } from "../../db";
-import { auth } from "../../lib/auth";
-import { user } from "../../db/schemas";
+import { db } from "../../db/index.ts";
+import { auth } from "../../lib/auth.ts";
+import { user } from "../../db/schemas/index.ts";
 import { eq, desc, ilike, sql } from "drizzle-orm";
 
 const app = new Hono();

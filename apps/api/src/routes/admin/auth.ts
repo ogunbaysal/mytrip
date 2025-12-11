@@ -1,7 +1,7 @@
 import { Hono } from "hono";
-import { auth } from "../../lib/auth";
-import { db } from "../../db";
-import { admin, adminSession, adminRoles, adminPermissions, adminRolePermissions } from "../../db/schemas";
+import { auth } from "../../lib/auth.ts";
+import { db } from "../../db/index.ts";
+import { admin, adminSession, adminRoles, adminPermissions, adminRolePermissions } from "../../db/schemas/index.ts";
 import { eq, desc, sql, and } from "drizzle-orm";
 
 type Variables = {

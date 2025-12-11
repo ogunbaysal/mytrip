@@ -1,6 +1,6 @@
 import { Hono } from "hono";
-import { db } from "../../db";
-import { subscriptionPlan } from "../../db/schemas";
+import { db } from "../../db/index.ts";
+import { subscriptionPlan } from "../../db/schemas/index.ts";
 import { eq, desc, asc } from "drizzle-orm";
 import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";

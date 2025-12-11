@@ -1,6 +1,6 @@
 import { Hono } from "hono";
-import { db } from "../db";
-import { place, user, review, placeCategory } from "../db/schemas";
+import { db } from "../db/index.ts";
+import { place, user, review, placeCategory } from "../db/schemas/index.ts";
 import { eq, desc, ilike, sql, and, gt } from "drizzle-orm";
 
 const app = new Hono();

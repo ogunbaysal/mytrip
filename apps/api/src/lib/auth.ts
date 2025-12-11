@@ -1,7 +1,7 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { db } from "../db";
-import * as schema from "../db/schemas";
+import { db } from "../db/index.ts";
+import * as schema from "../db/schemas/index.ts";
 
 export const auth = betterAuth({
   appName: "Admin Panel",

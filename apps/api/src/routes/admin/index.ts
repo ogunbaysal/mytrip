@@ -1,19 +1,19 @@
 import { Hono } from "hono";
-import { adminAuth } from "../../middleware/admin-auth";
-import { authRoutes } from "./auth";
-import { usersRoutes } from "./users";
-import { placesRoutes } from "./places";
-import { bookingsRoutes } from "./bookings";
-import { collectionsRoutes } from "./collections";
-import { blogRoutes } from "./blog";
-import { reviewsRoutes } from "./reviews";
-import { analyticsRoutes } from "./analytics";
-import { uploadRoutes } from "./upload";
-import settings from "./settings";
-import categories from "./categories";
-import { plansRoutes } from "./plans";
-import { subscriptionsRoutes } from "./subscriptions";
-import { paymentsRoutes } from "./payments";
+import { adminAuth } from "../../middleware/admin-auth.ts";
+import { authRoutes } from "./auth.ts";
+import { usersRoutes } from "./users.ts";
+import { placesRoutes } from "./places.ts";
+import { bookingsRoutes } from "./bookings.ts";
+import { collectionsRoutes } from "./collections.ts";
+import { blogRoutes } from "./blog.ts";
+import { reviewsRoutes } from "./reviews.ts";
+import { analyticsRoutes } from "./analytics.ts";
+import { uploadRoutes } from "./upload.ts";
+import settings from "./settings.ts";
+import categories from "./categories.ts";
+import { plansRoutes } from "./plans.ts";
+import { subscriptionsRoutes } from "./subscriptions.ts";
+import { paymentsRoutes } from "./payments.ts";
 
 const app = new Hono<{
   Variables: {

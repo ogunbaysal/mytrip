@@ -1,5 +1,5 @@
-import { db } from "../index";
-import { place, placeCategory, user, blogPost, collection } from "../schemas";
+import { db } from "../index.ts";
+import { place, placeCategory, user, blogPost, collection } from "../schemas/index.ts";
 import { nanoid } from "nanoid";
 import { eq } from "drizzle-orm";
 

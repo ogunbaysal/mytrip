@@ -1,10 +1,10 @@
 import { Hono } from "hono";
-import { db } from "../../db";
-import { subscription, user, subscriptionPlan } from "../../db/schemas";
+import { db } from "../../db/index.ts";
+import { subscription, user, subscriptionPlan } from "../../db/schemas/index.ts";
 import { eq, desc, and } from "drizzle-orm";
 import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
-import { paymentProvider } from "../../lib/payment-provider";
+import { paymentProvider } from "../../lib/payment-provider.ts";
 
 const app = new Hono();
 

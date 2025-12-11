@@ -1,10 +1,10 @@
 import "dotenv/config";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { auth } from "./lib/auth";
-import { adminRoutes } from "./routes/admin";
-import { routes } from "./routes";
-import { locationsRoutes } from "./routes/locations";
+import { auth } from "./lib/auth.ts";
+import { adminRoutes } from "./routes/admin/index.ts";
+import { routes } from "./routes/index.ts";
+import { locationsRoutes } from "./routes/locations.ts";
 
 import { serveStatic } from "hono/bun";
 

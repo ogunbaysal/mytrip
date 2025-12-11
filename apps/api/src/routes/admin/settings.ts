@@ -1,10 +1,10 @@
 import { Hono } from "hono";
-import { db } from "../../db";
-import { settings, user } from "../../db/schemas";
+import { db } from "../../db/index.ts";
+import { settings, user } from "../../db/schemas/index.ts";
 import { eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
-import { auth } from "../../lib/auth";
+import { auth } from "../../lib/auth.ts";
 
 const router = new Hono();
 

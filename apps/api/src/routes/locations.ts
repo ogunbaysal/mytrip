@@ -1,6 +1,6 @@
 
 import { Hono } from "hono";
-import { TR_LOCATIONS } from "../lib/locations";
+import { TR_LOCATIONS } from "../lib/locations.ts";
 
 export const locationsRoutes = new Hono();
 

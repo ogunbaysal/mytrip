@@ -1,6 +1,6 @@
-import { auth } from "../lib/auth";
-import { db } from "../db";
-import { admin, adminRoles, adminPermissions, adminRolePermissions } from "../db/schemas/auth";
+import { auth } from "../lib/auth.ts";
+import { db } from "../db/index.ts";
+import { admin, adminRoles, adminPermissions, adminRolePermissions } from "../db/schemas/auth.ts";
 import { eq } from "drizzle-orm";
 
 async function main() {

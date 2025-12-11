@@ -4,8 +4,8 @@ import {
   timestamp,
   jsonb
 } from "drizzle-orm/pg-core";
-import { user } from "./auth";
-import { place } from "./places";
+import { user } from "./auth.ts";
+import { place } from "./places.ts";
 
 // ============================================================================
 // ANALYTICS EVENTS TABLE

@@ -1,9 +1,9 @@
 import { Hono } from "hono";
-import { placesRoutes } from "./places";
-import { collectionsRoutes } from "./collections";
-import { blogRoutes } from "./blog";
-import { reviewsRoutes } from "./reviews";
-import { searchRoutes } from "./search";
+import { placesRoutes } from "./places.ts";
+import { collectionsRoutes } from "./collections.ts";
+import { blogRoutes } from "./blog.ts";
+import { reviewsRoutes } from "./reviews.ts";
+import { searchRoutes } from "./search.ts";
 
 const app = new Hono();
 

@@ -8,8 +8,8 @@ import {
   pgEnum,
   jsonb
 } from "drizzle-orm/pg-core";
-import { user } from "./auth";
-import { placeCategory } from "./categories";
+import { user } from "./auth.ts";
+import { placeCategory } from "./categories.ts";
 
 // ============================================================================
 // ENUMS

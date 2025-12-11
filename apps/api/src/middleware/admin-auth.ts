@@ -1,5 +1,5 @@
 import { Context, Next } from "hono";
-import { auth } from "../lib/auth";
+import { auth } from "../lib/auth.ts";
 
 /**
  * Middleware to protect admin routes

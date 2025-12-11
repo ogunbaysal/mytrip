@@ -1,6 +1,6 @@
-import { auth } from "../lib/auth";
-import { db } from "./index";
-import { admin, adminRoles, adminPermissions, adminRolePermissions } from "./schemas/auth"; // Explicit import from auth schema file
+import { auth } from "../lib/auth.ts";
+import { db } from "./index.ts";
+import { admin, adminRoles, adminPermissions, adminRolePermissions } from "./schemas/auth.ts"; // Explicit import from auth schema file
 import { eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
 

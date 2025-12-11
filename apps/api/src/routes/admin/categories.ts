@@ -1,7 +1,7 @@
 
 import { Hono } from "hono";
-import { db } from "../../db";
-import { placeCategory } from "../../db/schemas";
+import { db } from "../../db/index.ts";
+import { placeCategory } from "../../db/schemas/index.ts";
 import { eq, desc, ilike, sql } from "drizzle-orm";
 import { nanoid } from "nanoid";
 
