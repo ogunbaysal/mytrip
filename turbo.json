@@ -1,6 +1,18 @@
 {
   "$schema": "https://turborepo.com/schema.json",
   "ui": "tui",
+  "globalEnv": [
+    "NEXT_PUBLIC_API_URL",
+    "DATABASE_URL",
+    "DATABASE_SSL",
+    "PORT",
+    "BETTER_AUTH_SECRET",
+    "BETTER_AUTH_URL",
+    "ALLOWED_ORIGINS",
+    "PGPOOL_MAX",
+    "PGPOOL_IDLE_MS",
+    "PGPOOL_CONN_TIMEOUT_MS"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
