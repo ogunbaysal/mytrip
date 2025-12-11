@@ -6,7 +6,7 @@ export type BlogPost = {
   title: string;
   excerpt: string | null;
   heroImage: string | null;
-  featuredImage: string | null;
+  featuredImage?: string | null;
   publishedAt: string | null;
   readTime: number | null;
   category: string | null;
@@ -15,11 +15,23 @@ export type BlogPost = {
   views?: number;
 };
 
+export type BlogSection = {
+  title?: string;
+  paragraphs: string[];
+  image?: {
+    src: string;
+    alt: string;
+  };
+};
+
 export type BlogPostDetail = BlogPost & {
-  content: string | null;
-  tags: string | null;
+  content?: string | null;
+  tags?: string | null;
   seoTitle?: string | null;
   seoDescription?: string | null;
   relatedPosts?: BlogPost[];
+  intro?: string;
+  sections?: BlogSection[];
+  tips?: string[];
 };
 

@@ -7,7 +7,9 @@ import { PlaceSearchForm } from "@/components/places/place-search-form";
 import { PlacesMap } from "@/components/places/places-map";
 import { usePlaces } from "@/hooks/use-places";
 
-export default function PlacesPage() {
+import { Suspense } from "react";
+
+function PlacesContent() {
   const searchParams = useSearchParams();
   const filters = {
       search: searchParams.get("search") || "",
@@ -61,5 +63,13 @@ export default function PlacesPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function PlacesPage() {
+  return (
+    <Suspense fallback={<div className="container mx-auto py-10">Yükleniyor...</div>}>
+      <PlacesContent />
+    </Suspense>
   );
 }

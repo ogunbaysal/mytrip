@@ -1,8 +1,5 @@
 import type { CollectionSummary, PlaceSummary, PlaceTypeSummary, PlaceDetail, PlaceAmenity, BlogPost, BlogPostDetail, CollectionDetail } from "@/types";
 
-import { FEATURED_COLLECTIONS } from "./data/collections";
-import { FEATURED_PLACES } from "./data/featured-places";
-
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 const DEFAULT_LOCALE = "tr";
 
@@ -173,7 +170,7 @@ export const api = {
         return response.places.map(mapBackendPlaceToSummary);
       } catch (error) {
         console.error("Failed to fetch featured places from API:", error);
-        return FEATURED_PLACES;
+        return [];
       }
     },
     async listAll(params?: {
@@ -199,7 +196,7 @@ export const api = {
         return response.places.map(mapBackendPlaceToSummary);
       } catch (error) {
         console.error("Failed to fetch places from API:", error);
-        return FEATURED_PLACES;
+        return [];
       }
     },
     async listTypes(): Promise<PlaceTypeSummary[]> {
@@ -252,7 +249,7 @@ export const api = {
         return response.collections.map(mapBackendCollectionToSummary);
       } catch (error) {
         console.error("Failed to fetch featured collections from API:", error);
-        return FEATURED_COLLECTIONS;
+        return [];
       }
     },
     async list(params?: {

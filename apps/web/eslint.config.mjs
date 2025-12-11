@@ -10,7 +10,12 @@ const compat = new FlatCompat({
 });
 
 const eslintConfig = [
-  ...compat.extends("next/core-web-vitals", "next/typescript"),
+  ...compat.extends("next/core-web-vitals", "next/typescript").map(config => {
+      // Clean up config to avoid "Unexpected top-level property name" error
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { name, ...rest } = config; 
+      return rest;
+  }),
   {
     ignores: [
       "node_modules/**",
