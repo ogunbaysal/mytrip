@@ -1,16 +1,19 @@
 import "dotenv/config";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { handle } from "hono/vercel";
 import { auth } from "./lib/auth";
 import { adminRoutes } from "./routes/admin";
 import { routes } from "./routes";
 import { locationsRoutes } from "./routes/locations";
 
-import { serveStatic } from "hono/bun";
-
 const app = new Hono()
 
-app.use("/uploads/*", serveStatic({ root: "./apps/api/public" }));
+// Only use Bun's serveStatic in Bun environment
+if (typeof Bun !== "undefined") {
+    const { serveStatic } = await import("hono/bun");
+    app.use("/uploads/*", serveStatic({ root: "./apps/api/public" }));
+}
 
 const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",").map((origin) => origin.trim()).filter(Boolean) ?? [
     "http://localhost:3000",
@@ -62,9 +65,13 @@ app.route("/api/locations", locationsRoutes)
 
 const port = Number(process.env.PORT ?? 3002)
 
-Bun.serve({
-    port,
-    fetch: app.fetch,
-})
+// Conditional server startup for Bun
+if (typeof Bun !== "undefined") {
+    Bun.serve({
+        port,
+        fetch: app.fetch,
+    })
+    console.log(`API server listening on http://localhost:${port}`)
+}
 
-console.log(`API server listening on http://localhost:${port}`)
+export default handle(app);

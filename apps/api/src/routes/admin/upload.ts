@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { v4 as uuidv4 } from "uuid";
 import { join } from "path";
+import { writeFile } from "fs/promises";
 
 const app = new Hono();
 
@@ -20,7 +21,7 @@ app.post("/", async (c) => {
         const arrayBuffer = await file.arrayBuffer();
         const buffer = new Uint8Array(arrayBuffer);
         
-        await Bun.write(path, buffer);
+        await writeFile(path, buffer);
 
         // Get the base URL from the request or env
         // Since we are serving /uploads from root, the URL is just /uploads/filename
