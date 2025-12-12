@@ -4,21 +4,20 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
-    "build": "esbuild src/index.ts --bundle --platform=node --format=esm --outdir=dist --packages=external",
-    "serve": "node dist/index.js",
-    "start": "npm run build && npm run serve",
+    "dev": "bun --watch src/index.ts",
+    "build": "bun build src/index.ts --outdir dist --target bun",
+    "serve": "bun dist/index.js",
+    "start": "bun run build && bun run serve",
     "lint": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
-    "db:seed": "tsx src/db/seed.ts",
-    "db:seed:content": "tsx src/db/scripts/seed-content.ts"
+    "db:seed": "bun run src/db/seed.ts",
+    "db:seed:content": "bun run src/db/scripts/seed-content.ts"
   },
   "dependencies": {
     "@hono/zod-validator": "^0.7.5",
-    "@hono/node-server": "^1.13.7",
     "better-auth": "^1.4.3",
     "drizzle-orm": "^0.44.7",
     "hono": "^4.9.8",
@@ -29,13 +28,13 @@
   },
   "devDependencies": {
     "@better-auth/cli": "^1.4.3",
-    "@types/node": "^22.10.2",
+    "@types/bun": "latest",
     "@types/nanoid": "^3.0.0",
     "@types/pg": "^8.15.6",
     "@types/uuid": "^11.0.0",
+    "bun-types": "^1.3.3",
     "dotenv": "^17.2.3",
     "drizzle-kit": "^0.31.7",
-    "esbuild": "^0.24.2",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3"
   }

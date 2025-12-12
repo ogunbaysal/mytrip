@@ -1,12 +1,12 @@
 import "dotenv/config";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { serve } from "@hono/node-server";
-import { serveStatic } from "@hono/node-server/serve-static";
 import { auth } from "./lib/auth.ts";
 import { adminRoutes } from "./routes/admin/index.ts";
 import { routes } from "./routes/index.ts";
 import { locationsRoutes } from "./routes/locations.ts";
+
+import { serveStatic } from "hono/bun";
 
 const app = new Hono();
 
@@ -65,17 +65,5 @@ app.route("/api/admin", adminRoutes);
 
 // Locations routes
 app.route("/api/locations", locationsRoutes);
-
-const port = parseInt(process.env.PORT || "3002", 10);
-
-serve(
-  {
-    fetch: app.fetch,
-    port,
-  },
-  (info) => {
-    console.log(`Server is running on http://localhost:${info.port}`);
-  }
-);
 
 export default app;
