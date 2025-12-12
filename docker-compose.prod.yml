@@ -1,0 +1,62 @@
+# Production Docker Compose Override
+# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+services:
+  postgres:
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    # Don't expose port in production
+    ports: []
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  api:
+    restart: always
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      DATABASE_SSL: "false"
+      PORT: 3002
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
+      PGPOOL_MAX: ${PGPOOL_MAX:-100}
+      PGPOOL_IDLE_MS: ${PGPOOL_IDLE_MS:-30000}
+      PGPOOL_CONN_TIMEOUT_MS: ${PGPOOL_CONN_TIMEOUT_MS:-5000}
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1"
+        reservations:
+          memory: 256M
+
+  admin:
+    restart: always
+    build:
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
+
+  web:
+    restart: always
+    build:
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"

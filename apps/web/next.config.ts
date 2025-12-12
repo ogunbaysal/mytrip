@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  output: "standalone",
   typedRoutes: true,
   images: {
     remotePatterns: [
@@ -10,11 +11,12 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-   async rewrites() {
+  async rewrites() {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002";
     return [
       {
         source: "/api/:path*",
-        destination: "http://localhost:3002/api/:path*", // Proxy to Backend
+        destination: `${apiUrl}/api/:path*`, // Proxy to Backend
       },
     ];
   },

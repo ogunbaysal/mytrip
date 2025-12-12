@@ -1,0 +1,89 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: mytrip-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-demo1234}
+      POSTGRES_DB: ${POSTGRES_DB:-mytrip}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-mytrip}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # API Server (Bun + Hono)
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    container_name: mytrip-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "3002:3002"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-demo1234}@postgres:5432/${POSTGRES_DB:-mytrip}
+      DATABASE_SSL: "false"
+      PORT: 3002
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-change-me-very-secret-key}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3002}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3001,http://localhost:3002}
+      PGPOOL_MAX: ${PGPOOL_MAX:-50}
+      PGPOOL_IDLE_MS: ${PGPOOL_IDLE_MS:-30000}
+      PGPOOL_CONN_TIMEOUT_MS: ${PGPOOL_CONN_TIMEOUT_MS:-5000}
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3002/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Admin Dashboard (Next.js)
+  admin:
+    build:
+      context: ./apps/admin
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://api:3002
+    container_name: mytrip-admin
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "3001:3001"
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: http://api:3002
+
+  # Public Website (Next.js)
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://api:3002
+    container_name: mytrip-web
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: http://api:3002
+
+volumes:
+  postgres_data:
+
+networks:
+  default:
+    name: mytrip-network
