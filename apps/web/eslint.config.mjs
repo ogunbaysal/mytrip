@@ -9,13 +9,44 @@ const compat = new FlatCompat({
   baseDirectory: __dirname,
 });
 
+// Get the configs from compat
+const nextConfigs = compat.extends("next/core-web-vitals", "next/typescript");
+
+// Deep filter to remove all 'name' properties from any nested object
+function deepFilterName(obj, visited = new WeakSet()) {
+  if (obj === null || typeof obj !== 'object') {
+    return obj;
+  }
+
+  // Prevent circular reference issues
+  if (visited.has(obj)) {
+    return obj;
+  }
+  visited.add(obj);
+
+  if (Array.isArray(obj)) {
+    return obj.map(item => deepFilterName(item, visited));
+  }
+
+  const result = {};
+  for (const key of Object.keys(obj)) {
+    // Skip 'name' properties at any level
+    if (key === 'name') {
+      continue;
+    }
+
+    const value = obj[key];
+    if (typeof value === 'object' && value !== null) {
+      result[key] = deepFilterName(value, visited);
+    } else {
+      result[key] = value;
+    }
+  }
+  return result;
+}
+
 const eslintConfig = [
-  ...compat.extends("next/core-web-vitals", "next/typescript").map(config => {
-      // Clean up config to avoid "Unexpected top-level property name" error
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { name, ...rest } = config; 
-      return rest;
-  }),
+  ...nextConfigs.map(config => deepFilterName(config)),
   {
     ignores: [
       "node_modules/**",
