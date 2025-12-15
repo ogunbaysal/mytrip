@@ -11,6 +11,10 @@ const trustedOrigins = process.env.ALLOWED_ORIGINS?.split(",")
   "http://localhost:3002",
 ];
 
+console.log({
+  trustedOrigins,
+});
+
 export const auth = betterAuth({
   appName: "Admin Panel",
   trustedOrigins,
