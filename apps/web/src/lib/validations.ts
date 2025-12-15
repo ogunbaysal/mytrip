@@ -8,9 +8,9 @@ export const searchFormSchema = z
     checkIn: z.string().nullable().optional(),
     checkOut: z.string().nullable().optional(),
     guests: z
-      .number({ invalid_type_error: "Geçerli bir misafir sayısı girin" })
-      .int({ message: "Geçerli bir misafir sayısı girin" })
-      .min(1, "En az bir misafir"),
+      .number({ error: "Geçerli bir misafir sayısı girin" })
+      .int({ error: "Geçerli bir misafir sayısı girin" })
+      .min(1, { error: "En az bir misafir" }),
     stayType: z.enum(STAY_TYPES),
   })
   .refine(
@@ -24,7 +24,7 @@ export const searchFormSchema = z
     {
       message: "Çıkış tarihi girişten sonra olmalı",
       path: ["checkOut"],
-    },
+    }
   );
 
 export type SearchFormValues = z.infer<typeof searchFormSchema>;
