@@ -47,7 +47,7 @@ export const auth = betterAuth({
   socialProviders: {},
   advanced: {
     crossSubDomainCookies: {
-      enabled: false,
+      enabled: true,
     },
     generateId: false, // Use our own UUID generation
   },
