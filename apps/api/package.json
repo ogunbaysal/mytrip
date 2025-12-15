@@ -24,7 +24,7 @@
     "nanoid": "^5.1.6",
     "pg": "^8.16.3",
     "uuid": "^11.0.0",
-    "zod": "^4.1.13"
+    "zod": "^4.1.12"
   },
   "devDependencies": {
     "@better-auth/cli": "^1.4.3",
