@@ -13,7 +13,7 @@ const trustedOrigins = process.env.ALLOWED_ORIGINS?.split(",")
 
 // Check if we're in production (cross-origin scenario)
 const isProduction = process.env.NODE_ENV === "production";
-const cookieDomain = process.env.COOKIE_DOMAIN;
+const cookieDomain = process.env.COOKIE_DOMAIN || ".ogun.me";
 
 console.log({
   trustedOrigins,
