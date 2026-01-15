@@ -1,11 +1,24 @@
-import type { CollectionSummary, PlaceSummary, PlaceTypeSummary, PlaceDetail, PlaceAmenity, BlogPost, BlogPostDetail, CollectionDetail } from "@/types";
+import type {
+  CollectionSummary,
+  PlaceSummary,
+  PlaceTypeSummary,
+  PlaceDetail,
+  PlaceAmenity,
+  BlogPost,
+  BlogPostDetail,
+  CollectionDetail,
+} from "@/types";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3002";
 const DEFAULT_LOCALE = "tr";
 
 type RequestOptions = RequestInit & { cache?: RequestCache };
 
-async function request<T>(endpoint: string, options?: RequestOptions): Promise<T> {
+async function request<T>(
+  endpoint: string,
+  options?: RequestOptions,
+): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     ...options,
     headers: {
@@ -25,7 +38,6 @@ async function request<T>(endpoint: string, options?: RequestOptions): Promise<T
   return response.json() as Promise<T>;
 }
 
-// Backend types
 type APIPlace = {
   id: string;
   slug: string;
@@ -37,16 +49,16 @@ type APIPlace = {
   address: string | null;
   city: string | null;
   district: string | null;
-  location: string | object | null; // JSON string or object
+  location: string | object | null;
   rating: string | null;
   reviewCount: number;
   priceLevel: string | null;
   nightlyPrice: string | null;
-  images: string | object | null; // JSON string or object
-  features: string | object | null; // JSON string or object
-  openingHours: string | object | null; // JSON string or object
-  contactInfo: string | object | null; // JSON string or object
-  checkInInfo: string | object | null; // JSON string or object
+  images: string | object | null;
+  features: string | object | null;
+  openingHours: string | object | null;
+  contactInfo: string | object | null;
+  checkInInfo: string | object | null;
   checkOutInfo: string | object | null;
   verified: boolean;
   featured: boolean;
@@ -54,7 +66,10 @@ type APIPlace = {
   bookingCount: number;
 };
 
-function safelyParseJSON<T>(input: string | object | null | undefined, fallback: T): T {
+function safelyParseJSON<T>(
+  input: string | object | null | undefined,
+  fallback: T,
+): T {
   if (!input) return fallback;
   if (typeof input === "object") return input as T;
   try {
@@ -83,24 +98,25 @@ function mapFeaturesToAmenities(features: string[]): PlaceAmenity[] {
     family_friendly: "👨‍👩‍👧‍👦",
   };
 
-  return features.map(f => ({
+  return features.map((f) => ({
     icon: commonAmenities[f] || "✨",
-    label: f.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase()), // Simple label formatter
+    label: f.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase()),
   }));
 }
 
 function mapBackendPlaceToSummary(place: APIPlace): PlaceSummary {
   const images = safelyParseJSON<string[]>(place.images, []);
-  const location = safelyParseJSON<{ lat: number; lng: number }>(place.location, { lat: 37.1, lng: 28.3 });
+  const location = safelyParseJSON<{ lat: number; lng: number }>(
+    place.location,
+    { lat: 37.1, lng: 28.3 },
+  );
 
-  // Map type
   let type: PlaceSummary["type"] = "stay";
   const pType = place.type.toLowerCase();
   if (["hotel", "stay"].includes(pType)) type = "stay";
   else if (["restaurant", "cafe"].includes(pType)) type = "restaurant";
   else type = "experience";
 
-  // Map category (simplified fallback)
   const category: any = place.category?.toLowerCase() || "wellness";
 
   return {
@@ -120,14 +136,16 @@ function mapBackendPlaceToSummary(place: APIPlace): PlaceSummary {
   };
 }
 
-function mapBackendPlaceToDetail(place: APIPlace, nearbyPlaces: APIPlace[] = []): PlaceDetail {
+function mapBackendPlaceToDetail(
+  place: APIPlace,
+  nearbyPlaces: APIPlace[] = [],
+): PlaceDetail {
   const summary = mapBackendPlaceToSummary(place);
   const images = safelyParseJSON<string[]>(place.images, []);
   const features = safelyParseJSON<string[]>(place.features, []);
-  
-  // We can treat features as short highlights too if they are few, or specific ones
-  const shortHighlights = features.slice(0, 3).map(f => f.replace(/_/g, " ")); 
-  
+
+  const shortHighlights = features.slice(0, 3).map((f) => f.replace(/_/g, " "));
+
   return {
     ...summary,
     heroImage: images[0] || "/images/placeholders/place-placeholder.jpg",
@@ -135,9 +153,9 @@ function mapBackendPlaceToDetail(place: APIPlace, nearbyPlaces: APIPlace[] = [])
     shortHighlights,
     description: place.description || "",
     amenities: mapFeaturesToAmenities(features),
-    checkInInfo: safelyParseJSON<any>(place.checkInInfo, null)?.checkIn || undefined, // Adjust based on actual JSON structure of checkInInfo
-    checkOutInfo: safelyParseJSON<any>(place.checkOutInfo, null)?.checkOut || undefined,
-    featuredCollections: [], // Need backend support or separate call
+    checkInInfo: safelyParseJSON<any>(place.checkInInfo, null)?.checkIn,
+    checkOutInfo: safelyParseJSON<any>(place.checkOutInfo, null)?.checkOut,
+    featuredCollections: [],
     nearbyPlaces: nearbyPlaces.map(mapBackendPlaceToSummary),
   };
 }
@@ -151,13 +169,17 @@ type APICollection = {
   itemCount: number;
 };
 
-function mapBackendCollectionToSummary(collection: APICollection): CollectionSummary {
+function mapBackendCollectionToSummary(
+  collection: APICollection,
+): CollectionSummary {
   return {
     id: collection.id,
     slug: collection.slug,
     name: collection.name,
     description: collection.description || "",
-    coverImage: collection.coverImage || "/images/placeholders/collection-placeholder.jpg",
+    coverImage:
+      collection.coverImage ||
+      "/images/placeholders/collection-placeholder.jpg",
     itemCount: collection.itemCount,
   };
 }
@@ -166,7 +188,9 @@ export const api = {
   places: {
     async listFeatured(): Promise<PlaceSummary[]> {
       try {
-        const response = await request<{ places: APIPlace[] }>(`/api/places/featured?limit=9`);
+        const response = await request<{ places: APIPlace[] }>(
+          `/api/places/featured?limit=9`,
+        );
         return response.places.map(mapBackendPlaceToSummary);
       } catch (error) {
         console.error("Failed to fetch featured places from API:", error);
@@ -185,14 +209,17 @@ export const api = {
         const queryParams = new URLSearchParams();
         if (params?.limit) queryParams.set("limit", params.limit.toString());
         else queryParams.set("limit", "20");
-        
+
         if (params?.search) queryParams.set("search", params.search);
         if (params?.city) queryParams.set("city", params.city);
         if (params?.district) queryParams.set("district", params.district);
-        if (params?.type && params.type !== "all") queryParams.set("type", params.type);
+        if (params?.type && params.type !== "all")
+          queryParams.set("type", params.type);
         if (params?.category) queryParams.set("category", params.category);
 
-        const response = await request<{ places: APIPlace[] }>(`/api/places?${queryParams.toString()}`);
+        const response = await request<{ places: APIPlace[] }>(
+          `/api/places?${queryParams.toString()}`,
+        );
         return response.places.map(mapBackendPlaceToSummary);
       } catch (error) {
         console.error("Failed to fetch places from API:", error);
@@ -201,30 +228,45 @@ export const api = {
     },
     async listTypes(): Promise<PlaceTypeSummary[]> {
       try {
-        const response = await request<{ categories: { id: string, title: string, description: string, count: number }[] }>(`/api/places/categories`);
-        return response.categories.map(cat => ({
+        const response = await request<{
+          categories: {
+            id: string;
+            title: string;
+            description: string;
+            count: number;
+          }[];
+        }>(`/api/places/categories`);
+        return response.categories.map((cat) => ({
           id: cat.id,
           title: cat.title,
           description: cat.description,
-          count: cat.count
+          count: cat.count,
         }));
       } catch (error) {
         console.error("Failed to fetch place categories:", error);
         return [];
       }
     },
-    async listCities(): Promise<{ name: string; slug: string; count: number }[]> {
+    async listCities(): Promise<
+      { name: string; slug: string; count: number }[]
+    > {
       try {
-        const response = await request<{ cities: { name: string; slug: string; count: number }[] }>(`/api/places/cities`);
+        const response = await request<{
+          cities: { name: string; slug: string; count: number }[];
+        }>(`/api/places/cities`);
         return response.cities;
       } catch (error) {
         console.error("Failed to fetch cities:", error);
         return [];
       }
     },
-    async listPlaceTypes(): Promise<{ type: string; name: string; count: number }[]> {
+    async listPlaceTypes(): Promise<
+      { type: string; name: string; count: number }[]
+    > {
       try {
-        const response = await request<{ types: { type: string; name: string; count: number }[] }>(`/api/places/types`);
+        const response = await request<{
+          types: { type: string; name: string; count: number }[];
+        }>(`/api/places/types`);
         return response.types;
       } catch (error) {
         console.error("Failed to fetch place types:", error);
@@ -233,9 +275,15 @@ export const api = {
     },
     async getBySlug(slug: string): Promise<PlaceDetail | null> {
       try {
-        const response = await request<{ place: APIPlace, nearbyPlaces: APIPlace[] } | null>(`/api/places/${slug}`);
+        const response = await request<{
+          place: APIPlace;
+          nearbyPlaces: APIPlace[];
+        } | null>(`/api/places/${slug}`);
         if (!response || !response.place) return null;
-        return mapBackendPlaceToDetail(response.place, response.nearbyPlaces);
+        return mapBackendPlaceToDetail(
+          response.place,
+          response.nearbyPlaces || [],
+        );
       } catch (error) {
         console.error(`Failed to fetch place by slug ${slug}:`, error);
         return null;
@@ -245,7 +293,9 @@ export const api = {
   collections: {
     async listFeatured(): Promise<CollectionSummary[]> {
       try {
-        const response = await request<{ collections: APICollection[] }>(`/api/collections/featured?limit=6`);
+        const response = await request<{ collections: APICollection[] }>(
+          `/api/collections/featured?limit=6`,
+        );
         return response.collections.map(mapBackendCollectionToSummary);
       } catch (error) {
         console.error("Failed to fetch featured collections from API:", error);
@@ -267,7 +317,10 @@ export const api = {
         if (params?.season) queryParams.set("season", params.season);
         if (params?.bestFor) queryParams.set("bestFor", params.bestFor);
 
-        const response = await request<{ collections: APICollection[]; pagination: any }>(`/api/collections?${queryParams.toString()}`);
+        const response = await request<{
+          collections: APICollection[];
+          pagination: any;
+        }>(`/api/collections?${queryParams.toString()}`);
         return {
           collections: response.collections.map(mapBackendCollectionToSummary),
           pagination: response.pagination,
@@ -277,9 +330,16 @@ export const api = {
         return { collections: [], pagination: {} };
       }
     },
-    async getBySlug(slug: string): Promise<{ collection: CollectionDetail; relatedCollections: CollectionSummary[] } | null> {
+    async getBySlug(slug: string): Promise<{
+      collection: CollectionDetail;
+      relatedCollections: CollectionSummary[];
+    } | null> {
       try {
-        const response = await request<{ collection: any; featuredPlaces: APIPlace[]; relatedCollections: APICollection[] } | null>(`/api/collections/${slug}`);
+        const response = await request<{
+          collection: any;
+          featuredPlaces: APIPlace[];
+          relatedCollections: APICollection[];
+        } | null>(`/api/collections/${slug}`);
         if (!response || !response.collection) return null;
 
         const col = response.collection;
@@ -288,9 +348,13 @@ export const api = {
           slug: col.slug,
           name: col.name,
           description: col.description || "",
-          coverImage: col.coverImage || "/images/placeholders/collection-placeholder.jpg",
+          coverImage:
+            col.coverImage || "/images/placeholders/collection-placeholder.jpg",
           itemCount: col.itemCount,
-          heroImage: col.heroImage || col.coverImage || "/images/placeholders/collection-placeholder.jpg",
+          heroImage:
+            col.heroImage ||
+            col.coverImage ||
+            "/images/placeholders/collection-placeholder.jpg",
           intro: col.intro || "",
           duration: col.duration || "",
           season: col.season || "",
@@ -298,12 +362,16 @@ export const api = {
           highlights: safelyParseJSON(col.highlights, []),
           itinerary: safelyParseJSON(col.itinerary, []),
           tips: safelyParseJSON(col.tips, []),
-          featuredPlaces: response.featuredPlaces ? response.featuredPlaces.map(mapBackendPlaceToSummary) : [],
+          featuredPlaces: response.featuredPlaces
+            ? response.featuredPlaces.map(mapBackendPlaceToSummary)
+            : [],
         };
 
         return {
           collection: details,
-          relatedCollections: response.relatedCollections ? response.relatedCollections.map(mapBackendCollectionToSummary) : [],
+          relatedCollections: response.relatedCollections
+            ? response.relatedCollections.map(mapBackendCollectionToSummary)
+            : [],
         };
       } catch (error) {
         console.error(`Failed to fetch collection ${slug}:`, error);
@@ -324,26 +392,29 @@ export const api = {
         if (params?.page) queryParams.set("page", params.page.toString());
         if (params?.limit) queryParams.set("limit", params.limit.toString());
         if (params?.search) queryParams.set("search", params.search);
-        if (params?.category && params.category !== "tum") queryParams.set("category", params.category);
+        if (params?.category && params.category !== "tum")
+          queryParams.set("category", params.category);
         if (params?.featured) queryParams.set("featured", "true");
 
-        const response = await request<{ blogPosts: any[]; pagination: any; filters: any }>(`/api/blog?${queryParams.toString()}`);
-        
-        // Map backend response to Frontend Type if needed, or assume match
-        // Backend returns roughly consistent data.
+        const response = await request<{
+          blogPosts: any[];
+          pagination: any;
+          filters: any;
+        }>(`/api/blog?${queryParams.toString()}`);
+
         const mappedPosts: BlogPost[] = response.blogPosts.map((post: any) => ({
-             id: post.id,
-             slug: post.slug,
-             title: post.title,
-             excerpt: post.excerpt,
-             heroImage: post.heroImage,
-             featuredImage: post.featuredImage,
-             publishedAt: post.publishedAt,
-             readTime: post.readTime,
-             category: post.category,
-             authorName: post.authorName,
-             authorAvatar: post.authorAvatar,
-             views: post.views,
+          id: post.id,
+          slug: post.slug,
+          title: post.title,
+          excerpt: post.excerpt,
+          heroImage: post.heroImage,
+          featuredImage: post.featuredImage,
+          publishedAt: post.publishedAt,
+          readTime: post.readTime,
+          category: post.category,
+          authorName: post.authorName,
+          authorAvatar: post.authorAvatar,
+          views: post.views,
         }));
 
         return { blogPosts: mappedPosts, pagination: response.pagination };
@@ -352,61 +423,90 @@ export const api = {
         return { blogPosts: [], pagination: {} };
       }
     },
-    async getBySlug(slug: string): Promise<{ blogPost: BlogPostDetail; relatedPosts: BlogPost[] } | null> {
+    async getBySlug(slug: string): Promise<{
+      blogPost: BlogPostDetail;
+      relatedPosts: BlogPost[];
+    } | null> {
       try {
-        const response = await request<{ blogPost: any; relatedPosts: any[] } | null>(`/api/blog/${slug}`);
+        const response = await request<{
+          blogPost: any;
+          relatedPosts: any[];
+        } | null>(`/api/blog/${slug}`);
         if (!response || !response.blogPost) return null;
-        
+
         const post = response.blogPost;
         const details: BlogPostDetail = {
-             id: post.id,
-             slug: post.slug,
-             title: post.title,
-             excerpt: post.excerpt,
-             heroImage: post.heroImage,
-             featuredImage: post.featuredImage,
-             publishedAt: post.publishedAt,
-             readTime: post.readTime,
-             category: post.category,
-             authorName: post.authorName,
-             authorAvatar: post.authorAvatar,
-             views: post.views,
-             content: post.content,
-             tags: post.tags,
-             seoTitle: post.seoTitle,
-             seoDescription: post.seoDescription,
+          id: post.id,
+          slug: post.slug,
+          title: post.title,
+          excerpt: post.excerpt,
+          heroImage: post.heroImage,
+          featuredImage: post.featuredImage,
+          publishedAt: post.publishedAt,
+          readTime: post.readTime,
+          category: post.category,
+          authorName: post.authorName,
+          authorAvatar: post.authorAvatar,
+          views: post.views,
+          content: post.content,
+          tags: post.tags,
+          seoTitle: post.seoTitle,
+          seoDescription: post.seoDescription,
         };
-        
+
         const related = response.relatedPosts.map((p: any) => ({
-             id: p.id,
-             slug: p.slug,
-             title: p.title,
-             excerpt: p.excerpt,
-             heroImage: p.heroImage,
-             featuredImage: p.featuredImage,
-             publishedAt: p.publishedAt,
-             readTime: p.readTime,
-             category: p.category,
-             authorName: p.authorName,
-             authorAvatar: p.authorAvatar,
-             views: p.views,
+          id: p.id,
+          slug: p.slug,
+          title: p.title,
+          excerpt: p.excerpt,
+          heroImage: p.heroImage,
+          featuredImage: p.featuredImage,
+          publishedAt: p.publishedAt,
+          readTime: p.readTime,
+          category: p.category,
+          authorName: p.authorName,
+          authorAvatar: p.authorAvatar,
+          views: p.views,
         }));
 
         return { blogPost: details, relatedPosts: related };
-
       } catch (error) {
-         console.error(`Failed to fetch blog post ${slug}:`, error);
-         return null;
+        console.error(`Failed to fetch blog post ${slug}:`, error);
+        return null;
       }
     },
-    async listCategories(): Promise<{ name: string; displayName: string; count: number; slug: string }[]> {
-        try {
-            const response = await request<{ categories: any[] }>(`/api/blog/categories`);
-            return response.categories;
-        } catch (error) {
-            console.error("Failed to fetch blog categories:", error);
-            return [];
-        }
-    }
+    async listCategories(): Promise<
+      { name: string; displayName: string; count: number; slug: string }[]
+    > {
+      try {
+        const response = await request<{ categories: any[] }>(
+          `/api/blog/categories`,
+        );
+        return response.categories;
+      } catch (error) {
+        console.error("Failed to fetch blog categories:", error);
+        return [];
+      }
+    },
+  },
+  profile: {
+    async update(data: {
+      name: string;
+      phone?: string;
+      bio?: string;
+    }): Promise<{ success: boolean; message: string }> {
+      try {
+        return await request<{ success: boolean; message: string }>(
+          "/api/profile/update",
+          {
+            method: "PUT",
+            body: JSON.stringify(data),
+          },
+        );
+      } catch (error) {
+        console.error("Failed to update profile:", error);
+        throw error;
+      }
+    },
   },
 };

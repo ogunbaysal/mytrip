@@ -2,9 +2,11 @@ import "dotenv/config";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { auth } from "./lib/auth.ts";
+import { webAuth } from "./lib/web-auth.ts";
 import { adminRoutes } from "./routes/admin/index.ts";
 import { routes } from "./routes/index.ts";
 import { locationsRoutes } from "./routes/locations.ts";
+import { profileRoutes } from "./routes/profile";
 
 import { serveStatic } from "hono/bun";
 
@@ -27,12 +29,17 @@ app.use(
     credentials: true,
     allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type", "X-API-Key", "Authorization"],
-  })
+  }),
 );
 
-// Better Auth routes
+// Better Auth routes - Admin
 app.on(["POST", "GET"], "/api/auth/*", (c) => {
   return auth.handler(c.req.raw);
+});
+
+// Better Auth routes - Web Users
+app.on(["POST", "GET"], "/api/web/auth/*", (c) => {
+  return webAuth.handler(c.req.raw);
 });
 
 // API health check and info
@@ -46,6 +53,7 @@ app.get("/api", (c) =>
     endpoints: {
       public: "/api",
       auth: "/api/auth",
+      "web-auth": "/api/web/auth",
       admin: "/api/admin",
       places: "/api/places",
       collections: "/api/collections",
@@ -54,7 +62,7 @@ app.get("/api", (c) =>
       search: "/api/search",
     },
     documentation: "https://github.com/your-repo/mytrip",
-  })
+  }),
 );
 
 // Public API routes
@@ -62,6 +70,9 @@ app.route("/api", routes);
 
 // Admin routes
 app.route("/api/admin", adminRoutes);
+
+// Profile routes
+app.route("/api/profile", profileRoutes);
 
 // Locations routes
 app.route("/api/locations", locationsRoutes);
