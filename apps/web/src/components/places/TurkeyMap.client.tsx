@@ -1,20 +1,14 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { MapContainer, GeoJSON } from "react-leaflet";
+import { MapContainer, GeoJSON, useMap } from "react-leaflet";
 import type { GeoJsonObject, Feature } from "geojson";
-import type { LeafletEventHandlerFnMap, PathOptions } from "leaflet";
+import type { PathOptions, Layer, LeafletMouseEvent } from "leaflet";
 import L from "leaflet";
 
 interface ProvinceProperties {
   name: string;
-  nameEn?: string;
-  region?: string;
   [key: string]: unknown;
-}
-
-interface ProvinceFeature extends Feature {
-  properties: ProvinceProperties;
 }
 
 interface TurkeyMapProps {
@@ -22,183 +16,181 @@ interface TurkeyMapProps {
   onProvinceClick?: (provinceName: string) => void;
 }
 
-export default function TurkeyMap({ className = "", onProvinceClick }: TurkeyMapProps) {
-  const [geoData, setGeoData] = useState<GeoJsonObject | null>(null);
-  const [selectedProvince, setSelectedProvince] = useState<string | null>(null);
-  const geoJsonRef = useRef<L.GeoJSON | null>(null);
+// Component to fit bounds after map loads
+function FitBounds({ geoData }: { geoData: GeoJsonObject }) {
+  const map = useMap();
 
   useEffect(() => {
-    // Fix for default markers in react-leaflet (only on client)
-    delete (L.Icon.Default.prototype as unknown as { _getIconUrl: unknown })._getIconUrl;
-    L.Icon.Default.mergeOptions({
-      iconRetinaUrl: "/leaflet/marker-icon-2x.png",
-      iconUrl: "/leaflet/marker-icon.png",
-      shadowUrl: "/leaflet/marker-shadow.png",
-    });
+    const geoJsonLayer = L.geoJSON(geoData);
+    const bounds = geoJsonLayer.getBounds();
+    map.fitBounds(bounds, { padding: [20, 20] });
+  }, [map, geoData]);
 
-    // Load GeoJSON data
+  return null;
+}
+
+export default function TurkeyMap({
+  className = "",
+  onProvinceClick,
+}: TurkeyMapProps) {
+  const [geoData, setGeoData] = useState<GeoJsonObject | null>(null);
+  const [selectedProvince, setSelectedProvince] = useState<string | null>(null);
+  const [hoveredProvince, setHoveredProvince] = useState<string | null>(null);
+
+  // Store callback in ref to avoid stale closures
+  const callbackRef = useRef(onProvinceClick);
+  useEffect(() => {
+    callbackRef.current = onProvinceClick;
+  }, [onProvinceClick]);
+
+  useEffect(() => {
     fetch("/data/tr-provinces.geojson")
-      .then((response) => response.json())
-      .then((data) => setGeoData(data))
-      .catch((error) => console.error("Error loading GeoJSON:", error));
+      .then((res) => res.json())
+      .then((data) => {
+        console.log("GeoJSON loaded, features:", data.features?.length);
+        setGeoData(data);
+      })
+      .catch((err) => console.error("Error loading GeoJSON:", err));
   }, []);
 
-  const getProvinceStyle = (feature: ProvinceFeature): PathOptions => {
-    const isSelected = selectedProvince === feature.properties.name;
-    
+  const getStyle = (feature: Feature | undefined): PathOptions => {
+    if (!feature?.properties) return {};
+
+    const name = (feature.properties as ProvinceProperties).name;
+    const isSelected = selectedProvince === name;
+    const isHovered = hoveredProvince === name && !isSelected;
+
     return {
-      fillColor: isSelected ? "#ff5a5f" : "#ffffff",
-      weight: 2,
+      fillColor: isSelected ? "#ff5a5f" : isHovered ? "#fecaca" : "#ffffff",
+      weight: isSelected ? 2 : 1,
       opacity: 1,
-      color: "#d1d5db",
-      dashArray: "",
+      color: isSelected ? "#dc2626" : "#d1d5db",
       fillOpacity: 1,
     };
   };
 
-  const onEachFeature = (feature: Feature, layer: L.Layer) => {
-    const eventHandlers: LeafletEventHandlerFnMap = {
-      click: () => {
-        const provinceName = (feature.properties as ProvinceProperties).name;
-        console.log("Province clicked:", provinceName);
-        
-        // Update selected province
-        setSelectedProvince(provinceName);
-        
-        // Call external callback if provided
-        onProvinceClick?.(provinceName);
-        
-        // Re-style all features
-        if (geoJsonRef.current) {
-          geoJsonRef.current.eachLayer((layer) => {
-            if (layer instanceof L.Path) {
-              const featureData = (layer as unknown as { feature: ProvinceFeature }).feature;
-              layer.setStyle(getProvinceStyle(featureData));
-            }
-          });
-        }
-      },
-      mouseover: (e) => {
-        const layer = e.target;
-        if (!selectedProvince || selectedProvince !== (feature.properties as ProvinceProperties).name) {
-          layer.setStyle({
-            fillColor: "#f3f4f6",
-            fillOpacity: 1,
-          });
-        }
-        
-        // Show tooltip with only province name
-        const tooltip = `
-          <div class="font-medium text-sm">
-            ${(feature.properties as ProvinceProperties).name}
-          </div>
-        `;
-        layer.bindTooltip(tooltip, {
-          permanent: false,
-          direction: "top",
-          className: "custom-tooltip",
-        }).openTooltip();
-      },
-      mouseout: (e) => {
-        const layer = e.target;
-        if (!selectedProvince || selectedProvince !== (feature.properties as ProvinceProperties).name) {
-          layer.setStyle(getProvinceStyle(feature as ProvinceFeature));
-        }
-        layer.closeTooltip();
-      },
-    };
+  const handleClick = (provinceName: string) => {
+    console.log("handleClick called for:", provinceName);
+    setSelectedProvince(provinceName);
 
-    layer.on(eventHandlers);
+    // Use setTimeout to ensure state updates don't interfere
+    setTimeout(() => {
+      if (callbackRef.current) {
+        console.log("Executing navigation callback for:", provinceName);
+        callbackRef.current(provinceName);
+      }
+    }, 0);
+  };
+
+  const onEachFeature = (feature: Feature, layer: Layer) => {
+    const props = feature.properties as ProvinceProperties;
+    const provinceName = props?.name;
+
+    if (!provinceName) {
+      console.warn("Feature without name:", feature);
+      return;
+    }
+
+    // Bind click event
+    layer.on({
+      click: (e: LeafletMouseEvent) => {
+        if (e.originalEvent) {
+          e.originalEvent.stopPropagation();
+          e.originalEvent.preventDefault();
+        }
+        handleClick(provinceName);
+      },
+      mouseover: () => {
+        setHoveredProvince(provinceName);
+        (layer as L.Path).setStyle({
+          fillColor: selectedProvince === provinceName ? "#ff5a5f" : "#fecaca",
+        });
+        layer
+          .bindTooltip(provinceName, {
+            permanent: false,
+            direction: "top",
+            className: "province-tooltip",
+          })
+          .openTooltip();
+      },
+      mouseout: () => {
+        setHoveredProvince(null);
+        (layer as L.Path).setStyle({
+          fillColor: selectedProvince === provinceName ? "#ff5a5f" : "#ffffff",
+        });
+        layer.unbindTooltip();
+      },
+    });
   };
 
   if (!geoData) {
     return (
-      <div className={`rounded-2xl shadow-sm border bg-background p-8 ${className}`}>
-        <div className="flex items-center justify-center h-[80vh]">
-          <div className="text-muted-foreground">Loading map...</div>
+      <div className={`rounded-2xl border bg-white ${className}`}>
+        <div className="flex items-center justify-center h-full min-h-[300px]">
+          <div className="text-muted-foreground animate-pulse">
+            Harita yükleniyor...
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className={`h-[400px] w-full relative overflow-hidden rounded-2xl shadow-sm border bg-gray-50 ${className}`}>
+    <div
+      className={`w-full relative overflow-hidden rounded-2xl border bg-white ${className}`}
+      style={{ isolation: "isolate" }}
+    >
       <MapContainer
-        center={[39, 35.5]}
-        zoom={5}
-        minZoom={5}
-        maxZoom={6}
-        style={{ height: "100%", width: "100%", backgroundColor: "#f9fafb" }}
-        className="rounded-2xl"
-        scrollWheelZoom={true}
-        doubleClickZoom={true}
-        dragging={true}
-        zoomControl={true}
-        maxBounds={[[35, 25], [43, 45]]}
-        maxBoundsViscosity={1.0}
+        center={[39, 35]}
+        zoom={6}
+        style={{
+          height: "100%",
+          width: "100%",
+          background: "#ffffff",
+          zIndex: 1,
+        }}
+        zoomControl={false}
+        scrollWheelZoom={false}
+        doubleClickZoom={false}
+        dragging={false}
+        touchZoom={false}
+        keyboard={false}
+        boxZoom={false}
+        attributionControl={false}
       >
-{/* No tile layer - only show Turkey provinces */}
-        
+        <FitBounds geoData={geoData} />
         <GeoJSON
           data={geoData}
-          style={(feature) => getProvinceStyle(feature as ProvinceFeature)}
+          style={getStyle}
           onEachFeature={onEachFeature}
-          ref={geoJsonRef}
         />
       </MapContainer>
-      
+
       {selectedProvince && (
-        <div className="absolute top-4 right-4 bg-background/95 backdrop-blur-sm rounded-lg shadow-lg border p-3 z-[1000]">
-          <div className="text-sm font-medium text-foreground">
-            Seçili Şehir
-          </div>
-          <div className="text-lg font-semibold text-primary">
+        <div className="absolute bottom-3 left-3 bg-white rounded-lg shadow-md border px-3 py-1.5 z-[1000] pointer-events-none">
+          <span className="text-xs text-muted-foreground">Seçili: </span>
+          <span className="text-sm font-semibold text-primary">
             {selectedProvince}
-          </div>
-          <button
-            onClick={() => setSelectedProvince(null)}
-            className="mt-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Seçimi Temizle
-          </button>
+          </span>
         </div>
       )}
-      
+
       <style jsx global>{`
-        .custom-tooltip {
-          background: rgba(255, 255, 255, 0.95) !important;
-          border: 1px solid #e4e4e7 !important;
-          border-radius: 8px !important;
-          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
-          color: #18181b !important;
-          font-size: 12px !important;
-          padding: 8px 12px !important;
-          backdrop-filter: blur(8px) !important;
+        .province-tooltip {
+          background: white !important;
+          border: 1px solid #e5e7eb !important;
+          border-radius: 6px !important;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12) !important;
+          color: #1f2937 !important;
+          font-size: 13px !important;
+          font-weight: 500 !important;
+          padding: 4px 10px !important;
         }
-        
-        .custom-tooltip::before {
-          border-top-color: rgba(255, 255, 255, 0.95) !important;
+        .province-tooltip::before {
+          display: none !important;
         }
-        
-        .leaflet-container {
-          font-family: var(--font-sans, "Inter", system-ui, sans-serif) !important;
-        }
-        
-        .leaflet-control-zoom a {
-          background-color: rgba(255, 255, 255, 0.95) !important;
-          border: 1px solid #e4e4e7 !important;
-          color: #18181b !important;
-          backdrop-filter: blur(8px) !important;
-        }
-        
-        .leaflet-control-zoom a:hover {
-          background-color: #f4f4f5 !important;
-        }
-        
-        .leaflet-control-attribution {
-          background-color: rgba(255, 255, 255, 0.8) !important;
-          backdrop-filter: blur(4px) !important;
-          font-size: 10px !important;
+        .leaflet-interactive {
+          cursor: pointer !important;
         }
       `}</style>
     </div>

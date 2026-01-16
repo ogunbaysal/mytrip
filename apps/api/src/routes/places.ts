@@ -24,6 +24,10 @@ app.get("/", async (c) => {
       verified = "",
       sortBy = "createdAt",
       sortOrder = "desc",
+      amenities = "",
+      bounds = "",
+      priceMin = "",
+      priceMax = "",
     } = c.req.query();
 
     const offset = (parseInt(page) - 1) * parseInt(limit);
@@ -34,7 +38,7 @@ app.get("/", async (c) => {
 
     if (search) {
       conditions.push(
-        sql`(LOWER(${place.name}) ILIKE ${'%' + search.toLowerCase() + '%'} OR LOWER(${place.description}) ILIKE ${'%' + search.toLowerCase() + '%'} OR LOWER(${place.shortDescription}) ILIKE ${'%' + search.toLowerCase() + '%'} OR LOWER(${place.category}) ILIKE ${'%' + search.toLowerCase() + '%'} OR LOWER(${place.address}) ILIKE ${'%' + search.toLowerCase() + '%'})`
+        sql`(LOWER(${place.name}) ILIKE ${"%" + search.toLowerCase() + "%"} OR LOWER(${place.description}) ILIKE ${"%" + search.toLowerCase() + "%"} OR LOWER(${place.shortDescription}) ILIKE ${"%" + search.toLowerCase() + "%"} OR LOWER(${place.category}) ILIKE ${"%" + search.toLowerCase() + "%"} OR LOWER(${place.address}) ILIKE ${"%" + search.toLowerCase() + "%"})`,
       );
     }
 
@@ -66,19 +70,72 @@ app.get("/", async (c) => {
       conditions.push(eq(place.verified, verified === "true"));
     }
 
+    // Price range filtering
+    if (priceMin) {
+      const minPrice = parseFloat(priceMin);
+      if (!isNaN(minPrice)) {
+        conditions.push(
+          sql`CAST(${place.nightlyPrice} AS NUMERIC) >= ${minPrice}`,
+        );
+      }
+    }
+
+    if (priceMax) {
+      const maxPrice = parseFloat(priceMax);
+      if (!isNaN(maxPrice)) {
+        conditions.push(
+          sql`CAST(${place.nightlyPrice} AS NUMERIC) <= ${maxPrice}`,
+        );
+      }
+    }
+
+    // Amenities filtering - check if place.features JSON contains all requested amenities
+    if (amenities) {
+      const amenityList = amenities
+        .split(",")
+        .map((a) => a.trim())
+        .filter(Boolean);
+      for (const amenity of amenityList) {
+        conditions.push(
+          sql`${place.features}::text ILIKE ${"%" + amenity + "%"}`,
+        );
+      }
+    }
+
+    // Bounds filtering for map - format: minLat,minLng,maxLat,maxLng
+    if (bounds) {
+      const [minLat, minLng, maxLat, maxLng] = bounds
+        .split(",")
+        .map(parseFloat);
+      if (
+        !isNaN(minLat) &&
+        !isNaN(minLng) &&
+        !isNaN(maxLat) &&
+        !isNaN(maxLng)
+      ) {
+        conditions.push(
+          sql`(${place.location}::json->>'lat')::numeric BETWEEN ${minLat} AND ${maxLat}`,
+        );
+        conditions.push(
+          sql`(${place.location}::json->>'lng')::numeric BETWEEN ${minLng} AND ${maxLng}`,
+        );
+      }
+    }
+
     const whereClause = conditions.length > 0 ? and(...conditions) : sql`1=1`;
 
     // Build order by clause
-    const orderByColumn = {
-      name: place.name,
-      rating: place.rating,
-      reviewCount: place.reviewCount,
-      price: place.nightlyPrice,
-      views: place.views,
-      bookingCount: place.bookingCount,
-      createdAt: place.createdAt,
-      updatedAt: place.updatedAt,
-    }[sortBy] || place.createdAt;
+    const orderByColumn =
+      {
+        name: place.name,
+        rating: place.rating,
+        reviewCount: place.reviewCount,
+        price: place.nightlyPrice,
+        views: place.views,
+        bookingCount: place.bookingCount,
+        createdAt: place.createdAt,
+        updatedAt: place.updatedAt,
+      }[sortBy] || place.createdAt;
 
     const orderDirection = sortOrder === "asc" ? sql`ASC` : sql`DESC`;
 
@@ -88,7 +145,7 @@ app.get("/", async (c) => {
       .from(place)
       .where(whereClause);
 
-    // Get places with basic owner info
+    // Get places with basic owner info and features
     const places = await db
       .select({
         id: place.id,
@@ -106,6 +163,7 @@ app.get("/", async (c) => {
         priceLevel: place.priceLevel,
         nightlyPrice: place.nightlyPrice,
         images: place.images,
+        features: place.features,
         verified: place.verified,
         featured: place.featured,
         ownerId: place.ownerId,
@@ -135,6 +193,10 @@ app.get("/", async (c) => {
         priceLevel,
         featured,
         verified,
+        amenities,
+        bounds,
+        priceMin,
+        priceMax,
       },
     });
   } catch (error) {
@@ -142,9 +204,9 @@ app.get("/", async (c) => {
     return c.json(
       {
         error: "Failed to fetch places",
-        message: "Unable to retrieve places"
+        message: "Unable to retrieve places",
       },
-      500
+      500,
     );
   }
 });
@@ -158,10 +220,7 @@ app.get("/featured", async (c) => {
     const { limit = "12", type = "" } = c.req.query();
     const limitInt = parseInt(limit);
 
-    const conditions = [
-      eq(place.status, "active"),
-      eq(place.featured, true),
-    ];
+    const conditions = [eq(place.status, "active"), eq(place.featured, true)];
 
     if (type) {
       conditions.push(eq(place.type, type as any));
@@ -203,9 +262,9 @@ app.get("/featured", async (c) => {
     return c.json(
       {
         error: "Failed to fetch featured places",
-        message: "Unable to retrieve featured places"
+        message: "Unable to retrieve featured places",
       },
-      500
+      500,
     );
   }
 });
@@ -219,10 +278,7 @@ app.get("/popular", async (c) => {
     const { limit = "12", type = "" } = c.req.query();
     const limitInt = parseInt(limit);
 
-    const conditions = [
-      eq(place.status, "active"),
-      gt(place.reviewCount, 0),
-    ];
+    const conditions = [eq(place.status, "active"), gt(place.reviewCount, 0)];
 
     if (type) {
       conditions.push(eq(place.type, type as any));
@@ -252,7 +308,11 @@ app.get("/popular", async (c) => {
       })
       .from(place)
       .where(whereClause)
-      .orderBy(desc(place.rating), desc(place.reviewCount), desc(place.bookingCount))
+      .orderBy(
+        desc(place.rating),
+        desc(place.reviewCount),
+        desc(place.bookingCount),
+      )
       .limit(limitInt);
 
     return c.json({
@@ -264,13 +324,12 @@ app.get("/popular", async (c) => {
     return c.json(
       {
         error: "Failed to fetch popular places",
-        message: "Unable to retrieve popular places"
+        message: "Unable to retrieve popular places",
       },
-      500
+      500,
     );
   }
 });
-
 
 /**
  * Get place categories
@@ -292,13 +351,16 @@ app.get("/categories", async (c) => {
         count: sql`COUNT(${place.id})::int`,
       })
       .from(placeCategory)
-      .leftJoin(place, and(eq(place.categoryId, placeCategory.id), eq(place.status, "active")))
+      .leftJoin(
+        place,
+        and(eq(place.categoryId, placeCategory.id), eq(place.status, "active")),
+      )
       .groupBy(placeCategory.id)
       .orderBy(sql`COUNT(${place.id}) DESC`);
 
     return c.json({
-      categories: categories.map(cat => ({
-        id: cat.slug, 
+      categories: categories.map((cat) => ({
+        id: cat.slug,
         title: cat.name,
         description: cat.description || `${cat.count} seçenek`,
         count: Number(cat.count),
@@ -309,9 +371,9 @@ app.get("/categories", async (c) => {
     return c.json(
       {
         error: "Failed to fetch categories",
-        message: "Unable to retrieve place categories"
+        message: "Unable to retrieve place categories",
       },
-      500
+      500,
     );
   }
 });
@@ -333,10 +395,10 @@ app.get("/cities", async (c) => {
       .orderBy(sql`COUNT(*) DESC`);
 
     return c.json({
-      cities: cities.map(city => ({
+      cities: cities.map((city) => ({
         name: city.city!,
         count: Number(city.count),
-        slug: city.city!.toLowerCase().replace(/\s+/g, '-'),
+        slug: city.city!.toLowerCase().replace(/\s+/g, "-"),
       })),
     });
   } catch (error) {
@@ -344,9 +406,107 @@ app.get("/cities", async (c) => {
     return c.json(
       {
         error: "Failed to fetch cities",
-        message: "Unable to retrieve cities"
+        message: "Unable to retrieve cities",
       },
-      500
+      500,
+    );
+  }
+});
+
+/**
+ * Get available amenities/features across all places
+ * GET /places/amenities
+ */
+app.get("/amenities", async (c) => {
+  try {
+    // Get all features from active places
+    const placesWithFeatures = await db
+      .select({
+        features: place.features,
+      })
+      .from(place)
+      .where(eq(place.status, "active"));
+
+    // Count occurrences of each amenity
+    const amenityCounts: Record<string, number> = {};
+
+    for (const p of placesWithFeatures) {
+      if (!p.features) continue;
+
+      let features: string[] = [];
+      try {
+        features =
+          typeof p.features === "string" ? JSON.parse(p.features) : p.features;
+      } catch {
+        continue;
+      }
+
+      for (const feature of features) {
+        amenityCounts[feature] = (amenityCounts[feature] || 0) + 1;
+      }
+    }
+
+    // Turkish translations for common amenities
+    const amenityLabels: Record<string, string> = {
+      wifi: "Wifi",
+      parking: "Otopark",
+      free_parking: "Ücretsiz Otopark",
+      pool: "Havuz",
+      spa: "Spa",
+      gym: "Spor Salonu",
+      restaurant: "Restoran",
+      bar: "Bar",
+      room_service: "Oda Servisi",
+      air_conditioning: "Klima",
+      heating: "Isıtma",
+      sea_view: "Deniz Manzarası",
+      beach_access: "Plaj Erişimi",
+      pet_friendly: "Evcil Hayvan Dostu",
+      wheelchair_accessible: "Engelli Erişimi",
+      family_friendly: "Aile Dostu",
+      kitchen: "Mutfak",
+      washer: "Çamaşır Makinesi",
+      dryer: "Kurutma Makinesi",
+      iron: "Ütü",
+      dedicated_workspace: "Çalışma Alanı",
+      free_cancellation: "Ücretsiz İptal",
+      tv: "TV",
+      balcony: "Balkon",
+      terrace: "Teras",
+      garden: "Bahçe",
+      bbq: "Barbekü",
+      fireplace: "Şömine",
+      safe: "Kasa",
+      minibar: "Minibar",
+      coffee_maker: "Kahve Makinesi",
+      dishwasher: "Bulaşık Makinesi",
+      microwave: "Mikrodalga",
+      elevator: "Asansör",
+      concierge: "Konsiyerj",
+      laundry: "Çamaşırhane",
+      breakfast: "Kahvaltı",
+    };
+
+    // Sort by count and return
+    const amenities = Object.entries(amenityCounts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([key, count]) => ({
+        key,
+        label:
+          amenityLabels[key] ||
+          key.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase()),
+        count,
+      }));
+
+    return c.json({ amenities });
+  } catch (error) {
+    console.error("Failed to fetch amenities:", error);
+    return c.json(
+      {
+        error: "Failed to fetch amenities",
+        message: "Unable to retrieve amenities",
+      },
+      500,
     );
   }
 });
@@ -377,7 +537,7 @@ app.get("/types", async (c) => {
     };
 
     return c.json({
-      types: placeTypes.map(pt => ({
+      types: placeTypes.map((pt) => ({
         type: pt.type,
         name: typeNames[pt.type as keyof typeof typeNames] || pt.type,
         count: Number(pt.count),
@@ -389,9 +549,9 @@ app.get("/types", async (c) => {
     return c.json(
       {
         error: "Failed to fetch place types",
-        message: "Unable to retrieve place types"
+        message: "Unable to retrieve place types",
       },
-      500
+      500,
     );
   }
 });
@@ -441,9 +601,9 @@ app.get("/:slug", async (c) => {
       return c.json(
         {
           error: "Place not found",
-          message: "The specified place does not exist or is not available"
+          message: "The specified place does not exist or is not available",
         },
-        404
+        404,
       );
     }
 
@@ -468,7 +628,9 @@ app.get("/:slug", async (c) => {
       })
       .from(review)
       .innerJoin(user, eq(review.userId, user.id))
-      .where(and(eq(review.placeId, placeData.id), eq(review.status, "published")))
+      .where(
+        and(eq(review.placeId, placeData.id), eq(review.status, "published")),
+      )
       .orderBy(desc(review.createdAt))
       .limit(5);
 
@@ -490,7 +652,13 @@ app.get("/:slug", async (c) => {
         verified: place.verified,
       })
       .from(place)
-      .where(and(eq(place.city, placeData.city || ""), eq(place.status, "active"), sql`${place.id} != ${placeData.id}`))
+      .where(
+        and(
+          eq(place.city, placeData.city || ""),
+          eq(place.status, "active"),
+          sql`${place.id} != ${placeData.id}`,
+        ),
+      )
       .orderBy(desc(place.rating), desc(place.reviewCount))
       .limit(6);
 
@@ -507,9 +675,9 @@ app.get("/:slug", async (c) => {
     return c.json(
       {
         error: "Failed to fetch place",
-        message: "Unable to retrieve place details"
+        message: "Unable to retrieve place details",
       },
-      500
+      500,
     );
   }
 });

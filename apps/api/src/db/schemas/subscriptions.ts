@@ -119,11 +119,10 @@ export const payment = pgTable("payment", {
     .defaultNow(),
 });
 
-const businessRegistrationStatusEnum = pgEnum("business_registration_status", [
-  "pending",
-  "approved",
-  "rejected",
-]);
+export const businessRegistrationStatusEnum = pgEnum(
+  "business_registration_status",
+  ["pending", "approved", "rejected"],
+);
 
 export const businessRegistration = pgTable("business_registration", {
   id: text("id").primaryKey(),

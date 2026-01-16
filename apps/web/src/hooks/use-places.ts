@@ -17,6 +17,10 @@ export type PlaceFilters = {
   priceMin?: number;
   priceMax?: number;
   sort?: string;
+  amenities?: string[];
+  bounds?: { minLat: number; minLng: number; maxLat: number; maxLng: number };
+  featured?: boolean;
+  verified?: boolean;
 };
 
 export function usePlaces(filters?: PlaceFilters) {

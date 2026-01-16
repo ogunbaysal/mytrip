@@ -111,6 +111,7 @@ function mapBackendPlaceToSummary(place: APIPlace): PlaceSummary {
     place.location,
     { lat: 37.1, lng: 28.3 },
   );
+  const features = safelyParseJSON<string[]>(place.features, []);
 
   let type: PlaceSummary["type"] = "stay";
   const pType = place.type.toLowerCase();
@@ -134,6 +135,7 @@ function mapBackendPlaceToSummary(place: APIPlace): PlaceSummary {
     type,
     category,
     coordinates: location,
+    features,
   };
 }
 
@@ -372,6 +374,15 @@ export const api = {
       priceMin?: number;
       priceMax?: number;
       sort?: string;
+      amenities?: string[];
+      bounds?: {
+        minLat: number;
+        minLng: number;
+        maxLat: number;
+        maxLng: number;
+      };
+      featured?: boolean;
+      verified?: boolean;
     }): Promise<PlaceSummary[]> {
       try {
         const queryParams = new URLSearchParams();
@@ -388,9 +399,22 @@ export const api = {
         if (params?.season) queryParams.set("season", params.season);
         if (params?.checkIn) queryParams.set("checkIn", params.checkIn);
         if (params?.checkOut) queryParams.set("checkOut", params.checkOut);
-        if (params?.priceMin) queryParams.set("priceMin", params.priceMin.toString());
-        if (params?.priceMax) queryParams.set("priceMax", params.priceMax.toString());
+        if (params?.priceMin)
+          queryParams.set("priceMin", params.priceMin.toString());
+        if (params?.priceMax)
+          queryParams.set("priceMax", params.priceMax.toString());
         if (params?.sort) queryParams.set("sort", params.sort);
+        if (params?.amenities && params.amenities.length > 0) {
+          queryParams.set("amenities", params.amenities.join(","));
+        }
+        if (params?.bounds) {
+          queryParams.set(
+            "bounds",
+            `${params.bounds.minLat},${params.bounds.minLng},${params.bounds.maxLat},${params.bounds.maxLng}`,
+          );
+        }
+        if (params?.featured) queryParams.set("featured", "true");
+        if (params?.verified) queryParams.set("verified", "true");
 
         const response = await request<{ places: APIPlace[] }>(
           `/api/places?${queryParams.toString()}`,
@@ -398,6 +422,19 @@ export const api = {
         return response.places.map(mapBackendPlaceToSummary);
       } catch (error) {
         console.error("Failed to fetch places from API:", error);
+        return [];
+      }
+    },
+    async listAmenities(): Promise<
+      { key: string; label: string; count: number }[]
+    > {
+      try {
+        const response = await request<{
+          amenities: { key: string; label: string; count: number }[];
+        }>(`/api/places/amenities`);
+        return response.amenities;
+      } catch (error) {
+        console.error("Failed to fetch amenities:", error);
         return [];
       }
     },

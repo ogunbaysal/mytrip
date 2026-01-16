@@ -1,18 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import type { Route } from "next";
 import { useQuery } from "@tanstack/react-query";
+import { motion } from "framer-motion";
 import {
   Building2,
   FileText,
   ArrowRight,
   TrendingUp,
   Calendar,
+  Sparkles,
+  Plus,
   BarChart3,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { StatCard, DashboardCard, SectionHeader } from "@/components/dashboard";
 import { api } from "@/lib/api";
 
 export default function DashboardPage() {
@@ -30,19 +32,13 @@ export default function DashboardPage() {
   const usage = usageData?.usage;
   const subscription = subscriptionData?.subscription;
 
-  const getUsageColor = (current: number, max: number) => {
-    const percentage = (current / max) * 100;
-    if (percentage >= 90) return "text-red-500";
-    if (percentage >= 70) return "text-yellow-500";
-    return "text-green-500";
-  };
+  const placesUsed = usage?.places.current || 0;
+  const placesMax = usage?.places.max || 1;
+  const blogsUsed = usage?.blogs.current || 0;
+  const blogsMax = usage?.blogs.max || 1;
 
-  const getProgressColor = (current: number, max: number) => {
-    const percentage = (current / max) * 100;
-    if (percentage >= 90) return "bg-red-500";
-    if (percentage >= 70) return "bg-yellow-500";
-    return "bg-green-500";
-  };
+  const placesPercentage = Math.round((placesUsed / placesMax) * 100);
+  const blogsPercentage = Math.round((blogsUsed / blogsMax) * 100);
 
   if (isLoading) {
     return (
@@ -54,195 +50,302 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="mb-2 text-3xl font-bold">Hoş Geldiniz</h1>
-        <p className="text-muted-foreground">
-          İşletme panelinizden kontrolünüzde
-        </p>
-      </div>
+      {/* Welcome Hero Card */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+      >
+        <DashboardCard
+          padding="lg"
+          className="relative overflow-hidden bg-gradient-to-br from-primary via-primary/90 to-primary/80"
+        >
+          {/* Background decorative elements */}
+          <div className="absolute right-0 top-0 -mr-8 -mt-8 size-64 rounded-full bg-white/5" />
+          <div className="absolute bottom-0 left-1/2 -mb-16 size-48 rounded-full bg-white/5" />
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">
-                Mekanlar
+          <div className="relative z-10 flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <div className="flex size-10 items-center justify-center rounded-xl bg-white/20 text-white">
+                  <Sparkles className="size-5" />
+                </div>
+                <h1 className="text-2xl font-bold text-white md:text-3xl">
+                  Hos Geldiniz
+                </h1>
+              </div>
+              <p className="max-w-md text-white/80">
+                Isletme panelinizden mekanlarinizi ve blog yazilarinizi kolayca
+                yonetin. Bugun neler yapmayi planliyorsunuz?
               </p>
-              <p className="text-3xl font-bold mt-1">
-                {usage?.places.current || 0}{" "}
-                <span className="text-lg font-normal text-muted-foreground">
-                  / {usage?.places.max || 0}
-                </span>
-              </p>
             </div>
-            <div className="rounded-full bg-primary/10 p-3 text-primary">
-              <Building2 className="size-6" />
-            </div>
-          </div>
-          <div className="mt-4">
-            <div className="mb-2 flex justify-between text-sm">
-              <span className="text-muted-foreground">Kullanım</span>
-              <span
-                className={getUsageColor(
-                  usage?.places.current || 0,
-                  usage?.places.max || 1,
-                )}
-              >
-                {Math.round(
-                  ((usage?.places.current || 0) / (usage?.places.max || 1)) *
-                    100,
-                )}
-                %
-              </span>
-            </div>
-            <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-              <div
-                className={`h-full transition-all ${getProgressColor(
-                  usage?.places.current || 0,
-                  usage?.places.max || 1,
-                )}`}
-                style={{
-                  width: `${((usage?.places.current || 0) / (usage?.places.max || 1)) * 100}%`,
-                }}
-              />
-            </div>
-          </div>
-        </Card>
 
-        <Card className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">
-                Blog Yazıları
-              </p>
-              <p className="text-3xl font-bold mt-1">
-                {usage?.blogs.current || 0}{" "}
-                <span className="text-lg font-normal text-muted-foreground">
-                  / {usage?.blogs.max || 0}
-                </span>
-              </p>
-            </div>
-            <div className="rounded-full bg-primary/10 p-3 text-primary">
-              <FileText className="size-6" />
-            </div>
-          </div>
-          <div className="mt-4">
-            <div className="mb-2 flex justify-between text-sm">
-              <span className="text-muted-foreground">Kullanım</span>
-              <span
-                className={getUsageColor(
-                  usage?.blogs.current || 0,
-                  usage?.blogs.max || 1,
-                )}
-              >
-                {Math.round(
-                  ((usage?.blogs.current || 0) / (usage?.blogs.max || 1)) * 100,
-                )}
-                %
-              </span>
-            </div>
-            <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-              <div
-                className={`h-full transition-all ${getProgressColor(
-                  usage?.blogs.current || 0,
-                  usage?.blogs.max || 1,
-                )}`}
-                style={{
-                  width: `${((usage?.blogs.current || 0) / (usage?.blogs.max || 1)) * 100}%`,
-                }}
-              />
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">
-                Abonelik Durumu
-              </p>
-              <p className="text-xl font-semibold mt-1 capitalize">
-                {subscription?.status || "Active"}
-              </p>
-            </div>
-            <div className="rounded-full bg-primary/10 p-3 text-primary">
-              <TrendingUp className="size-6" />
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">
-                Sonraki Ödeme
-              </p>
-              <p className="text-xl font-semibold mt-1">
-                {subscription?.nextBillingDate ||
-                  new Date().toISOString().split("T")[0]}
-              </p>
-            </div>
-            <div className="rounded-full bg-primary/10 p-3 text-primary">
-              <Calendar className="size-6" />
-            </div>
-          </div>
-        </Card>
-      </div>
-
-      <div>
-        <h2 className="mb-4 text-2xl font-bold">Hızlı İşlemler</h2>
-        <div className="grid gap-4 md:grid-cols-2">
-          <Card className="p-6">
-            <h3 className="mb-2 text-lg font-semibold">Mekan Ekle</h3>
-            <p className="mb-4 text-sm text-muted-foreground">
-              Yeni bir mekan ekleyin ve müşterilere ulaşın
-            </p>
-            {(usage?.places.current || 0) >= (usage?.places.max || 1) ? (
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={() => (window.location.href = "/pricing")}
-              >
-                <BarChart3 className="mr-2 size-4" />
-                Planı Yükselt
-              </Button>
-            ) : (
-              <Link href="/dashboard/places/create" className="block">
-                <Button className="w-full">
-                  <Building2 className="mr-2 size-4" />
+            <div className="flex flex-wrap gap-3">
+              <Link href="/dashboard/places/create">
+                <Button
+                  variant="secondary"
+                  className="gap-2 bg-white text-primary hover:bg-white/90"
+                >
+                  <Building2 className="size-4" />
                   Mekan Ekle
-                  <ArrowRight className="ml-auto size-4" />
                 </Button>
               </Link>
-            )}
-          </Card>
+              <Link href="/dashboard/blogs/create">
+                <Button
+                  variant="secondary"
+                  className="gap-2 bg-white/20 text-white hover:bg-white/30"
+                >
+                  <FileText className="size-4" />
+                  Blog Yaz
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </DashboardCard>
+      </motion.div>
 
-          <Card className="p-6">
-            <h3 className="mb-2 text-lg font-semibold">Blog Yazısı Ekle</h3>
-            <p className="mb-4 text-sm text-muted-foreground">
-              Blog yazısı yayınlayarak markanız bilinirliğini artırın
-            </p>
-            {(usage?.blogs.current || 0) >= (usage?.blogs.max || 1) ? (
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={() => (window.location.href = "/pricing")}
-              >
-                <BarChart3 className="mr-2 size-4" />
-                Planı Yükselt
-              </Button>
-            ) : (
-              <Link href="/dashboard/blogs/create" className="block">
-                <Button className="w-full">
-                  <FileText className="mr-2 size-4" />
-                  Blog Yazısı Ekle
-                  <ArrowRight className="ml-auto size-4" />
-                </Button>
-              </Link>
-            )}
-          </Card>
+      {/* Stats Grid */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          label="Mekanlar"
+          value={placesUsed}
+          subValue={placesMax}
+          icon={<Building2 className="size-5" />}
+          iconGradient="from-blue-500 to-blue-600"
+          showProgress
+          progressValue={placesPercentage}
+          index={0}
+        />
+
+        <StatCard
+          label="Blog Yazilari"
+          value={blogsUsed}
+          subValue={blogsMax}
+          icon={<FileText className="size-5" />}
+          iconGradient="from-emerald-500 to-emerald-600"
+          showProgress
+          progressValue={blogsPercentage}
+          index={1}
+        />
+
+        <StatCard
+          label="Abonelik Durumu"
+          value={
+            subscription?.status === "active"
+              ? "Aktif"
+              : subscription?.status || "Aktif"
+          }
+          icon={<TrendingUp className="size-5" />}
+          iconGradient="from-violet-500 to-violet-600"
+          index={2}
+          footer={
+            <Link
+              href="/dashboard/subscription"
+              className="flex items-center gap-1 text-sm text-primary hover:underline"
+            >
+              Plani Goruntule
+              <ArrowRight className="size-3" />
+            </Link>
+          }
+        />
+
+        <StatCard
+          label="Sonraki Odeme"
+          value={
+            subscription?.nextBillingDate
+              ? new Date(subscription.nextBillingDate).toLocaleDateString(
+                  "tr-TR",
+                )
+              : "-"
+          }
+          icon={<Calendar className="size-5" />}
+          iconGradient="from-amber-500 to-amber-600"
+          index={3}
+        />
+      </div>
+
+      {/* Quick Actions */}
+      <div className="space-y-4">
+        <SectionHeader
+          title="Hizli Islemler"
+          subtitle="Sikca kullanilan islemlere hizlica eris"
+          size="md"
+        />
+
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {/* Add Place Card */}
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 0.1 }}
+          >
+            <DashboardCard
+              padding="md"
+              hoverable
+              className="group cursor-pointer"
+            >
+              <div className="flex items-start gap-4">
+                <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/25">
+                  <Building2 className="size-6" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="mb-1 font-semibold text-foreground">
+                    Mekan Ekle
+                  </h3>
+                  <p className="mb-3 text-sm text-muted-foreground">
+                    Yeni bir mekan ekleyin ve musterilere ulasin
+                  </p>
+
+                  {placesUsed >= placesMax ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => (window.location.href = "/pricing")}
+                      className="w-full gap-2"
+                    >
+                      <BarChart3 className="size-4" />
+                      Plani Yukselt
+                    </Button>
+                  ) : (
+                    <Link href="/dashboard/places/create" className="block">
+                      <Button size="sm" className="w-full gap-2">
+                        <Plus className="size-4" />
+                        Mekan Ekle
+                        <ArrowRight className="ml-auto size-4 transition-transform group-hover:translate-x-1" />
+                      </Button>
+                    </Link>
+                  )}
+                </div>
+              </div>
+            </DashboardCard>
+          </motion.div>
+
+          {/* Add Blog Card */}
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 0.15 }}
+          >
+            <DashboardCard
+              padding="md"
+              hoverable
+              className="group cursor-pointer"
+            >
+              <div className="flex items-start gap-4">
+                <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/25">
+                  <FileText className="size-6" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="mb-1 font-semibold text-foreground">
+                    Blog Yazisi Ekle
+                  </h3>
+                  <p className="mb-3 text-sm text-muted-foreground">
+                    Blog yazisi yayinlayarak markanizi tanitin
+                  </p>
+
+                  {blogsUsed >= blogsMax ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => (window.location.href = "/pricing")}
+                      className="w-full gap-2"
+                    >
+                      <BarChart3 className="size-4" />
+                      Plani Yukselt
+                    </Button>
+                  ) : (
+                    <Link href="/dashboard/blogs/create" className="block">
+                      <Button size="sm" className="w-full gap-2">
+                        <Plus className="size-4" />
+                        Blog Yaz
+                        <ArrowRight className="ml-auto size-4 transition-transform group-hover:translate-x-1" />
+                      </Button>
+                    </Link>
+                  )}
+                </div>
+              </div>
+            </DashboardCard>
+          </motion.div>
+
+          {/* Subscription Card */}
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 0.2 }}
+          >
+            <DashboardCard
+              padding="md"
+              hoverable
+              className="group cursor-pointer"
+            >
+              <div className="flex items-start gap-4">
+                <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-violet-600 text-white shadow-lg shadow-violet-500/25">
+                  <TrendingUp className="size-6" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="mb-1 font-semibold text-foreground">
+                    Aboneliginiz
+                  </h3>
+                  <p className="mb-3 text-sm text-muted-foreground">
+                    Plan detaylari ve kullanim istatistikleri
+                  </p>
+
+                  <Link href="/dashboard/subscription" className="block">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full gap-2"
+                    >
+                      Detaylari Gor
+                      <ArrowRight className="ml-auto size-4 transition-transform group-hover:translate-x-1" />
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            </DashboardCard>
+          </motion.div>
         </div>
       </div>
+
+      {/* Usage Summary */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: 0.25 }}
+      >
+        <DashboardCard padding="md">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h3 className="font-semibold text-foreground">Kullanim Ozeti</h3>
+              <p className="text-sm text-muted-foreground">
+                Planinizdaki kaynaklarin kullanim durumu
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-6">
+              <div className="flex items-center gap-2">
+                <div className="size-3 rounded-full bg-blue-500" />
+                <span className="text-sm text-muted-foreground">
+                  Mekanlar: {placesUsed}/{placesMax}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="size-3 rounded-full bg-emerald-500" />
+                <span className="text-sm text-muted-foreground">
+                  Bloglar: {blogsUsed}/{blogsMax}
+                </span>
+              </div>
+            </div>
+
+            <Link href="/dashboard/subscription">
+              <Button variant="outline" size="sm" className="gap-2">
+                Limitleri Artir
+                <ArrowRight className="size-4" />
+              </Button>
+            </Link>
+          </div>
+        </DashboardCard>
+      </motion.div>
     </div>
   );
 }
