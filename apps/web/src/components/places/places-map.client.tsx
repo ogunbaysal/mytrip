@@ -95,17 +95,33 @@ function ZoomControls() {
   );
 }
 
+// Helper to validate coordinates
+function isValidCoordinate(coord: { lat: number; lng: number }): boolean {
+  return (
+    typeof coord.lat === "number" &&
+    typeof coord.lng === "number" &&
+    !Number.isNaN(coord.lat) &&
+    !Number.isNaN(coord.lng) &&
+    coord.lat >= -90 &&
+    coord.lat <= 90 &&
+    coord.lng >= -180 &&
+    coord.lng <= 180
+  );
+}
+
 function computeBounds(places: PlaceSummary[]): LatLngBoundsExpression | null {
-  if (places.length === 0) {
+  const validPlaces = places.filter((p) => isValidCoordinate(p.coordinates));
+
+  if (validPlaces.length === 0) {
     return null;
   }
 
-  let south = places[0].coordinates.lat;
-  let north = places[0].coordinates.lat;
-  let west = places[0].coordinates.lng;
-  let east = places[0].coordinates.lng;
+  let south = validPlaces[0].coordinates.lat;
+  let north = validPlaces[0].coordinates.lat;
+  let west = validPlaces[0].coordinates.lng;
+  let east = validPlaces[0].coordinates.lng;
 
-  for (const place of places) {
+  for (const place of validPlaces) {
     const { lat, lng } = place.coordinates;
     south = Math.min(south, lat);
     north = Math.max(north, lat);
@@ -120,11 +136,14 @@ function computeBounds(places: PlaceSummary[]): LatLngBoundsExpression | null {
 }
 
 function computeCenter(places: PlaceSummary[]): LatLngTuple {
-  if (places.length === 0) {
-    return [37.0, 27.0];
+  const validPlaces = places.filter((p) => isValidCoordinate(p.coordinates));
+
+  if (validPlaces.length === 0) {
+    // Default to Muğla center
+    return [37.0, 28.3];
   }
 
-  const sum = places.reduce(
+  const sum = validPlaces.reduce(
     (acc, place) => {
       acc.lat += place.coordinates.lat;
       acc.lng += place.coordinates.lng;
@@ -133,7 +152,7 @@ function computeCenter(places: PlaceSummary[]): LatLngTuple {
     { lat: 0, lng: 0 },
   );
 
-  return [sum.lat / places.length, sum.lng / places.length];
+  return [sum.lat / validPlaces.length, sum.lng / validPlaces.length];
 }
 
 // Create custom icon for price markers
@@ -203,33 +222,35 @@ export function PlacesMapClient({
         />
         <ZoomControls />
 
-        {places.map((place) => {
-          const isActive = hoveredPlaceId === place.id;
-          return (
-            <Marker
-              key={place.id}
-              position={[place.coordinates.lat, place.coordinates.lng]}
-              icon={createPriceIcon(place.nightlyPrice, isActive)}
-              eventHandlers={{
-                click: () => onPlaceClick?.(place.id),
-                mouseover: () => onPlaceHover?.(place.id),
-                mouseout: () => onPlaceHover?.(null),
-              }}
-            >
-              <Popup>
-                <div className="min-w-[200px] space-y-2">
-                  <h3 className="text-base font-semibold text-gray-900">
-                    {place.name}
-                  </h3>
-                  <p className="text-sm text-gray-500">{place.city}</p>
-                  <p className="text-sm font-medium text-gray-700">
-                    ₺{place.nightlyPrice.toLocaleString("tr-TR")}/gece
-                  </p>
-                </div>
-              </Popup>
-            </Marker>
-          );
-        })}
+        {places
+          .filter((place) => isValidCoordinate(place.coordinates))
+          .map((place) => {
+            const isActive = hoveredPlaceId === place.id;
+            return (
+              <Marker
+                key={place.id}
+                position={[place.coordinates.lat, place.coordinates.lng]}
+                icon={createPriceIcon(place.nightlyPrice, isActive)}
+                eventHandlers={{
+                  click: () => onPlaceClick?.(place.id),
+                  mouseover: () => onPlaceHover?.(place.id),
+                  mouseout: () => onPlaceHover?.(null),
+                }}
+              >
+                <Popup>
+                  <div className="min-w-[200px] space-y-2">
+                    <h3 className="text-base font-semibold text-gray-900">
+                      {place.name}
+                    </h3>
+                    <p className="text-sm text-gray-500">{place.city}</p>
+                    <p className="text-sm font-medium text-gray-700">
+                      ₺{place.nightlyPrice.toLocaleString("tr-TR")}/gece
+                    </p>
+                  </div>
+                </Popup>
+              </Marker>
+            );
+          })}
       </MapContainer>
 
       {/* Search as I move toggle */}

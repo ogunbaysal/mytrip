@@ -105,12 +105,46 @@ function mapFeaturesToAmenities(features: string[]): PlaceAmenity[] {
   }));
 }
 
+function parseCoordinates(location: string | object | null | undefined): {
+  lat: number;
+  lng: number;
+} {
+  const defaultCoords = { lat: 37.1, lng: 28.3 }; // Default to Muğla area
+
+  if (!location) return defaultCoords;
+
+  let parsed: { lat?: unknown; lng?: unknown };
+  if (typeof location === "string") {
+    try {
+      parsed = JSON.parse(location);
+    } catch {
+      return defaultCoords;
+    }
+  } else {
+    parsed = location as { lat?: unknown; lng?: unknown };
+  }
+
+  const lat = Number(parsed.lat);
+  const lng = Number(parsed.lng);
+
+  // Validate coordinates are valid numbers and within reasonable bounds
+  if (
+    Number.isNaN(lat) ||
+    Number.isNaN(lng) ||
+    lat < -90 ||
+    lat > 90 ||
+    lng < -180 ||
+    lng > 180
+  ) {
+    return defaultCoords;
+  }
+
+  return { lat, lng };
+}
+
 function mapBackendPlaceToSummary(place: APIPlace): PlaceSummary {
   const images = safelyParseJSON<string[]>(place.images, []);
-  const location = safelyParseJSON<{ lat: number; lng: number }>(
-    place.location,
-    { lat: 37.1, lng: 28.3 },
-  );
+  const location = parseCoordinates(place.location);
   const features = safelyParseJSON<string[]>(place.features, []);
 
   let type: PlaceSummary["type"] = "stay";

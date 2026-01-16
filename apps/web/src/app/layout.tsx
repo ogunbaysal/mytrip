@@ -24,7 +24,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="tr" suppressHydrationWarning>
-      <body className={`${fontClassName} antialiased bg-page text-foreground`}>
+      <body
+        className={`${fontClassName} antialiased bg-page text-foreground`}
+        suppressHydrationWarning
+      >
         <AppProviders>
           <SiteShell>{children}</SiteShell>
         </AppProviders>
