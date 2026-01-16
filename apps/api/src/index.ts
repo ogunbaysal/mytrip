@@ -9,6 +9,10 @@ import { locationsRoutes } from "./routes/locations.ts";
 import { profileRoutes } from "./routes/profile";
 
 import { serveStatic } from "hono/bun";
+import { businessRoutes } from "./routes/business.ts";
+import { subscriptionRoutes } from "./routes/subscriptions.ts";
+import { ownerRoutes } from "./routes/owner/index.ts";
+import { refreshSessionRoutes } from "./routes/refresh-session.ts";
 
 const app = new Hono();
 
@@ -76,5 +80,17 @@ app.route("/api/profile", profileRoutes);
 
 // Locations routes
 app.route("/api/locations", locationsRoutes);
+
+// Business registration routes
+app.route("/api/business", businessRoutes);
+
+// Subscription routes
+app.route("/api/subscriptions", subscriptionRoutes);
+
+// Owner routes
+app.route("/api/owner", ownerRoutes);
+
+// Session refresh route
+app.route("/api", refreshSessionRoutes);
 
 export default app;

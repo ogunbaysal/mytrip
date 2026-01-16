@@ -10,6 +10,13 @@ export type PlaceFilters = {
   district?: string;
   type?: string;
   category?: string;
+  guests?: number;
+  season?: string;
+  checkIn?: string;
+  checkOut?: string;
+  priceMin?: number;
+  priceMax?: number;
+  sort?: string;
 };
 
 export function usePlaces(filters?: PlaceFilters) {

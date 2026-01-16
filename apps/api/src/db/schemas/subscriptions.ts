@@ -6,7 +6,7 @@ import {
   integer,
   date,
   timestamp,
-  pgEnum
+  pgEnum,
 } from "drizzle-orm/pg-core";
 import { user } from "./auth.ts";
 
@@ -17,7 +17,7 @@ import { user } from "./auth.ts";
 export const billingCycleEnum = pgEnum("billing_cycle", [
   "monthly",
   "quarterly",
-  "yearly"
+  "yearly",
 ]);
 
 export const subscriptionStatusEnum = pgEnum("subscription_status", [
@@ -25,14 +25,14 @@ export const subscriptionStatusEnum = pgEnum("subscription_status", [
   "expired",
   "cancelled",
   "pending",
-  "trial"
+  "trial",
 ]);
 
 export const paymentStatusEnum = pgEnum("payment_status", [
   "success",
   "failed",
   "pending",
-  "refunded"
+  "refunded",
 ]);
 
 export const currencyEnum = pgEnum("currency", ["TRY", "USD", "EUR"]);
@@ -41,20 +41,20 @@ export const providerEnum = pgEnum("provider", [
   "iyzico",
   "paytr",
   "stripe",
-  "mock"
+  "mock",
 ]);
 
 // ... (keep usage of currencyEnum)
 
 export const subscriptionPlan = pgTable("subscription_plan", {
   id: text("id").primaryKey(),
-  name: text("name").notNull(), 
+  name: text("name").notNull(),
   description: text("description"),
   price: numeric("price", { precision: 10, scale: 2 }).notNull(),
   currency: currencyEnum("currency").notNull().default("TRY"),
   billingCycle: billingCycleEnum("billing_cycle").notNull(),
-  features: text("features"), 
-  limits: text("limits"), 
+  features: text("features"),
+  limits: text("limits"),
   active: boolean("active").notNull().default(true),
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true })
@@ -96,7 +96,9 @@ export const subscription = pgTable("subscription", {
 
 export const payment = pgTable("payment", {
   id: text("id").primaryKey(),
-  subscriptionId: text("subscription_id").references(() => subscription.id, { onDelete: "cascade" }),
+  subscriptionId: text("subscription_id").references(() => subscription.id, {
+    onDelete: "cascade",
+  }),
   userId: text("user_id")
     .notNull()
     .references(() => user.id, { onDelete: "cascade" }),
@@ -117,6 +119,56 @@ export const payment = pgTable("payment", {
     .defaultNow(),
 });
 
+const businessRegistrationStatusEnum = pgEnum("business_registration_status", [
+  "pending",
+  "approved",
+  "rejected",
+]);
+
+export const businessRegistration = pgTable("business_registration", {
+  id: text("id").primaryKey(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  companyName: text("company_name").notNull(),
+  taxId: text("tax_id").notNull(),
+  businessAddress: text("business_address"),
+  contactPhone: text("contact_phone"),
+  contactEmail: text("contact_email"),
+  businessType: text("business_type"),
+  documents: text("documents"),
+  status: businessRegistrationStatusEnum("status").notNull().default("pending"),
+  reviewedBy: text("reviewed_by").references(() => user.id),
+  reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+  rejectionReason: text("rejection_reason"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const businessProfile = pgTable("business_profile", {
+  id: text("id").primaryKey(),
+  userId: text("user_id")
+    .notNull()
+    .unique()
+    .references(() => user.id, { onDelete: "cascade" }),
+  logo: text("logo"),
+  description: text("description"),
+  website: text("website"),
+  socialMedia: text("social_media"),
+  businessHours: text("business_hours"),
+  responseTime: text("response_time"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
 // ============================================================================
 // TYPE EXPORTS
 // ============================================================================
@@ -129,3 +181,9 @@ export type NewSubscription = typeof subscription.$inferInsert;
 
 export type Payment = typeof payment.$inferSelect;
 export type NewPayment = typeof payment.$inferInsert;
+
+export type BusinessRegistration = typeof businessRegistration.$inferSelect;
+export type NewBusinessRegistration = typeof businessRegistration.$inferInsert;
+
+export type BusinessProfile = typeof businessProfile.$inferSelect;
+export type NewBusinessProfile = typeof businessProfile.$inferInsert;

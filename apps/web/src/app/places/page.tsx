@@ -3,7 +3,6 @@
 import { useSearchParams } from "next/navigation";
 
 import { PlaceCard } from "@/components/places/place-card";
-import { PlaceSearchForm } from "@/components/places/place-search-form";
 import { PlacesMap } from "@/components/places/places-map";
 import { usePlaces } from "@/hooks/use-places";
 
@@ -16,27 +15,24 @@ function PlacesContent() {
       city: searchParams.get("city") || "",
       district: searchParams.get("district") || "",
       type: searchParams.get("type") || "",
+      season: searchParams.get("season") || "",
+      guests: searchParams.get("guests") ? parseInt(searchParams.get("guests") || "0") : undefined,
+      checkIn: searchParams.get("checkIn") || "",
+      checkOut: searchParams.get("checkOut") || "",
+      priceMin: searchParams.get("priceMin") ? parseInt(searchParams.get("priceMin") || "0") : undefined,
+      priceMax: searchParams.get("priceMax") ? parseInt(searchParams.get("priceMax") || "0") : undefined,
+      sort: searchParams.get("sort") || "recommended",
   };
 
   const { data, isLoading } = usePlaces(filters);
   const places = data ?? [];
-
+  
   return (
-    <div className="mx-auto flex w-full flex-col gap-6 px-4 pb-24 pt-10 md:px-6 md:pt-14 lg:flex-row">
-      <div className="flex w-full flex-col gap-6 lg:w-[55%]">
-        <div className="rounded-3xl border border-border bg-white/90 p-4 shadow-sm shadow-black/5">
-          <div className="mb-4 space-y-1">
-            <h1 className="text-2xl font-semibold tracking-tight text-foreground">Konaklama ve deneyimleri filtrele</h1>
-            <p className="text-sm text-muted-foreground">
-              Muğla&apos;da aradığınız deneyimi bulmak için filtreleri kullanın.
-            </p>
-          </div>
-          <PlaceSearchForm />
-        </div>
-
-        <div className="space-y-3">
-          <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
-            <h2 className="text-xl font-semibold text-foreground">Sonuçlar</h2>
+    <div className="min-h-screen">
+      <div className="mx-auto flex w-full flex-col gap-6 px-4 py-6 md:px-8 lg:flex-row lg:py-10">
+        <div className="flex w-full flex-col gap-6 lg:w-[55%]">
+          <div className="space-y-3">
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">Sonuçlar</h1>
             <span className="text-sm text-muted-foreground">
               {isLoading ? "Yükleniyor..." : `${places.length} sonuç bulundu`}
             </span>
@@ -51,15 +47,15 @@ function PlacesContent() {
             )}
           </div>
         </div>
-      </div>
 
-      <div className="sticky top-24 hidden h-[600px] flex-1 overflow-hidden rounded-3xl border border-border bg-white shadow-sm shadow-black/5 lg:block">
-        <PlacesMap places={places} />
-      </div>
-
-      <div className="lg:hidden">
-        <div className="mt-6 h-[420px] overflow-hidden rounded-3xl border border-border bg-white shadow-sm shadow-black/5">
+        <div className="sticky top-24 hidden h-[600px] flex-1 overflow-hidden rounded-3xl border border-border bg-white shadow-sm shadow-black/5 lg:block">
           <PlacesMap places={places} />
+        </div>
+
+        <div className="lg:hidden">
+          <div className="mt-6 h-[420px] overflow-hidden rounded-3xl border border-border bg-white shadow-sm shadow-black/5">
+            <PlacesMap places={places} />
+          </div>
         </div>
       </div>
     </div>

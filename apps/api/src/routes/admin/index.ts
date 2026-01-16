@@ -14,6 +14,8 @@ import categories from "./categories.ts";
 import { plansRoutes } from "./plans.ts";
 import { subscriptionsRoutes } from "./subscriptions.ts";
 import { paymentsRoutes } from "./payments.ts";
+import { approvalsRoutes } from "./approvals/places.ts";
+import { businessApprovalRoutes } from "./approvals/business.ts";
 
 const app = new Hono<{
   Variables: {
@@ -59,5 +61,7 @@ app.route("/categories", categories);
 app.route("/plans", plansRoutes);
 app.route("/subscriptions", subscriptionsRoutes);
 app.route("/payments", paymentsRoutes);
+app.route("/approvals/places", approvalsRoutes);
+app.route("/approvals/business", businessApprovalRoutes);
 
 export { app as adminRoutes };

@@ -9,3 +9,26 @@ export const authClient = createAuthClient({
     credentials: "include",
   },
 });
+
+export async function refreshSession() {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/refresh-session`, {
+      method: "POST",
+      credentials: "include",
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to refresh session");
+    }
+
+    const data = await response.json();
+
+    // Refresh the session using better-auth's client
+    await authClient.getSession({ fetchOptions: { cache: "no-store" } });
+
+    return data;
+  } catch (error) {
+    console.error("Session refresh error:", error);
+    throw error;
+  }
+}

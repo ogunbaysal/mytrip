@@ -49,7 +49,6 @@ const NAV_ITEMS: NavItem[] = [
 
 const HERO_EYEBROW = "Muğla, Türkiye";
 const GUESTS_HELPER = "Kaç kişi?";
-const LIST_PLACE = "Yerini listele";
 
 export function SiteHeader() {
   const router = useRouter();
@@ -185,14 +184,6 @@ export function SiteHeader() {
           </nav>
 
           <div className="ml-auto flex items-center gap-2 xl:ml-6">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="hidden rounded-full border border-border bg-white px-4 py-2 text-sm font-medium shadow-sm hover:bg-white/90 lg:inline-flex"
-            >
-              {LIST_PLACE}
-            </Button>
-
             <div className="flex items-center gap-2">
               <Button
                 variant="ghost"
@@ -304,14 +295,6 @@ export function SiteHeader() {
         </nav>
 
         <div className="ml-auto flex items-center gap-2 xl:ml-6">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="hidden rounded-full border border-border bg-white px-4 py-2 text-sm font-medium shadow-sm hover:bg-white/90 lg:inline-flex"
-          >
-            {LIST_PLACE}
-          </Button>
-
           {user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -359,12 +342,28 @@ export function SiteHeader() {
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
+                {user.role === "owner" && (
+                  <DropdownMenuItem
+                    onClick={() => router.push("/dashboard" as Route)}
+                  >
+                    <Settings className="mr-2 size-4" />
+                    İşletme Paneli
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem
                   onClick={() => router.push("/profile" as Route)}
                 >
                   <User className="mr-2 size-4" />
                   Profilim
                 </DropdownMenuItem>
+                {user.role === "traveler" && (
+                  <DropdownMenuItem
+                    onClick={() => router.push("/pricing" as Route)}
+                  >
+                    <CheckCircle className="mr-2 size-4" />
+                    İşletme Ol
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem
                   onClick={() => router.push("/bookings" as Route)}
                 >

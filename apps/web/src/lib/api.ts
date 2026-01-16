@@ -21,6 +21,7 @@ async function request<T>(
 ): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     ...options,
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
       ...(options?.headers ?? {}),
@@ -185,6 +186,166 @@ function mapBackendCollectionToSummary(
 }
 
 export const api = {
+  business: {
+    async register(data: {
+      companyName: string;
+      taxId: string;
+      businessAddress?: string;
+      contactPhone: string;
+      contactEmail: string;
+      businessType: string;
+      documents?: string[];
+    }) {
+      return await request<{
+        success: boolean;
+        registrationId: string;
+        message: string;
+      }>("/api/business/register", {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+    },
+    async getProfile() {
+      return await request<{ registration: any; profile: any; user: any }>(
+        "/api/business/profile",
+      );
+    },
+    async updateProfile(data: {
+      logo?: string;
+      description?: string;
+      website?: string;
+      socialMedia?: Record<string, string>;
+      businessHours?: any;
+      responseTime?: string;
+    }) {
+      return await request<{ success: boolean; message: string }>(
+        "/api/business/profile",
+        { method: "PUT", body: JSON.stringify(data) },
+      );
+    },
+    async getStatus() {
+      return await request<{
+        hasRegistration: boolean;
+        status: string;
+        role: string;
+      }>("/api/business/status");
+    },
+  },
+  subscriptions: {
+    async getPlans() {
+      return await request<{ plans: any[] }>("/api/subscriptions/plans");
+    },
+    async getCurrent() {
+      return await request<{ subscription: any; hasSubscription: boolean }>(
+        "/api/subscriptions/current",
+      );
+    },
+    async create(planId: string, paymentData: any) {
+      return await request<{
+        success: boolean;
+        subscriptionId: string;
+        message: string;
+        subscription: any;
+      }>("/api/subscriptions/create", {
+        method: "POST",
+        body: JSON.stringify({ planId, paymentMethod: paymentData }),
+      });
+    },
+    async cancel() {
+      return await request<{
+        success: boolean;
+        message: string;
+        endDate?: string;
+      }>("/api/subscriptions/cancel", { method: "POST" });
+    },
+    async getUsage() {
+      return await request<{ usage: any; subscription: any }>(
+        "/api/subscriptions/usage",
+      );
+    },
+  },
+  owner: {
+    places: {
+      async list(params?: { page?: number; limit?: number; status?: string }) {
+        const queryParams = new URLSearchParams();
+        if (params?.page) queryParams.set("page", params.page.toString());
+        if (params?.limit) queryParams.set("limit", params.limit.toString());
+        if (params?.status) queryParams.set("status", params.status);
+        return await request<{ places: any[]; pagination: any }>(
+          `/api/owner/places?${queryParams.toString()}`,
+        );
+      },
+      async getById(id: string) {
+        return await request<{ place: any }>(`/api/owner/places/${id}`);
+      },
+      async create(data: any) {
+        return await request<{
+          success: boolean;
+          placeId: string;
+          message: string;
+          place: any;
+        }>("/api/owner/places", { method: "POST", body: JSON.stringify(data) });
+      },
+      async update(id: string, data: any) {
+        return await request<{ success: boolean; message: string; place: any }>(
+          `/api/owner/places/${id}`,
+          { method: "PUT", body: JSON.stringify(data) },
+        );
+      },
+      async delete(id: string) {
+        return await request<{ success: boolean; message: string }>(
+          `/api/owner/places/${id}`,
+          { method: "DELETE" },
+        );
+      },
+      async submit(id: string) {
+        return await request<{ success: boolean; message: string }>(
+          `/api/owner/places/${id}/submit`,
+          { method: "POST" },
+        );
+      },
+    },
+    blogs: {
+      async list(params?: { page?: number; limit?: number; status?: string }) {
+        const queryParams = new URLSearchParams();
+        if (params?.page) queryParams.set("page", params.page.toString());
+        if (params?.limit) queryParams.set("limit", params.limit.toString());
+        if (params?.status) queryParams.set("status", params.status);
+        return await request<{ blogs: any[]; pagination: any }>(
+          `/api/owner/blogs?${queryParams.toString()}`,
+        );
+      },
+      async getById(id: string) {
+        return await request<{ blog: any }>(`/api/owner/blogs/${id}`);
+      },
+      async create(data: any) {
+        return await request<{
+          success: boolean;
+          blogId: string;
+          message: string;
+          blog: any;
+        }>("/api/owner/blogs", { method: "POST", body: JSON.stringify(data) });
+      },
+      async update(id: string, data: any) {
+        return await request<{ success: boolean; message: string; blog: any }>(
+          `/api/owner/blogs/${id}`,
+          { method: "PUT", body: JSON.stringify(data) },
+        );
+      },
+      async publish(id: string) {
+        return await request<{ success: boolean; message: string }>(
+          `/api/owner/blogs/${id}/publish`,
+          { method: "POST" },
+        );
+      },
+      async delete(id: string) {
+        return await request<{ success: boolean; message: string }>(
+          `/api/owner/blogs/${id}`,
+          { method: "DELETE" },
+        );
+      },
+    },
+  },
   places: {
     async listFeatured(): Promise<PlaceSummary[]> {
       try {
@@ -204,6 +365,13 @@ export const api = {
       type?: string;
       category?: string;
       limit?: number;
+      guests?: number;
+      season?: string;
+      checkIn?: string;
+      checkOut?: string;
+      priceMin?: number;
+      priceMax?: number;
+      sort?: string;
     }): Promise<PlaceSummary[]> {
       try {
         const queryParams = new URLSearchParams();
@@ -216,6 +384,13 @@ export const api = {
         if (params?.type && params.type !== "all")
           queryParams.set("type", params.type);
         if (params?.category) queryParams.set("category", params.category);
+        if (params?.guests) queryParams.set("guests", params.guests.toString());
+        if (params?.season) queryParams.set("season", params.season);
+        if (params?.checkIn) queryParams.set("checkIn", params.checkIn);
+        if (params?.checkOut) queryParams.set("checkOut", params.checkOut);
+        if (params?.priceMin) queryParams.set("priceMin", params.priceMin.toString());
+        if (params?.priceMax) queryParams.set("priceMax", params.priceMax.toString());
+        if (params?.sort) queryParams.set("sort", params.sort);
 
         const response = await request<{ places: APIPlace[] }>(
           `/api/places?${queryParams.toString()}`,

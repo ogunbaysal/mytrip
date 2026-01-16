@@ -75,6 +75,11 @@ export const webAuth = betterAuth({
         required: false,
         defaultValue: "active",
       },
+      subscriptionStatus: {
+        type: "string",
+        required: false,
+        defaultValue: "none",
+      },
       phone: {
         type: "string",
         required: false,

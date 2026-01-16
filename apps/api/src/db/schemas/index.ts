@@ -18,12 +18,18 @@ export {
   subscriptionPlan,
   subscription,
   payment,
+  businessRegistration,
+  businessProfile,
   type SubscriptionPlan,
   type NewSubscriptionPlan,
   type Subscription,
   type NewSubscription,
   type Payment,
-  type NewPayment
+  type NewPayment,
+  type BusinessRegistration,
+  type NewBusinessRegistration,
+  type BusinessProfile,
+  type NewBusinessProfile,
 } from "./subscriptions.ts";
 export * from "./settings.ts";
 export * from "./categories.ts";

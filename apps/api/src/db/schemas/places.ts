@@ -6,7 +6,7 @@ import {
   boolean,
   timestamp,
   pgEnum,
-  jsonb
+  jsonb,
 } from "drizzle-orm/pg-core";
 import { user } from "./auth.ts";
 import { placeCategory } from "./categories.ts";
@@ -21,21 +21,22 @@ export const placeTypeEnum = pgEnum("place_type", [
   "cafe",
   "activity",
   "attraction",
-  "transport"
+  "transport",
 ]);
 
 export const placeStatusEnum = pgEnum("place_status", [
   "active",
   "inactive",
   "pending",
-  "suspended"
+  "suspended",
+  "rejected",
 ]);
 
 export const priceLevelEnum = pgEnum("price_level", [
   "budget",
   "moderate",
   "expensive",
-  "luxury"
+  "luxury",
 ]);
 
 // ============================================================================
