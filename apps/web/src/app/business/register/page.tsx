@@ -65,7 +65,7 @@ export default function BusinessRegisterPage() {
             </div>
             <h2 className="mb-2 text-2xl font-bold">Kayıt İnceleniyor</h2>
             <p className="mb-6 text-muted-foreground">
-              İşletme kaydınız şu anda MyTrip yöneticileri tarafından
+              İşletme kaydınız şu anda TatilDesen yöneticileri tarafından
               inceleniyor. Bu süreç genellikle 24-48 saat sürer. Onaylandığında
               size bildirim gönderilecektir.
             </p>
@@ -282,7 +282,7 @@ export default function BusinessRegisterPage() {
             <div className="rounded-lg bg-muted p-4 text-sm">
               <p className="mb-2 font-semibold">Onay Süreci</p>
               <p className="text-muted-foreground">
-                Kaydınızı tamamladıktan sonra MyTrip yöneticileri bilgilerinizi
+                Kaydınızı tamamladıktan sonra TatilDesen yöneticileri bilgilerinizi
                 inceleyecektir. Bu süreç genellikle 24-48 saat sürer.
                 Onaylandıktan sonra abonelik planı seçip işletmenizi kullanmaya
                 başlayabilirsiniz.
@@ -304,7 +304,7 @@ export default function BusinessRegisterPage() {
             İşletme Kaydı
           </h1>
           <p className="text-lg text-muted-foreground">
-            MyTrip platformunda işletmenizi kaydedin ve müşterilere ulaşın
+            TatilDesen platformunda işletmenizi kaydedin ve müşterilere ulaşın
           </p>
         </div>
 

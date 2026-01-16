@@ -115,7 +115,7 @@ const reportsData = {
       type: "performance",
       frequency: "weekly",
       nextRun: "2024-07-08T08:00:00",
-      recipients: ["admin@mytrip.com", "manager@mytrip.com"],
+      recipients: ["admin@tatildesen.com", "manager@tatildesen.com"],
       format: "pdf",
       enabled: true
     },
@@ -125,7 +125,7 @@ const reportsData = {
       type: "users",
       frequency: "monthly",
       nextRun: "2024-08-01T00:00:00",
-      recipients: ["admin@mytrip.com"],
+      recipients: ["admin@tatildesen.com"],
       format: "excel",
       enabled: true
     },
@@ -135,7 +135,7 @@ const reportsData = {
       type: "revenue",
       frequency: "quarterly",
       nextRun: "2024-10-01T00:00:00",
-      recipients: ["finance@mytrip.com", "admin@mytrip.com"],
+      recipients: ["finance@tatildesen.com", "admin@tatildesen.com"],
       format: "pdf",
       enabled: true
     }

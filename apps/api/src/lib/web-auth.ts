@@ -15,10 +15,10 @@ const cookieDomain = process.env.COOKIE_DOMAIN;
 const isProduction = process.env.NODE_ENV === "production";
 
 export const webAuth = betterAuth({
-  appName: "MyTrip",
+  appName: "TatilDesen",
   baseURL: new URL(
     "/api/web/auth",
-    process.env.BETTER_AUTH_URL || "http://localhost:3002",
+    process.env.BETTER_AUTH_URL || "http://localhost:3002"
   ).href,
   trustedOrigins,
   database: drizzleAdapter(db, {

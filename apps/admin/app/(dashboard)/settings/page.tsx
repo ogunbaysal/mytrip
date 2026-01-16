@@ -142,7 +142,7 @@ export default function SettingsPage() {
                     id="site-name" 
                     value={generalForm.siteName || ""} 
                     onChange={(e) => setGeneralForm({...generalForm, siteName: e.target.value})}
-                    placeholder="MyTrip Admin" 
+                    placeholder="TatilDesen Admin" 
                   />
                 </div>
                 <div className="space-y-2">
@@ -152,7 +152,7 @@ export default function SettingsPage() {
                     type="email" 
                     value={generalForm.siteEmail || ""} 
                     onChange={(e) => setGeneralForm({...generalForm, siteEmail: e.target.value})}
-                    placeholder="admin@mytrip.com" 
+                    placeholder="admin@tatildesen.com" 
                   />
                 </div>
                 <div className="space-y-2">

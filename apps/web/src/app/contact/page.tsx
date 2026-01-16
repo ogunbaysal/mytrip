@@ -4,29 +4,29 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 export const metadata: Metadata = {
-  title: "İletişim | MyTrip",
+  title: "İletişim | TatilDesen",
   description:
-    "MyTrip ekibiyle iletişime geçin, iş birlikleri ve destek taleplerinizi iletin.",
+    "TatilDesen ekibiyle iletişime geçin, iş birlikleri ve destek taleplerinizi iletin.",
 };
 
 const CONTACT_ENTRIES = [
   {
     title: "Genel iletişim",
     description: "Ekip sorularınız ve ortaklık talepleriniz için bizimle iletişime geçin.",
-    href: "mailto:hello@mytrip.com",
-    label: "hello@mytrip.com",
+    href: "mailto:hello@tatildesen.com",
+    label: "hello@tatildesen.com",
   },
   {
     title: "Basın ve iş birlikleri",
     description: "Basın kitleri, röportaj talepleri ve marka ortaklıkları.",
-    href: "mailto:press@mytrip.com",
-    label: "press@mytrip.com",
+    href: "mailto:press@tatildesen.com",
+    label: "press@tatildesen.com",
   },
   {
     title: "Destek",
     description: "Rezervasyon ve üyelikle ilgili tüm sorularınız için destek ekibimiz yanınızda.",
-    href: "mailto:support@mytrip.com",
-    label: "support@mytrip.com",
+    href: "mailto:support@tatildesen.com",
+    label: "support@tatildesen.com",
   },
 ] as const;
 
@@ -42,7 +42,7 @@ export default function ContactPage() {
             Bize ulaşın
           </span>
           <h1 className="text-3xl font-semibold tracking-tight text-foreground md:text-4xl">
-            MyTrip ekibiyle iletişime geçin
+            TatilDesen ekibiyle iletişime geçin
           </h1>
           <p className="mx-auto max-w-2xl text-sm text-muted-foreground md:text-base">
             Rezervasyon sorularınız, iş birlikleri veya ürün önerileriniz için formu doldurun ya da aşağıdaki kanallardan bize ulaşın.
@@ -85,7 +85,7 @@ export default function ContactPage() {
               <label htmlFor="email" className="text-sm font-medium text-foreground">
                 E-posta
               </label>
-              <Input id="email" name="email" type="email" placeholder="ornek@mytrip.com" required />
+              <Input id="email" name="email" type="email" placeholder="ornek@tatildesen.com" required />
             </div>
           </div>
           <div className="space-y-1">

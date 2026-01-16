@@ -67,7 +67,7 @@ export default function PricingPage() {
             İşletmeniz için doğru planı seçin
           </h1>
           <p className="mx-auto max-w-2xl text-muted-foreground">
-            Esnek abonelik seçenekleri ile işletmenizi MyTrip platformunda
+            Esnek abonelik seçenekleri ile işletmenizi TatilDesen platformunda
             büyütün. İstediğiniz zaman planı değiştirebilirsiniz.
           </p>
         </div>
@@ -220,7 +220,7 @@ export default function PricingPage() {
                 Mekanlarım ve blog yazılarım ne zaman yayınlanır?
               </summary>
               <p className="mt-2 text-sm text-muted-foreground">
-                Tüm mekanlar ve blog yazıları MyTrip yöneticileri tarafından
+                Tüm mekanlar ve blog yazıları TatilDesen yöneticileri tarafından
                 incelenir ve onaylandıktan sonra halka açılır. Bu süreç
                 genellikle 24-48 saat sürer.
               </p>
@@ -231,7 +231,7 @@ export default function PricingPage() {
               </summary>
               <p className="mt-2 text-sm text-muted-foreground">
                 Şu an kredi kartı ile ödeme alıyoruz. Kredi kartı bilgileriniz
-                güvenli bir şekilde işlenir ve MyTrip tarafından saklanmaz.
+                güvenli bir şekilde işlenir ve TatilDesen tarafından saklanmaz.
               </p>
             </details>
           </div>

@@ -1,16 +1,16 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Gizlilik Politikası | MyTrip",
-  description: "MyTrip gizlilik politikası ve kişisel verilerin korunmasına ilişkin bilgiler.",
+  title: "Gizlilik Politikası | TatilDesen",
+  description: "TatilDesen gizlilik politikası ve kişisel verilerin korunmasına ilişkin bilgiler.",
 };
 
 const SECTIONS = [
   {
     title: "1. Genel bilgiler",
     paragraphs: [
-      "MyTrip, kullanıcılarının kişisel verilerinin gizliliğine saygı duyar ve 6698 sayılı Kişisel Verilerin Korunması Kanunu kapsamında gerekli tüm teknik ve idari tedbirleri alır.",
-      "Bu politika, mytrip.com ve bağlı alt alan adları üzerinden sunulan tüm hizmetler için geçerlidir.",
+      "TatilDesen, kullanıcılarının kişisel verilerinin gizliliğine saygı duyar ve 6698 sayılı Kişisel Verilerin Korunması Kanunu kapsamında gerekli tüm teknik ve idari tedbirleri alır.",
+      "Bu politika, tatildesen.com ve bağlı alt alan adları üzerinden sunulan tüm hizmetler için geçerlidir.",
     ],
   },
   {
@@ -45,7 +45,7 @@ const SECTIONS = [
     title: "6. Haklarınız",
     paragraphs: [
       "Kişisel verilerinizin silinmesini, düzeltilmesini veya taşınmasını talep edebilirsiniz.",
-      "Destek talepleri için kvkk@mytrip.com adresine e-posta gönderebilirsiniz.",
+      "Destek talepleri için kvkk@tatildesen.com adresine e-posta gönderebilirsiniz.",
     ],
   },
 ];
@@ -58,7 +58,7 @@ export default function PrivacyPolicyPage() {
           Gizlilik
         </span>
         <h1 className="text-3xl font-semibold tracking-tight text-foreground md:text-4xl">
-          MyTrip Gizlilik Politikası
+          TatilDesen Gizlilik Politikası
         </h1>
         <p className="mx-auto max-w-2xl text-sm text-muted-foreground md:text-base">
           Kullanıcı verilerinin nasıl toplandığı, saklandığı ve korunduğuna dair detaylı bilgi.
@@ -79,7 +79,7 @@ export default function PrivacyPolicyPage() {
       </section>
 
       <footer className="rounded-3xl border border-primary/30 bg-primary/5 p-6 text-sm text-primary/90">
-        Gizlilik politikamızla ilgili sorularınız için kvkk@mytrip.com adresine e-posta gönderebilirsiniz.
+        Gizlilik politikamızla ilgili sorularınız için kvkk@tatildesen.com adresine e-posta gönderebilirsiniz.
       </footer>
     </article>
   );

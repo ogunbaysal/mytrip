@@ -365,7 +365,7 @@ export default function CheckoutPage() {
                     <p className="mb-2 font-semibold">Güvenli Ödeme</p>
                     <p className="text-muted-foreground">
                       Ödeme bilgileriniz SSL şifreleme ile korunmaktadır. Kart
-                      bilgileriniz MyTrip tarafından saklanmaz.
+                      bilgileriniz TatilDesen tarafından saklanmaz.
                     </p>
                   </div>
                 </div>

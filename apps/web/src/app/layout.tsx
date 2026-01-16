@@ -8,13 +8,13 @@ import { AppProviders } from "@/providers/app-providers";
 import { fontClassName } from "@/styles/fonts";
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://mytrip.com"),
+  metadataBase: new URL("https://tatildesen.com"),
   title: {
-    default: "MyTrip",
-    template: "%s | MyTrip",
+    default: "TatilDesen",
+    template: "%s | TatilDesen",
   },
   description:
-    "Muğla'nın en iyi konaklama, yeme-içme ve deneyimlerini keşfetmenize yardımcı olan MyTrip ile tatilinizi planlayın.",
+    "Muğla'nın en iyi konaklama, yeme-içme ve deneyimlerini keşfetmenize yardımcı olan TatilDesen ile tatilinizi planlayın.",
 };
 
 export const viewport: Viewport = {

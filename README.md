@@ -1,4 +1,4 @@
-# MyTrip
+# TatilDesen
 
 A modern travel booking application built as a monorepo with Next.js, Hono, and PostgreSQL.
 
@@ -132,7 +132,7 @@ Authentication is handled by Better Auth with:
 ## 📁 Project Structure
 
 ```
-mytrip/
+tatildesen/
 ├── apps/
 │   ├── web/          # Customer booking app
 │   ├── admin/        # Admin dashboard

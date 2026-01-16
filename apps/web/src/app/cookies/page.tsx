@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Çerez Politikası | MyTrip",
-  description: "MyTrip platformunda kullanılan çerezler ve yönetim tercihleri hakkında bilgi alın.",
+  title: "Çerez Politikası | TatilDesen",
+  description: "TatilDesen platformunda kullanılan çerezler ve yönetim tercihleri hakkında bilgi alın.",
 };
 
 const SECTIONS = [
@@ -38,7 +38,7 @@ const SECTIONS = [
   {
     title: "5. İletişim",
     paragraphs: [
-      "Çerez politikamızla ilgili sorularınız için privacy@mytrip.com adresine e-posta gönderebilirsiniz.",
+      "Çerez politikamızla ilgili sorularınız için privacy@tatildesen.com adresine e-posta gönderebilirsiniz.",
     ],
   },
 ];
@@ -51,7 +51,7 @@ export default function CookiesPage() {
           Çerezler
         </span>
         <h1 className="text-3xl font-semibold tracking-tight text-foreground md:text-4xl">
-          MyTrip Çerez Politikası
+          TatilDesen Çerez Politikası
         </h1>
         <p className="mx-auto max-w-2xl text-sm text-muted-foreground md:text-base">
           Hangi çerezleri kullandığımızı ve tercihlerinizi nasıl yönetebileceğinizi öğrenin.
@@ -86,7 +86,7 @@ export default function CookiesPage() {
       </section>
 
       <footer className="rounded-3xl border border-primary/30 bg-primary/5 p-6 text-sm text-primary/90">
-        Çerez tercihlerinizi güncellemek için tarayıcı ayarlarınızı kullanabilir veya privacy@mytrip.com adresiyle iletişime geçebilirsiniz.
+        Çerez tercihlerinizi güncellemek için tarayıcı ayarlarınızı kullanabilir veya privacy@tatildesen.com adresiyle iletişime geçebilirsiniz.
       </footer>
     </article>
   );

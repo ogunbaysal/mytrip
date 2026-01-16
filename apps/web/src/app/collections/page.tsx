@@ -26,7 +26,7 @@ export default function CollectionsPage() {
         <div className="relative overflow-hidden rounded-3xl">
           <Image
             src={HERO_IMAGE}
-            alt="MyTrip koleksiyonları"
+            alt="TatilDesen koleksiyonları"
             fill
             className="object-cover"
             priority
@@ -34,14 +34,14 @@ export default function CollectionsPage() {
           />
           <div className="relative z-10 space-y-5 bg-gradient-to-t from-black/70 via-black/30 to-black/10 p-8 text-white md:p-12">
             <span className="inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-white/80">
-              MyTrip Rotaları
+              TatilDesen Rotaları
             </span>
             <div className="space-y-3">
               <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">
                 Editör seçkisiyle hazırlanan koleksiyonlar
               </h1>
               <p className="max-w-2xl text-sm text-white/85 md:text-base">
-                Gurme keşiflerinden mavi yolculuk rotalarına kadar MyTrip editörlerinin hazırladığı tematik planlarla Muğla&apos;yı baştan keşfedin.
+                Gurme keşiflerinden mavi yolculuk rotalarına kadar TatilDesen editörlerinin hazırladığı tematik planlarla Muğla&apos;yı baştan keşfedin.
               </p>
             </div>
           </div>

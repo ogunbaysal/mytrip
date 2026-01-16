@@ -61,10 +61,10 @@ export function SiteHeader() {
           <Link
             href="/"
             className="flex shrink-0 items-center text-primary"
-            aria-label="MyTrip ana sayfa"
+            aria-label="TatilDesen ana sayfa"
           >
             <span className="text-2xl font-semibold tracking-tight">
-              MyTrip
+              TatilDesen
             </span>
           </Link>
 
@@ -95,9 +95,9 @@ export function SiteHeader() {
         <Link
           href="/"
           className="flex shrink-0 items-center text-primary"
-          aria-label="MyTrip ana sayfa"
+          aria-label="TatilDesen ana sayfa"
         >
-          <span className="text-2xl font-semibold tracking-tight">MyTrip</span>
+          <span className="text-2xl font-semibold tracking-tight">TatilDesen</span>
         </Link>
 
         {/* Desktop Search Bar */}

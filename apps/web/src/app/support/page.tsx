@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { Button } from "@/components/ui/button";
 
 export const metadata: Metadata = {
-  title: "Destek | MyTrip",
+  title: "Destek | TatilDesen",
   description:
     "Rezervasyon, üyelik ve ödeme konularında sık sorulan sorular ve destek kanallarımız.",
 };
@@ -20,7 +20,7 @@ const FAQ_GROUPS = [
       {
         question: "Konaklama için ödeme planı sunuyor musunuz?",
         answer:
-          "MyTrip&apos;te seçili konaklamalar için %30 ön ödeme, kalan tutar check-in&apos;den 7 gün önce olacak şekilde esnek ödeme planları sunuyoruz.",
+          "TatilDesen&apos;te seçili konaklamalar için %30 ön ödeme, kalan tutar check-in&apos;den 7 gün önce olacak şekilde esnek ödeme planları sunuyoruz.",
       },
     ],
   },
@@ -30,12 +30,12 @@ const FAQ_GROUPS = [
       {
         question: "Üyelik seviyelerim nasıl yükselir?",
         answer:
-          "Toplam rezervasyon tutarı ve MyTrip deneyim puanlarınıza göre hesabınız otomatik olarak yükselir. Premium statünüzde özel concierge desteği sağlarız.",
+          "Toplam rezervasyon tutarı ve TatilDesen deneyim puanlarınıza göre hesabınız otomatik olarak yükselir. Premium statünüzde özel concierge desteği sağlarız.",
       },
       {
         question: "Hesabımı nasıl kapatırım?",
         answer:
-          "support@mytrip.com adresine talebinizi iletin. 48 saat içinde hesabınızı kapatıp size onay maili gönderiyoruz.",
+          "support@tatildesen.com adresine talebinizi iletin. 48 saat içinde hesabınızı kapatıp size onay maili gönderiyoruz.",
       },
     ],
   },
@@ -50,7 +50,7 @@ const FAQ_GROUPS = [
       {
         question: "Ödeme yöntemleri güvenli mi?",
         answer:
-          "Tüm ödemeler TLS 1.3 sertifikalı altyapıda şifrelenir. Kart bilgileriniz MyTrip sunucularında tutulmaz, yalnızca ödeme sağlayıcısında saklanır.",
+          "Tüm ödemeler TLS 1.3 sertifikalı altyapıda şifrelenir. Kart bilgileriniz TatilDesen sunucularında tutulmaz, yalnızca ödeme sağlayıcısında saklanır.",
       },
     ],
   },
@@ -62,7 +62,7 @@ const SUPPORT_CHANNELS = [
     description: "Hafta içi 09.00 - 20.00 arasında canlı sohbet ile destek alın.",
     action: {
       label: "Canlı sohbeti başlat",
-      href: "mailto:support@mytrip.com",
+      href: "mailto:support@tatildesen.com",
     },
   },
   {
@@ -77,8 +77,8 @@ const SUPPORT_CHANNELS = [
     title: "E-posta",
     description: "48 saat içinde çözümleyeceğimiz detaylı destek talebi oluşturun.",
     action: {
-      label: "support@mytrip.com",
-      href: "mailto:support@mytrip.com",
+      label: "support@tatildesen.com",
+      href: "mailto:support@tatildesen.com",
     },
   },
 ] as const;

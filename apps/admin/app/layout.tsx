@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "MyTrip Admin Panel",
-  description: "MyTrip seyahat platformu yönetim paneli",
+  title: "TatilDesen Admin Panel",
+  description: "TatilDesen seyahat platformu yönetim paneli",
 };
 
 export default function RootLayout({

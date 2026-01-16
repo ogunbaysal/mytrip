@@ -115,7 +115,7 @@ export function AppSidebar() {
                 <Hotel className="size-4" />
               </div>
               <div className="flex flex-col gap-0.5 leading-none">
-                <span className="font-semibold">MyTrip</span>
+                <span className="font-semibold">TatilDesen</span>
                 <span className="text-xs">Admin Panel</span>
               </div>
             </SidebarMenuButton>
@@ -212,7 +212,7 @@ export function AppSidebar() {
                   </Avatar>
                   <div className="grid flex-1 text-left text-sm leading-tight">
                     <span className="truncate font-semibold">{user?.name || "Admin"}</span>
-                    <span className="truncate text-xs">{user?.email || "admin@mytrip.com"}</span>
+                    <span className="truncate text-xs">{user?.email || "admin@tatildesen.com"}</span>
                   </div>
                   <ChevronDown className="ml-auto size-4" />
                 </SidebarMenuButton>
@@ -232,7 +232,7 @@ export function AppSidebar() {
                     <div className="flex flex-col">
                       <p className="text-sm font-medium leading-none">{user?.name || "Admin"}</p>
                       <p className="text-xs leading-none text-muted-foreground">
-                        {user?.email || "admin@mytrip.com"}
+                        {user?.email || "admin@tatildesen.com"}
                       </p>
                     </div>
                   </div>

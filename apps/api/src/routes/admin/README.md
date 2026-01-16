@@ -1,6 +1,6 @@
 # Admin API Routes
 
-This directory contains all admin-specific routes for the MyTrip travel booking platform. All routes in this directory are protected by authentication middleware and require admin role access.
+This directory contains all admin-specific routes for the TatilDesen travel booking platform. All routes in this directory are protected by authentication middleware and require admin role access.
 
 ## Authentication
 

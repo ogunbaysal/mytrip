@@ -1,6 +1,6 @@
-# MyTrip API Routes
+# TatilDesen API Routes
 
-This directory contains all public-facing API routes for the MyTrip travel booking platform. These routes provide access to the platform's content and functionality for end users.
+This directory contains all public-facing API routes for the TatilDesen travel booking platform. These routes provide access to the platform's content and functionality for end users.
 
 ## Route Overview
 

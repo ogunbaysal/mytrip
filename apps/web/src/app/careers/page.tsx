@@ -3,14 +3,14 @@ import type { Metadata } from "next";
 import { Button } from "@/components/ui/button";
 
 export const metadata: Metadata = {
-  title: "Kariyer | MyTrip",
-  description: "MyTrip ekibine katılın ve seyahat deneyimini yeniden tasarlayın.",
+  title: "Kariyer | TatilDesen",
+  description: "TatilDesen ekibine katılın ve seyahat deneyimini yeniden tasarlayın.",
 };
 
 const BENEFITS = [
   "Muğla merkezli hibrit çalışma modeli ve sezonluk sahil ofisi",
-  "Yılda iki kez MyTrip lokasyonlarında ekip buluşmaları",
-  "Özel sağlık sigortası ve sınırsız MyTrip deneyim kredisi",
+  "Yılda iki kez TatilDesen lokasyonlarında ekip buluşmaları",
+  "Özel sağlık sigortası ve sınırsız TatilDesen deneyim kredisi",
   "Ürün geliştirme süreçlerinde doğrudan misafir geri bildirimi",
 ] as const;
 
@@ -21,7 +21,7 @@ const OPEN_ROLES = [
     type: "Tam zamanlı",
     description:
       "Design system odaklı, performanslı ve erişilebilir kullanıcı arayüzleri inşa edecek ekip arkadaşı arıyoruz.",
-    link: "mailto:careers@mytrip.com?subject=Frontend%20Developer%20Başvurusu",
+    link: "mailto:careers@tatildesen.com?subject=Frontend%20Developer%20Başvurusu",
   },
   {
     title: "Deneyim Kürasyon Uzmanı",
@@ -29,15 +29,15 @@ const OPEN_ROLES = [
     type: "Tam zamanlı",
     description:
       "Yerel işletmelerle partnerlik kuracak, yeni deneyimleri kürate edecek saha ekibimize katılın.",
-    link: "mailto:careers@mytrip.com?subject=Deneyim%20K%C3%BCrasyon%20Uzman%C4%B1%20Başvurusu",
+    link: "mailto:careers@tatildesen.com?subject=Deneyim%20K%C3%BCrasyon%20Uzman%C4%B1%20Başvurusu",
   },
   {
     title: "Lifecycle Marketing Manager",
     location: "Uzaktan / İstanbul",
     type: "Tam zamanlı",
     description:
-      "E-posta, push ve CRM kampanyalarıyla MyTrip misafir yolculuğunu güçlendirecek pazarlama lideri arıyoruz.",
-    link: "mailto:careers@mytrip.com?subject=Lifecycle%20Marketing%20Manager%20Başvurusu",
+      "E-posta, push ve CRM kampanyalarıyla TatilDesen misafir yolculuğunu güçlendirecek pazarlama lideri arıyoruz.",
+    link: "mailto:careers@tatildesen.com?subject=Lifecycle%20Marketing%20Manager%20Başvurusu",
   },
 ] as const;
 
@@ -49,7 +49,7 @@ export default function CareersPage() {
           Kariyer
         </span>
         <h1 className="text-3xl font-semibold tracking-tight text-foreground md:text-4xl">
-          MyTrip ekibine katılın
+          TatilDesen ekibine katılın
         </h1>
         <p className="mx-auto max-w-2xl text-sm text-muted-foreground md:text-base">
           Misafirlerimize Muğla&apos;da unutulmaz deneyimler sunmak için ürün, tasarım ve saha ekipleriyle birlikte çalışın.
@@ -57,7 +57,7 @@ export default function CareersPage() {
       </section>
 
       <section className="mx-auto w-full max-w-[960px] rounded-3xl border border-border bg-white/90 p-6 shadow-sm shadow-black/5 md:p-8">
-        <h2 className="text-xl font-semibold text-foreground">MyTrip&apos;te hayat</h2>
+        <h2 className="text-xl font-semibold text-foreground">TatilDesen&apos;te hayat</h2>
         <ul className="mt-4 grid gap-3 md:grid-cols-2">
           {BENEFITS.map((benefit) => (
             <li key={benefit} className="flex items-start gap-3 text-sm text-muted-foreground">

@@ -43,7 +43,7 @@ export default function BlogPage() {
         <div className="relative overflow-hidden rounded-3xl">
           <Image
             src={HERO_IMAGE}
-            alt="MyTrip blog"
+            alt="TatilDesen blog"
             fill
             className="object-cover"
             priority
@@ -51,11 +51,11 @@ export default function BlogPage() {
           />
           <div className="relative z-10 space-y-5 bg-gradient-to-t from-black/70 via-black/30 to-black/10 p-8 text-white md:p-12">
             <span className="inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-white/80">
-              MyTrip Hikayeler
+              TatilDesen Hikayeler
             </span>
             <div className="space-y-3">
               <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">
-                MyTrip editörlerinden ilham veren yolculuk hikayeleri
+                TatilDesen editörlerinden ilham veren yolculuk hikayeleri
               </h1>
               <p className="max-w-2xl text-sm text-white/85 md:text-base">
                 Gurme keşifleri, mavi yolculuk rotaları ve yerel deneyimlerle dolu yeni sezon içeriklerini keşfedin.

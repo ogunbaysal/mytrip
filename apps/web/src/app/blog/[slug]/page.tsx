@@ -38,14 +38,14 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
   if (!data || !data.blogPost) {
     return {
-        title: "Blog | MyTrip",
+        title: "Blog | TatilDesen",
     };
   }
   
   const { blogPost: detail } = data;
 
   return {
-    title: `${detail.title} | MyTrip Blog`,
+    title: `${detail.title} | TatilDesen Blog`,
     description: detail.seoDescription || detail.excerpt,
   };
 }

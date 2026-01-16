@@ -33,7 +33,7 @@ app.use(
     credentials: true,
     allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type", "X-API-Key", "Authorization"],
-  }),
+  })
 );
 
 // Better Auth routes - Admin
@@ -51,7 +51,7 @@ app.get("/", (c) => c.text("API is running"));
 app.get("/health", (c) => c.json({ status: "ok" }));
 app.get("/api", (c) =>
   c.json({
-    name: "MyTrip API",
+    name: "TatilDesen API",
     version: "1.0.0",
     status: "running",
     endpoints: {
@@ -66,7 +66,7 @@ app.get("/api", (c) =>
       search: "/api/search",
     },
     documentation: "https://github.com/your-repo/mytrip",
-  }),
+  })
 );
 
 // Public API routes

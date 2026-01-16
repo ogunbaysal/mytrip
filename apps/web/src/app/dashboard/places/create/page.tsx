@@ -618,7 +618,7 @@ export default function CreatePlacePage() {
                 Onay Süreci
               </h4>
               <p className="text-sm text-muted-foreground">
-                Mekanınız MyTrip yöneticileri tarafından incelenecek. Bu süreç
+                Mekanınız TatilDesen yöneticileri tarafından incelenecek. Bu süreç
                 genellikle 24-48 saat sürer. Onaylandıktan sonra mekanınız halka
                 açılacak. Durumu "Mekanlarım" sayfasından takip edebilirsiniz.
               </p>

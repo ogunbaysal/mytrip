@@ -160,7 +160,7 @@ export default function DashboardLayout({
               <Sparkles className="size-4" />
             </div>
             <span className="bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">
-              MyTrip
+              TatilDesen
             </span>
           </Link>
           <Button

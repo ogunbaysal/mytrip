@@ -1,7 +1,7 @@
-# Product Requirements Document (PRD) — MyTrip
+# Product Requirements Document (PRD) — TatilDesen
 
 ## 1) Executive Summary
-- MyTrip is a curated travel discovery platform for Muğla, Türkiye, highlighting premium stays, dining, and experiences through a visually rich, map-enabled web app (Next.js 15).
+- TatilDesen is a curated travel discovery platform for Muğla, Türkiye, highlighting premium stays, dining, and experiences through a visually rich, map-enabled web app (Next.js 15).
 - Current build delivers static, editor-curated content (places, collections, blog stories) with location-aware filtering and detailed itineraries; API layer exists primarily for authentication and is not yet wired to dynamic listings.
 - Goal: validate traveler demand and concierge/lead capture in Muğla, then scale with real inventory, owner onboarding, and admin operations.
 
@@ -11,10 +11,10 @@ Deliver a trusted, local-first discovery and planning companion for Muğla that 
 ## 3) Target Users / Personas
 - **Premium Leisure Traveler (P0)**: 28–45, urban professional/couple, mid-high spend, wants tasteful, low-effort curation; values trust, design, and local tips.
 - **Boutique Host / Experience Operator (P1)**: Villa/hotel/restaurant/experience owner seeking qualified demand and higher ADR via better storytelling; needs easy onboarding and guidance.
-- **MyTrip Operations (P0)**: Small internal team curating listings, managing content, and handling concierge inquiries; needs simple tooling and approvals.
+- **TatilDesen Operations (P0)**: Small internal team curating listings, managing content, and handling concierge inquiries; needs simple tooling and approvals.
 
 ## 4) Problem Statement
-Travelers struggle to find trustworthy, design-forward stays and authentic experiences in Muğla without sifting through noisy marketplaces. Local hosts lack a premium channel to reach the right guests. MyTrip must provide a high-signal catalog, clear itineraries, and low-friction contact paths while keeping operational overhead low.
+Travelers struggle to find trustworthy, design-forward stays and authentic experiences in Muğla without sifting through noisy marketplaces. Local hosts lack a premium channel to reach the right guests. TatilDesen must provide a high-signal catalog, clear itineraries, and low-friction contact paths while keeping operational overhead low.
 
 ## 5) Solution Overview
 - **Traveler Web (apps/web, Next.js 15)**: Home discovery (hero, categories), featured places, map-enabled search, filtered results, rich place detail pages, curated collections with itineraries, and an editorial blog. Contact/support pages exist for lead capture (currently static).

@@ -1,15 +1,15 @@
 export interface User {
-  id: string
-  name: string
-  email: string
-  role: "admin" | "owner" | "traveler"
-  status: "active" | "suspended" | "pending"
-  avatar?: string
-  phone?: string
-  createdAt: Date
-  lastLoginAt?: Date
-  placeCount?: number
-  subscriptionStatus?: "active" | "expired" | "cancelled" | null
+  id: string;
+  name: string;
+  email: string;
+  role: "admin" | "owner" | "traveler";
+  status: "active" | "suspended" | "pending";
+  avatar?: string;
+  phone?: string;
+  createdAt: Date;
+  lastLoginAt?: Date;
+  placeCount?: number;
+  subscriptionStatus?: "active" | "expired" | "cancelled" | null;
 }
 
 export const mockUsers: User[] = [
@@ -80,7 +80,7 @@ export const mockUsers: User[] = [
   {
     id: "6",
     name: "Admin User",
-    email: "admin@mytrip.com",
+    email: "admin@tatildesen.com",
     role: "admin",
     status: "active",
     phone: "+90 212 555 0123",
@@ -164,18 +164,18 @@ export const mockUsers: User[] = [
     placeCount: 0,
     subscriptionStatus: undefined,
   },
-]
+];
 
 export const roleOptions = [
   { value: "all", label: "Tüm Rollar" },
   { value: "admin", label: "Admin" },
   { value: "owner", label: "Mekan Sahibi" },
   { value: "traveler", label: "Seyahatçi" },
-]
+];
 
 export const statusOptions = [
   { value: "all", label: "Tüm Durumlar" },
   { value: "active", label: "Aktif" },
   { value: "suspended", label: "Askıya Alınmış" },
   { value: "pending", label: "Beklemede" },
-]
+];

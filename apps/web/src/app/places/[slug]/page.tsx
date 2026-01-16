@@ -51,7 +51,7 @@ export async function generateMetadata({
   }
 
   return {
-    title: `${detail.name} | MyTrip`,
+    title: `${detail.name} | TatilDesen`,
     description: detail.shortDescription,
   };
 }
@@ -561,7 +561,7 @@ export default async function PlaceDetailPage({
           <div className="flex items-start gap-4 rounded-lg bg-muted/50 p-4 text-xs text-muted-foreground">
             <Shield className="h-5 w-5 shrink-0" />
             <p>
-              Ödemenizi korumak için hiçbir zaman MyTrip web sitesi veya
+              Ödemenizi korumak için hiçbir zaman TatilDesen web sitesi veya
               uygulaması dışında para transferi yapmayın veya iletişim kurmayın.
             </p>
           </div>

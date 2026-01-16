@@ -31,7 +31,7 @@ A web-first platform that helps travelers discover and plan their trips by provi
 
 ### Turborepo Structure
 ```
-mytrip/
+tatildesen/
 ├── apps/
 │   ├── web/                 # NextJS - Traveler frontend
 │   ├── dashboard/           # NextJS - Place owner dashboard  

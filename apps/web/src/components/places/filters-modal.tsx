@@ -317,7 +317,7 @@ export function FiltersModal({
                 <div>
                   <p className="font-medium">Dogrulanmis Mekanlar</p>
                   <p className="text-sm text-gray-500">
-                    MyTrip tarafindan dogrulanmis
+                    TatilDesen tarafindan dogrulanmis
                   </p>
                 </div>
                 <ToggleSwitch

@@ -9,7 +9,7 @@ type FooterLinkProps = {
 };
 
 const companyLinks = [
-  { label: "MyTrip hakkında", href: "/about" },
+  { label: "TatilDesen hakkında", href: "/about" },
   { label: "Kariyer", href: "/careers" },
   { label: "Destek", href: "/support" },
 ] as const satisfies FooterLinkProps[];
@@ -37,7 +37,7 @@ export function SiteFooter() {
         <div className="grid gap-8 md:grid-cols-4">
           <div className="space-y-3">
             <Link href="/" className="text-xl font-semibold text-primary">
-              MyTrip
+              TatilDesen
             </Link>
             <p className="max-w-sm text-sm text-muted-foreground">
               Muğla&apos;da sevgiyle tasarlandı
@@ -60,7 +60,7 @@ export function SiteFooter() {
           </FooterColumn>
         </div>
         <div className="flex flex-col gap-4 border-t border-border/50 pt-6 text-sm text-muted-foreground md:flex-row md:items-center md:justify-between">
-          <span>© {new Date().getFullYear()} MyTrip</span>
+          <span>© {new Date().getFullYear()} TatilDesen</span>
           <div className="flex flex-wrap items-center gap-4">
             {legalLinks.map((item) => (
               <FooterLink key={item.href} href={item.href} label={item.label} />

@@ -73,7 +73,7 @@ export default function LoginPage() {
           <div className="mx-auto w-12 h-12 bg-primary rounded-lg flex items-center justify-center mb-4">
             <Shield className="h-7 w-7 text-primary-foreground" />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight">MyTrip Admin</h1>
+          <h1 className="text-2xl font-bold tracking-tight">TatilDesen Admin</h1>
           <p className="text-muted-foreground">
             Yönetim paneline giriş yapın
           </p>
@@ -192,7 +192,7 @@ export default function LoginPage() {
         {/* Footer */}
         <div className="text-center text-xs text-muted-foreground">
           <p>
-            © 2024 MyTrip. Tüm hakları saklıdır.
+            © 2026 TatilDesen. Tüm hakları saklıdır.
           </p>
         </div>
       </div>

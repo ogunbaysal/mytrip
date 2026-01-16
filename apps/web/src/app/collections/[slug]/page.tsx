@@ -22,14 +22,14 @@ export async function generateMetadata({ params }: { params: PageParams }) {
 
   if (!data) {
     return {
-        title: "Koleksiyon | MyTrip",
+        title: "Koleksiyon | TatilDesen",
     };
   }
   
   const { collection } = data;
 
   return {
-    title: `${collection.name} | MyTrip`,
+    title: `${collection.name} | TatilDesen`,
     description: collection.description,
   };
 }
@@ -136,7 +136,7 @@ export default async function CollectionDetailPage({ params }: { params: PagePar
         <div className="space-y-2">
           <h2 className="text-2xl font-semibold tracking-tight text-foreground">Yerel ipuçları</h2>
           <p className="text-sm text-muted-foreground">
-            MyTrip editörlerinin rotayı kusursuz yaşamanız için önerdiği küçük hatırlatmalar.
+            TatilDesen editörlerinin rotayı kusursuz yaşamanız için önerdiği küçük hatırlatmalar.
           </p>
         </div>
         <ul className="grid gap-4 md:grid-cols-2">
@@ -159,7 +159,7 @@ export default async function CollectionDetailPage({ params }: { params: PagePar
           <div className="space-y-2">
             <h2 className="text-2xl font-semibold tracking-tight text-foreground">Öne çıkan konaklamalar</h2>
             <p className="text-sm text-muted-foreground">
-              Rotayı yaşarken konaklayabileceğiniz MyTrip editör önerileri.
+              Rotayı yaşarken konaklayabileceğiniz TatilDesen editör önerileri.
             </p>
           </div>
           <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">

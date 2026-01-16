@@ -1,22 +1,22 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Kullanım Şartları | MyTrip",
-  description: "MyTrip platformunun kullanım koşulları ve hizmet şartları.",
+  title: "Kullanım Şartları | TatilDesen",
+  description: "TatilDesen platformunun kullanım koşulları ve hizmet şartları.",
 };
 
 const SECTIONS = [
   {
     title: "1. Taraflar",
     paragraphs: [
-      "Bu kullanım şartları, MyTrip Teknoloji A.Ş. ile kullanıcı arasında akdedilmiştir.",
+      "Bu kullanım şartları, TatilDesen Teknoloji A.Ş. ile kullanıcı arasında akdedilmiştir.",
       "Platformu kullanmakla şartları kabul etmiş sayılırsınız.",
     ],
   },
   {
     title: "2. Hizmet tanımı",
     paragraphs: [
-      "MyTrip, seçili konaklama ve deneyim sağlayıcılarını misafirlerle buluşturan bir aracı hizmet platformudur.",
+      "TatilDesen, seçili konaklama ve deneyim sağlayıcılarını misafirlerle buluşturan bir aracı hizmet platformudur.",
       "Sunulan içerikler düzenli olarak güncellense de hatalar içerebilir; bu durumda düzeltme hakkımız saklıdır.",
     ],
   },
@@ -44,14 +44,14 @@ const SECTIONS = [
   {
     title: "6. Fikri mülkiyet",
     paragraphs: [
-      "MyTrip logosu, tasarım sistemi ve içerikleri telif hakları ile korunmaktadır.",
+      "TatilDesen logosu, tasarım sistemi ve içerikleri telif hakları ile korunmaktadır.",
       "İzinsiz kullanım, kopyalama ve çoğaltma yasaktır.",
     ],
   },
   {
     title: "7. Sorumluluk sınırları",
     paragraphs: [
-      "MyTrip, üçüncü taraf sağlayıcıların eylemlerinden doğan doğrudan zararlardan sorumlu değildir.",
+      "TatilDesen, üçüncü taraf sağlayıcıların eylemlerinden doğan doğrudan zararlardan sorumlu değildir.",
       "Ancak müşteri memnuniyeti için gerekli arabuluculuk sürecini yürütürüz.",
     ],
   },
@@ -71,7 +71,7 @@ export default function TermsPage() {
           Kullanım şartları
         </span>
         <h1 className="text-3xl font-semibold tracking-tight text-foreground md:text-4xl">
-          MyTrip Kullanım Şartları
+          TatilDesen Kullanım Şartları
         </h1>
         <p className="mx-auto max-w-2xl text-sm text-muted-foreground md:text-base">
           Platformumuzu kullanmadan önce lütfen aşağıdaki hüküm ve koşulları dikkatlice okuyun.
@@ -92,7 +92,7 @@ export default function TermsPage() {
       </section>
 
       <footer className="rounded-3xl border border-border bg-white/80 p-6 text-sm text-muted-foreground">
-        Şartlar hakkında sorularınız için legal@mytrip.com adresinden bize ulaşabilirsiniz.
+        Şartlar hakkında sorularınız için legal@tatildesen.com adresinden bize ulaşabilirsiniz.
       </footer>
     </article>
   );

@@ -10,7 +10,7 @@ const app = new Hono();
 // API information
 app.get("/", (c) => {
   return c.json({
-    name: "MyTrip API",
+    name: "TatilDesen API",
     version: "1.0.0",
     description: "Travel booking and discovery API for Muğla, Türkiye",
     endpoints: {

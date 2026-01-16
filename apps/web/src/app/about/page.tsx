@@ -5,14 +5,14 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
 export const metadata: Metadata = {
-  title: "Hakkımızda | MyTrip",
-  description: "MyTrip hikayesini, ekibini ve Muğla deneyimini yeniden tanımlama vizyonumuzu keşfedin.",
+  title: "Hakkımızda | TatilDesen",
+  description: "TatilDesen hikayesini, ekibini ve Muğla deneyimini yeniden tanımlama vizyonumuzu keşfedin.",
 };
 
 const MILESTONES = [
   {
     year: "2021",
-    title: "MyTrip kuruldu",
+    title: "TatilDesen kuruldu",
     description:
       "Muğla&apos;ya tutkuyla bağlı dört girişimci, premium konaklama ve deneyimleri tek platformda toplamak için yola çıktı.",
   },
@@ -26,7 +26,7 @@ const MILESTONES = [
     year: "2024",
     title: "Editör kürasyonu",
     description:
-      "Yerel yazarlar ve fotoğrafçılarla çalışarak MyTrip koleksiyonlarını zenginleştirdik, otel seçkilerimizi %40 genişlettik.",
+      "Yerel yazarlar ve fotoğrafçılarla çalışarak TatilDesen koleksiyonlarını zenginleştirdik, otel seçkilerimizi %40 genişlettik.",
   },
 ] as const;
 
@@ -56,7 +56,7 @@ const TEAM_ROLES = [
   {
     name: "Melis Soylu",
     role: "Deneyim Tasarım Direktörü",
-    bio: "MyTrip koleksiyonlarının sahadaki kürasyonundan sorumlu.",
+    bio: "TatilDesen koleksiyonlarının sahadaki kürasyonundan sorumlu.",
   },
 ] as const;
 
@@ -71,7 +71,7 @@ export default function AboutPage() {
           Muğla&apos;yı yerel gözlerle deneyimleyin
         </h1>
         <p className="mx-auto max-w-3xl text-sm text-muted-foreground md:text-base">
-          MyTrip, Muğla&apos;daki seçili konaklama, gastronomi ve deneyimleri tek çatı altında toplayarak misafirlerimize yerel kürasyonla hazırlanmış rotalar sunar.
+          TatilDesen, Muğla&apos;daki seçili konaklama, gastronomi ve deneyimleri tek çatı altında toplayarak misafirlerimize yerel kürasyonla hazırlanmış rotalar sunar.
         </p>
         <div className="flex flex-col items-center justify-center gap-3 md:flex-row">
           <Button asChild>
@@ -86,7 +86,7 @@ export default function AboutPage() {
       <section className="mx-auto w-full max-w-[960px] space-y-6 px-4 md:px-0">
         <h2 className="text-xl font-semibold text-foreground">Hikayemiz</h2>
         <p className="text-sm text-muted-foreground leading-relaxed">
-          Muğla&apos;nın farklı ilçelerinde büyüyen kurucu ekibimiz, yerel işletmelerin benzersiz hikayelerini misafirlerle buluşturmak için MyTrip&apos;i kurdu. Tasarım odaklı bir dijital deneyimle, konuklarımızın seyahat planlamasını kolaylaştırırken yerel ekosistemi de destekliyoruz.
+          Muğla&apos;nın farklı ilçelerinde büyüyen kurucu ekibimiz, yerel işletmelerin benzersiz hikayelerini misafirlerle buluşturmak için TatilDesen&apos;i kurdu. Tasarım odaklı bir dijital deneyimle, konuklarımızın seyahat planlamasını kolaylaştırırken yerel ekosistemi de destekliyoruz.
         </p>
       </section>
 
@@ -131,7 +131,7 @@ export default function AboutPage() {
       </section>
 
       <section className="mx-auto w-full max-w-[960px] rounded-3xl border border-primary/30 bg-primary/5 p-6 text-center text-sm text-primary/90">
-        MyTrip&apos;e katılmak ister misiniz? Açık pozisyonlarımızı <Link href="/careers" className="font-semibold underline">kariyer sayfamızdan</Link> inceleyin.
+        TatilDesen&apos;e katılmak ister misiniz? Açık pozisyonlarımızı <Link href="/careers" className="font-semibold underline">kariyer sayfamızdan</Link> inceleyin.
       </section>
     </div>
   );

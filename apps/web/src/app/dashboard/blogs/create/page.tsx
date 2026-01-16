@@ -217,7 +217,7 @@ export default function CreateBlogPage() {
       {/* Page Header */}
       <PageHeader
         title="Yeni Blog Yazisi"
-        description="Blog yazinizi olusturun ve MyTrip kullanicilarina ulasin"
+        description="Blog yazinizi olusturun ve TatilDesen kullanicilarina ulasin"
         icon={<FileText className="size-5" />}
         breadcrumbs={[
           { label: "Blog Yazilari", href: "/dashboard/blogs" },
@@ -637,7 +637,7 @@ export default function CreateBlogPage() {
                 Yayinlama Sureci
               </h4>
               <p className="text-sm text-muted-foreground">
-                Blog yaziniz "pending_review" durumunda MyTrip yoneticileri
+                Blog yaziniz "pending_review" durumunda TatilDesen yoneticileri
                 tarafindan incelenecek. Onaylandiktan sonra halka acilacak. Bu
                 surec genellikle 24-48 saat surer.
               </p>
