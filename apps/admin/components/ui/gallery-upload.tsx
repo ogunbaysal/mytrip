@@ -30,7 +30,7 @@ export function GalleryUpload({ value = [], onChange, disabled }: GalleryUploadP
         const formData = new FormData()
         formData.append("file", file)
 
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002"}/api/admin/upload`, {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "https://api.tatildesen.com"}/api/admin/upload`, {
             method: "POST",
             body: formData,
             credentials: 'include'

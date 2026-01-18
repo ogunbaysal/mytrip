@@ -27,7 +27,7 @@ export function ImageUpload({ value, onChange, onRemove, disabled, label = "Gör
         const formData = new FormData()
         formData.append("file", file)
 
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002"}/api/admin/upload`, {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "https://api.tatildesen.com"}/api/admin/upload`, {
             method: "POST",
             body: formData,
              // Add auth headers if needed, though simple fetch might not include cookies unless credentials: include

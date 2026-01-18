@@ -10,7 +10,7 @@ import type {
 } from "@/types";
 
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3002";
+  process.env.NEXT_PUBLIC_API_BASE_URL || "https://api.tatildesen.com";
 const DEFAULT_LOCALE = "tr";
 
 type RequestOptions = RequestInit & { cache?: RequestCache };
