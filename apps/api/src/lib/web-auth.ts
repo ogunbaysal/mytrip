@@ -18,7 +18,7 @@ export const webAuth = betterAuth({
   appName: "TatilDesen",
   baseURL: new URL(
     "/api/web/auth",
-    process.env.BETTER_AUTH_URL || "http://localhost:3002"
+    process.env.BETTER_AUTH_URL || "http://localhost:3002",
   ).href,
   trustedOrigins,
   database: drizzleAdapter(db, {
@@ -78,7 +78,7 @@ export const webAuth = betterAuth({
       subscriptionStatus: {
         type: "string",
         required: false,
-        defaultValue: "none",
+        // No default - will be null until user subscribes
       },
       phone: {
         type: "string",
