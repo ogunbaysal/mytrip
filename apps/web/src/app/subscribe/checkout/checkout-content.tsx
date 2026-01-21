@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { api } from "@/lib/api";
-import { authClient, refreshSession } from "@/lib/auth-client";
+import { authClient } from "@/lib/auth-client";
 
 function CheckoutForm() {
   const router = useRouter();
@@ -50,21 +50,22 @@ function CheckoutForm() {
         ...paymentData,
       } as any),
     onSuccess: async (data) => {
-      // Refresh session to get updated role and subscription status
+      // Force refresh session from database to get updated role and subscription status
+      // disableCookieCache: true forces Better Auth to fetch from DB and update the cookie
       try {
-        await refreshSession();
+        await authClient.getSession({
+          query: { disableCookieCache: true },
+          fetchOptions: { cache: "no-store" },
+        });
       } catch (e) {
         console.error("Failed to refresh session:", e);
       }
 
       // Invalidate all session-related queries
-      queryClient.invalidateQueries({ queryKey: ["session"] });
-      queryClient.invalidateQueries({ queryKey: ["subscription-current"] });
+      await queryClient.invalidateQueries({ queryKey: ["session"] });
+      await queryClient.invalidateQueries({ queryKey: ["subscription-current"] });
 
-      // Small delay to ensure session is refreshed
-      setTimeout(() => {
-        router.push("/dashboard" as Route);
-      }, 500);
+      router.push("/dashboard" as Route);
     },
     onError: (error: Error) => {
       console.error("Subscription error:", error);

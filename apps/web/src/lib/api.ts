@@ -381,6 +381,41 @@ export const api = {
         );
       },
     },
+    upload: {
+      async single(file: File): Promise<{ url: string }> {
+        const formData = new FormData();
+        formData.append("file", file);
+        const response = await fetch(`${API_BASE_URL}/api/owner/upload`, {
+          method: "POST",
+          credentials: "include",
+          body: formData,
+        });
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || "Upload failed");
+        }
+        return response.json();
+      },
+      async multiple(
+        files: File[],
+      ): Promise<{ urls: string[]; errors?: string[] }> {
+        const formData = new FormData();
+        files.forEach((file) => formData.append("files", file));
+        const response = await fetch(
+          `${API_BASE_URL}/api/owner/upload/multiple`,
+          {
+            method: "POST",
+            credentials: "include",
+            body: formData,
+          },
+        );
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || "Upload failed");
+        }
+        return response.json();
+      },
+    },
   },
   places: {
     async listFeatured(): Promise<PlaceSummary[]> {

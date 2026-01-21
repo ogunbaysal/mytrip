@@ -40,3 +40,4 @@ export {
 export * from "./settings.ts";
 export * from "./categories.ts";
 export * from "./analytics.ts";
+export * from "./files.ts";

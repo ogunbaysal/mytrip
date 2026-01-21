@@ -31,6 +31,7 @@ import { useEffect } from "react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ImageUpload } from "@/components/ui/image-upload"
 import { TiptapEditor } from "@/components/ui/tiptap-editor"
+import { TagsInput } from "@/components/ui/tags-input"
 
 const CATEGORIES = ["travel", "food", "culture", "history", "activity", "lifestyle", "business"] as const
 const STATUSES = ["published", "draft", "pending_review", "archived"] as const
@@ -54,10 +55,10 @@ const blogFormSchema = z.object({
   targetAudience: z.enum(AUDIENCES),
   heroImage: z.string().optional().or(z.literal("")),
   featuredImage: z.string().optional().or(z.literal("")),
-  tags: z.string().optional(),
+  tags: z.array(z.string()).default([]),
   seoTitle: z.string().optional(),
   seoDescription: z.string().optional(),
-  seoKeywords: z.string().optional(),
+  seoKeywords: z.array(z.string()).default([]),
 })
 
 type BlogFormValues = z.infer<typeof blogFormSchema>
@@ -96,8 +97,9 @@ export default function EditBlogPage() {
   // Pre-fill form when data is loaded
   useEffect(() => {
     if (blog) {
-        const tagsString = Array.isArray(blog.tags) ? blog.tags.join(", ") : (blog.tags || "");
-        const keywordsString = Array.isArray(blog.seoKeywords) ? blog.seoKeywords.join(", ") : (blog.seoKeywords || "");
+        // Tags and seoKeywords are already parsed as arrays by the API
+        const parseTags = Array.isArray(blog.tags) ? blog.tags : [];
+        const parseKeywords = Array.isArray(blog.seoKeywords) ? blog.seoKeywords : [];
 
         form.reset({
             title: blog.title,
@@ -111,10 +113,10 @@ export default function EditBlogPage() {
             targetAudience: blog.targetAudience,
             heroImage: blog.heroImage || "",
             featuredImage: blog.featuredImage || "",
-            tags: tagsString,
+            tags: parseTags,
             seoTitle: blog.seoTitle || "",
             seoDescription: blog.seoDescription || "",
-            seoKeywords: keywordsString,
+            seoKeywords: parseKeywords,
         })
     }
   }, [blog, form])
@@ -141,13 +143,8 @@ export default function EditBlogPage() {
 
 
   function onSubmit(data: BlogFormValues) {
-    const formattedData = {
-      ...data,
-      tags: data.tags ? data.tags.split(",").map(t => t.trim()) : [],
-      seoKeywords: data.seoKeywords ? data.seoKeywords.split(",").map(t => t.trim()) : [],
-    }
-
-    updateBlog({ postId, data: formattedData }, {
+    // Tags and seoKeywords are already arrays from the form
+    updateBlog({ postId, data }, {
       onSuccess: () => {
         toast.success("Blog yazısı başarıyla güncellendi")
       },
@@ -334,7 +331,11 @@ export default function EditBlogPage() {
                             <FormItem>
                                 <FormLabel>SEO Anahtar Kelimeler</FormLabel>
                                 <FormControl>
-                                <Input placeholder="virgül ile ayırın: seyahat, tatil, otel" {...field} />
+                                    <TagsInput
+                                        value={field.value || []}
+                                        onChange={field.onChange}
+                                        placeholder="Kelime ekle..."
+                                    />
                                 </FormControl>
                                 <FormMessage />
                             </FormItem>
@@ -427,7 +428,11 @@ export default function EditBlogPage() {
                             <FormItem>
                                 <FormLabel>Etiketler</FormLabel>
                                 <FormControl>
-                                <Input placeholder="virgül ile ayırın: gezi, istanbul" {...field} />
+                                    <TagsInput
+                                        value={field.value || []}
+                                        onChange={field.onChange}
+                                        placeholder="Etiket ekle..."
+                                    />
                                 </FormControl>
                                 <FormDescription>
                                     İçerikle ilgili etiketler.

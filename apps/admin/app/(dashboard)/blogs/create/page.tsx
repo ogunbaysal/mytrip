@@ -30,6 +30,7 @@ import { Separator } from "@/components/ui/separator"
 import { useEffect } from "react"
 import { ImageUpload } from "@/components/ui/image-upload"
 import { TiptapEditor } from "@/components/ui/tiptap-editor"
+import { TagsInput } from "@/components/ui/tags-input"
 
 const CATEGORIES = ["travel", "food", "culture", "history", "activity", "lifestyle", "business"] as const
 const STATUSES = ["published", "draft", "pending_review", "archived"] as const
@@ -53,10 +54,10 @@ const blogFormSchema = z.object({
   targetAudience: z.enum(AUDIENCES),
   heroImage: z.string().optional().or(z.literal("")),
   featuredImage: z.string().optional().or(z.literal("")),
-  tags: z.string().optional(),
+  tags: z.array(z.string()).default([]),
   seoTitle: z.string().optional(),
   seoDescription: z.string().optional(),
-  seoKeywords: z.string().optional(),
+  seoKeywords: z.array(z.string()).default([]),
 })
 
 type BlogFormValues = z.infer<typeof blogFormSchema>
@@ -73,10 +74,10 @@ const defaultValues: BlogFormValues = {
   targetAudience: "travelers",
   heroImage: "",
   featuredImage: "",
-  tags: "",
+  tags: [],
   seoTitle: "",
   seoDescription: "",
-  seoKeywords: "",
+  seoKeywords: [],
 }
 
 // Slug generation utility
@@ -110,13 +111,8 @@ export default function CreateBlogPage() {
   }, [title, form]);
 
   function onSubmit(data: BlogFormValues) {
-    const formattedData = {
-      ...data,
-      tags: data.tags ? data.tags.split(",").map(t => t.trim()) : [],
-      seoKeywords: data.seoKeywords ? data.seoKeywords.split(",").map(t => t.trim()) : [],
-    }
-
-    createBlog(formattedData, {
+    // Tags and seoKeywords are already arrays from the form
+    createBlog(data, {
       onSuccess: () => {
         toast.success("Blog yazısı başarıyla oluşturuldu")
         router.push("/blogs")
@@ -284,7 +280,11 @@ export default function CreateBlogPage() {
                             <FormItem>
                                 <FormLabel>SEO Anahtar Kelimeler</FormLabel>
                                 <FormControl>
-                                <Input placeholder="virgül ile ayırın: seyahat, tatil, otel" {...field} />
+                                    <TagsInput
+                                        value={field.value || []}
+                                        onChange={field.onChange}
+                                        placeholder="Kelime ekle..."
+                                    />
                                 </FormControl>
                                 <FormMessage />
                             </FormItem>
@@ -306,7 +306,7 @@ export default function CreateBlogPage() {
                             render={({ field }) => (
                             <FormItem>
                                 <FormLabel>Durum</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <Select onValueChange={field.onChange} value={field.value}>
                                 <FormControl>
                                     <SelectTrigger>
                                     <SelectValue placeholder="Durum seçiniz" />
@@ -329,7 +329,7 @@ export default function CreateBlogPage() {
                             render={({ field }) => (
                             <FormItem>
                                 <FormLabel>Kategori</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <Select onValueChange={field.onChange} value={field.value}>
                                 <FormControl>
                                     <SelectTrigger>
                                     <SelectValue placeholder="Kategori seçiniz" />
@@ -355,7 +355,7 @@ export default function CreateBlogPage() {
                             render={({ field }) => (
                             <FormItem>
                                 <FormLabel>Dil</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <Select onValueChange={field.onChange} value={field.value}>
                                 <FormControl>
                                     <SelectTrigger>
                                     <SelectValue placeholder="Dil seçiniz" />
@@ -377,7 +377,11 @@ export default function CreateBlogPage() {
                             <FormItem>
                                 <FormLabel>Etiketler</FormLabel>
                                 <FormControl>
-                                <Input placeholder="virgül ile ayırın: gezi, istanbul" {...field} />
+                                    <TagsInput
+                                        value={field.value || []}
+                                        onChange={field.onChange}
+                                        placeholder="Etiket ekle..."
+                                    />
                                 </FormControl>
                                 <FormDescription>
                                     İçerikle ilgili etiketler.
@@ -400,7 +404,7 @@ export default function CreateBlogPage() {
                             render={({ field }) => (
                             <FormItem>
                                 <FormLabel>Okuma Seviyesi</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <Select onValueChange={field.onChange} value={field.value}>
                                 <FormControl>
                                     <SelectTrigger>
                                     <SelectValue placeholder="Seviye seçiniz" />
@@ -422,7 +426,7 @@ export default function CreateBlogPage() {
                             render={({ field }) => (
                             <FormItem>
                                 <FormLabel>Hedef Kitle</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <Select onValueChange={field.onChange} value={field.value}>
                                 <FormControl>
                                     <SelectTrigger>
                                     <SelectValue placeholder="Kitle seçiniz" />

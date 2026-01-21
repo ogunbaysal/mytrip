@@ -86,9 +86,9 @@ const logSkip = (message: string): void => {
 // ============================================================================
 
 const ADMIN_CONFIG = {
-  email: "ogunbaysaltr@gmail.com",
+  email: "admin@tatildesen.com",
   password: "demo1234",
-  name: "Ogun Baysal",
+  name: "Tatildesen Admin",
 };
 
 const PERMISSIONS = [

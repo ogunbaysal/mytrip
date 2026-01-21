@@ -6,6 +6,35 @@ import { nanoid } from "nanoid";
 
 const app = new Hono();
 
+// Helper to safely parse JSON text fields
+function parseJsonField(value: string | null | undefined): string[] {
+  if (!value) return [];
+  if (typeof value !== "string") return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    // If not valid JSON, try splitting by comma
+    if (value.includes(",")) {
+      return value
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+    }
+    return value ? [value] : [];
+  }
+}
+
+// Transform blog post to have parsed arrays
+function transformBlogPost(post: any) {
+  return {
+    ...post,
+    tags: parseJsonField(post.tags),
+    seoKeywords: parseJsonField(post.seoKeywords),
+    images: parseJsonField(post.images),
+  };
+}
+
 /**
  * Get all blog posts with pagination and filtering
  * GET /admin/blog
@@ -33,7 +62,7 @@ app.get("/", async (c) => {
 
     if (search) {
       conditions.push(
-        sql`(LOWER(${blogPost.title}) ILIKE ${'%' + search.toLowerCase() + '%'} OR LOWER(${blogPost.excerpt}) ILIKE ${'%' + search.toLowerCase() + '%'} OR LOWER(${blogPost.content}) ILIKE ${'%' + search.toLowerCase() + '%'})`
+        sql`(LOWER(${blogPost.title}) ILIKE ${"%" + search.toLowerCase() + "%"} OR LOWER(${blogPost.excerpt}) ILIKE ${"%" + search.toLowerCase() + "%"} OR LOWER(${blogPost.content}) ILIKE ${"%" + search.toLowerCase() + "%"})`,
       );
     }
 
@@ -60,18 +89,19 @@ app.get("/", async (c) => {
     const whereClause = conditions.length > 0 ? and(...conditions) : sql`1=1`;
 
     // Build order by clause
-    const orderByColumn = {
-      title: blogPost.title,
-      category: blogPost.category,
-      status: blogPost.status,
-      language: blogPost.language,
-      views: blogPost.views,
-      likeCount: blogPost.likeCount,
-      commentCount: blogPost.commentCount,
-      publishedAt: blogPost.publishedAt,
-      createdAt: blogPost.createdAt,
-      updatedAt: blogPost.updatedAt,
-    }[sortBy] || blogPost.createdAt;
+    const orderByColumn =
+      {
+        title: blogPost.title,
+        category: blogPost.category,
+        status: blogPost.status,
+        language: blogPost.language,
+        views: blogPost.views,
+        likeCount: blogPost.likeCount,
+        commentCount: blogPost.commentCount,
+        publishedAt: blogPost.publishedAt,
+        createdAt: blogPost.createdAt,
+        updatedAt: blogPost.updatedAt,
+      }[sortBy] || blogPost.createdAt;
 
     const orderDirection = sortOrder === "asc" ? sql`ASC` : sql`DESC`;
 
@@ -122,7 +152,7 @@ app.get("/", async (c) => {
       .offset(offset);
 
     return c.json({
-      blogPosts,
+      blogPosts: blogPosts.map(transformBlogPost),
       pagination: {
         page: parseInt(page),
         limit: limitInt,
@@ -135,9 +165,9 @@ app.get("/", async (c) => {
     return c.json(
       {
         error: "Failed to fetch blog posts",
-        message: "Unable to retrieve blog posts"
+        message: "Unable to retrieve blog posts",
       },
-      500
+      500,
     );
   }
 });
@@ -191,21 +221,21 @@ app.get("/:postId", async (c) => {
       return c.json(
         {
           error: "Blog post not found",
-          message: "The specified blog post does not exist"
+          message: "The specified blog post does not exist",
         },
-        404
+        404,
       );
     }
 
-    return c.json({ blogPost: postData });
+    return c.json({ blogPost: transformBlogPost(postData) });
   } catch (error) {
     console.error("Failed to fetch blog post:", error);
     return c.json(
       {
         error: "Failed to fetch blog post",
-        message: "Unable to retrieve blog post details"
+        message: "Unable to retrieve blog post details",
       },
-      500
+      500,
     );
   }
 });
@@ -220,7 +250,9 @@ app.post("/", async (c) => {
 
     const newBlogPost = {
       id: nanoid(),
-      slug: postData.slug || `${postData.title.toLowerCase().replace(/\s+/g, '-')}-${nanoid(6)}`,
+      slug:
+        postData.slug ||
+        `${postData.title.toLowerCase().replace(/\s+/g, "-")}-${nanoid(6)}`,
       title: postData.title,
       excerpt: postData.excerpt,
       content: postData.content,
@@ -246,7 +278,10 @@ app.post("/", async (c) => {
       targetAudience: postData.targetAudience || "travelers",
     };
 
-    const [createdBlogPost] = await db.insert(blogPost).values(newBlogPost).returning();
+    const [createdBlogPost] = await db
+      .insert(blogPost)
+      .values(newBlogPost)
+      .returning();
 
     return c.json({
       success: true,
@@ -258,9 +293,9 @@ app.post("/", async (c) => {
     return c.json(
       {
         error: "Failed to create blog post",
-        message: "Unable to create new blog post"
+        message: "Unable to create new blog post",
       },
-      500
+      500,
     );
   }
 });
@@ -275,7 +310,14 @@ app.put("/:postId", async (c) => {
     const updates = await c.req.json();
 
     // Remove fields that shouldn't be updated directly
-    const { id, createdAt, updatedAt, authorName, authorEmail, ...allowedUpdates } = updates;
+    const {
+      id,
+      createdAt,
+      updatedAt,
+      authorName,
+      authorEmail,
+      ...allowedUpdates
+    } = updates;
 
     // Set publishedAt if status is being changed to published
     if (allowedUpdates.status === "published" && !updates.publishedAt) {
@@ -295,9 +337,9 @@ app.put("/:postId", async (c) => {
       return c.json(
         {
           error: "Blog post not found",
-          message: "The specified blog post does not exist"
+          message: "The specified blog post does not exist",
         },
-        404
+        404,
       );
     }
 
@@ -311,9 +353,9 @@ app.put("/:postId", async (c) => {
     return c.json(
       {
         error: "Failed to update blog post",
-        message: "Unable to update blog post details"
+        message: "Unable to update blog post details",
       },
-      500
+      500,
     );
   }
 });
@@ -327,13 +369,16 @@ app.patch("/:postId/status", async (c) => {
     const { postId } = c.req.param();
     const { status } = await c.req.json();
 
-    if (!["published", "draft", "archived", "pending_review"].includes(status)) {
+    if (
+      !["published", "draft", "archived", "pending_review"].includes(status)
+    ) {
       return c.json(
         {
           error: "Invalid status",
-          message: "Status must be one of: published, draft, archived, pending_review"
+          message:
+            "Status must be one of: published, draft, archived, pending_review",
         },
-        400
+        400,
       );
     }
 
@@ -357,9 +402,9 @@ app.patch("/:postId/status", async (c) => {
       return c.json(
         {
           error: "Blog post not found",
-          message: "The specified blog post does not exist"
+          message: "The specified blog post does not exist",
         },
-        404
+        404,
       );
     }
 
@@ -373,9 +418,9 @@ app.patch("/:postId/status", async (c) => {
     return c.json(
       {
         error: "Failed to update blog post status",
-        message: "Unable to update blog post status"
+        message: "Unable to update blog post status",
       },
-      500
+      500,
     );
   }
 });
@@ -398,9 +443,9 @@ app.patch("/:postId/feature", async (c) => {
       return c.json(
         {
           error: "Blog post not found",
-          message: "The specified blog post does not exist"
+          message: "The specified blog post does not exist",
         },
-        404
+        404,
       );
     }
 
@@ -423,9 +468,9 @@ app.patch("/:postId/feature", async (c) => {
     return c.json(
       {
         error: "Failed to toggle blog post featured status",
-        message: "Unable to update blog post featured status"
+        message: "Unable to update blog post featured status",
       },
-      500
+      500,
     );
   }
 });
@@ -447,9 +492,9 @@ app.delete("/:postId", async (c) => {
       return c.json(
         {
           error: "Blog post not found",
-          message: "The specified blog post does not exist"
+          message: "The specified blog post does not exist",
         },
-        404
+        404,
       );
     }
 
@@ -463,9 +508,9 @@ app.delete("/:postId", async (c) => {
     return c.json(
       {
         error: "Failed to delete blog post",
-        message: "Unable to delete blog post"
+        message: "Unable to delete blog post",
       },
-      500
+      500,
     );
   }
 });
@@ -531,19 +576,31 @@ app.get("/stats", async (c) => {
       .where(eq(blogPost.status, "published"));
 
     const stats = {
-      totalPosts: statusStats.reduce((sum, stat) => sum + Number(stat.count), 0),
-      byStatus: statusStats.reduce((acc, stat) => {
-        acc[stat.status] = Number(stat.count);
-        return acc;
-      }, {} as Record<string, number>),
-      byCategory: categoryStats.reduce((acc, stat) => {
-        acc[stat.category] = Number(stat.count);
-        return acc;
-      }, {} as Record<string, number>),
-      byLanguage: languageStats.reduce((acc, stat) => {
-        acc[stat.language] = Number(stat.count);
-        return acc;
-      }, {} as Record<string, number>),
+      totalPosts: statusStats.reduce(
+        (sum, stat) => sum + Number(stat.count),
+        0,
+      ),
+      byStatus: statusStats.reduce(
+        (acc, stat) => {
+          acc[stat.status] = Number(stat.count);
+          return acc;
+        },
+        {} as Record<string, number>,
+      ),
+      byCategory: categoryStats.reduce(
+        (acc, stat) => {
+          acc[stat.category] = Number(stat.count);
+          return acc;
+        },
+        {} as Record<string, number>,
+      ),
+      byLanguage: languageStats.reduce(
+        (acc, stat) => {
+          acc[stat.language] = Number(stat.count);
+          return acc;
+        },
+        {} as Record<string, number>,
+      ),
       totalViews: Number(engagementStats[0]?.totalViews || 0),
       totalLikes: Number(engagementStats[0]?.totalLikes || 0),
       totalComments: Number(engagementStats[0]?.totalComments || 0),
@@ -559,9 +616,9 @@ app.get("/stats", async (c) => {
     return c.json(
       {
         error: "Failed to fetch blog statistics",
-        message: "Unable to retrieve blog statistics"
+        message: "Unable to retrieve blog statistics",
       },
-      500
+      500,
     );
   }
 });
