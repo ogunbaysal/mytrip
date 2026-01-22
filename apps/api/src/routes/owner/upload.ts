@@ -18,7 +18,7 @@ const ALLOWED_IMAGE_TYPES = [
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
 // Ensure uploads directory exists
-const uploadsDir = join(process.cwd(), "apps/api/public/uploads");
+const uploadsDir = join(process.cwd(), "public/uploads");
 
 async function ensureUploadsDir() {
   if (!existsSync(uploadsDir)) {

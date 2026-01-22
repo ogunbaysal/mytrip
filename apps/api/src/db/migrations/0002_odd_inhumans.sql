@@ -1,1 +1,0 @@
-CREATE TYPE "public"."business_registration_status" AS ENUM('pending', 'approved', 'rejected');
