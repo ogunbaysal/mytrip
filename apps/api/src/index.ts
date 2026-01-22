@@ -16,7 +16,7 @@ import { refreshSessionRoutes } from "./routes/refresh-session.ts";
 
 const app = new Hono();
 
-app.use("/uploads/*", serveStatic({ root: "./apps/api/public" }));
+app.use("/uploads/*", serveStatic({ root: "./public" }));
 
 const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",")
   .map((origin) => origin.trim())
@@ -33,7 +33,7 @@ app.use(
     credentials: true,
     allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type", "X-API-Key", "Authorization"],
-  })
+  }),
 );
 
 // Better Auth routes - Admin
@@ -66,7 +66,7 @@ app.get("/api", (c) =>
       search: "/api/search",
     },
     documentation: "https://github.com/your-repo/mytrip",
-  })
+  }),
 );
 
 // Public API routes
