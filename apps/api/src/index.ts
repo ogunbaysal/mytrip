@@ -1,4 +1,6 @@
 import "dotenv/config";
+import { join, dirname, relative } from "path";
+import { fileURLToPath } from "url";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { auth } from "./lib/auth.ts";
@@ -16,7 +18,13 @@ import { refreshSessionRoutes } from "./routes/refresh-session.ts";
 
 const app = new Hono();
 
-app.use("/uploads/*", serveStatic({ root: "./public" }));
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const publicDir = join(__dirname, "../public");
+// serveStatic expects a path relative to process.cwd()
+const relativePublicDir = relative(process.cwd(), publicDir);
+
+app.use("/uploads/*", serveStatic({ root: relativePublicDir }));
 
 const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",")
   .map((origin) => origin.trim())

@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { v4 as uuidv4 } from "uuid";
-import { join } from "path";
+import { join, dirname } from "path";
+import { fileURLToPath } from "url";
 import { writeFile, mkdir } from "fs/promises";
 import { existsSync } from "fs";
 import { getSessionFromRequest } from "../../lib/session.ts";
@@ -18,7 +19,9 @@ const ALLOWED_IMAGE_TYPES = [
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
 // Ensure uploads directory exists
-const uploadsDir = join(process.cwd(), "public/uploads");
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const uploadsDir = join(__dirname, "../../../public/uploads");
 
 async function ensureUploadsDir() {
   if (!existsSync(uploadsDir)) {
