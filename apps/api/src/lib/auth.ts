@@ -12,14 +12,8 @@ const trustedOrigins = process.env.ALLOWED_ORIGINS?.split(",")
 ];
 
 // Check if we're in production (cross-origin scenario)
+const cookieDomain = process.env.COOKIE_DOMAIN;
 const isProduction = process.env.NODE_ENV === "production";
-const cookieDomain = process.env.COOKIE_DOMAIN || ".tatildesen.com";
-
-console.log({
-  trustedOrigins,
-  cookieDomain,
-  isProduction,
-});
 
 export const auth = betterAuth({
   appName: "Admin Panel",
@@ -52,18 +46,10 @@ export const auth = betterAuth({
   },
   socialProviders: {},
   advanced: {
-    // Only enable cross-subdomain cookies in production with a proper domain
-    crossSubDomainCookies:
-      isProduction && !!cookieDomain
-        ? {
-            enabled: true,
-            domain: cookieDomain,
-          }
-        : {
-            enabled: false,
-          },
-    // For cross-origin requests between subdomains, we need SameSite=None + Secure
-    // Only apply in production to avoid localhost issues
+    crossSubDomainCookies: {
+      enabled: isProduction && !!cookieDomain,
+      domain: cookieDomain,
+    },
     ...(isProduction &&
       cookieDomain && {
         defaultCookieAttributes: {

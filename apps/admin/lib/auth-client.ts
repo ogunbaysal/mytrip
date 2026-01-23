@@ -1,7 +1,7 @@
 import { createAuthClient } from "better-auth/react";
 
 const apiBaseUrl =
-  process.env.NEXT_PUBLIC_API_URL || "https://api.tatildesen.comlocalhost:3002";
+  process.env.NEXT_PUBLIC_API_URL || "https://api.tatildesen.com";
 
 export const authClient = createAuthClient({
   baseURL: `${apiBaseUrl}/api/auth`,
