@@ -2,6 +2,7 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { db } from "../db/index.ts";
 import * as schema from "../db/schemas/index.ts";
+import { resolveCookieDomain } from "./cookie-domain.ts";
 
 const trustedOrigins = process.env.ALLOWED_ORIGINS?.split(",")
   .map((origin) => origin.trim())
@@ -12,8 +13,9 @@ const trustedOrigins = process.env.ALLOWED_ORIGINS?.split(",")
 ];
 
 // Check if we're in production (cross-origin scenario)
-const cookieDomain = process.env.COOKIE_DOMAIN;
+const cookieDomain = resolveCookieDomain();
 const isProduction = process.env.NODE_ENV === "production";
+const enableCrossSubDomain = isProduction && !!cookieDomain;
 
 export const auth = betterAuth({
   appName: "Admin Panel",
@@ -47,17 +49,16 @@ export const auth = betterAuth({
   socialProviders: {},
   advanced: {
     crossSubDomainCookies: {
-      enabled: isProduction && !!cookieDomain,
+      enabled: enableCrossSubDomain,
       domain: cookieDomain,
     },
-    ...(isProduction &&
-      cookieDomain && {
-        defaultCookieAttributes: {
-          sameSite: "none" as const,
-          secure: true,
-          partitioned: true,
-        },
-      }),
+    ...(enableCrossSubDomain && {
+      defaultCookieAttributes: {
+        sameSite: "none" as const,
+        secure: true,
+        partitioned: true,
+      },
+    }),
     generateId: false, // Use our own UUID generation
   },
   user: {

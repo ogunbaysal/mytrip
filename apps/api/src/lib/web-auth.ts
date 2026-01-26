@@ -2,6 +2,7 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { db } from "../db/index.ts";
 import * as schema from "../db/schemas/index.ts";
+import { resolveCookieDomain } from "./cookie-domain.ts";
 
 const trustedOrigins = process.env.ALLOWED_ORIGINS?.split(",")
   .map((origin) => origin.trim())
@@ -11,8 +12,9 @@ const trustedOrigins = process.env.ALLOWED_ORIGINS?.split(",")
   "http://localhost:3002",
 ];
 
-const cookieDomain = process.env.COOKIE_DOMAIN;
+const cookieDomain = resolveCookieDomain();
 const isProduction = process.env.NODE_ENV === "production";
+const enableCrossSubDomain = isProduction && !!cookieDomain;
 
 export const webAuth = betterAuth({
   appName: "TatilDesen",
@@ -50,17 +52,16 @@ export const webAuth = betterAuth({
   socialProviders: {},
   advanced: {
     crossSubDomainCookies: {
-      enabled: isProduction && !!cookieDomain,
+      enabled: enableCrossSubDomain,
       domain: cookieDomain,
     },
-    ...(isProduction &&
-      cookieDomain && {
-        defaultCookieAttributes: {
-          sameSite: "none" as const,
-          secure: true,
-          partitioned: true,
-        },
-      }),
+    ...(enableCrossSubDomain && {
+      defaultCookieAttributes: {
+        sameSite: "none" as const,
+        secure: true,
+        partitioned: true,
+      },
+    }),
     generateId: false,
   },
   user: {
