@@ -1,51 +1,52 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import { useEditor, EditorContent } from '@tiptap/react'
-import StarterKit from '@tiptap/starter-kit'
-import Image from '@tiptap/extension-image'
-import Link from '@tiptap/extension-link'
-import Placeholder from '@tiptap/extension-placeholder'
-import { Toggle } from "@/components/ui/toggle"
-import { 
-  Bold, 
-  Italic, 
+import * as React from "react";
+import { useEditor, EditorContent } from "@tiptap/react";
+import StarterKit from "@tiptap/starter-kit";
+import Image from "@tiptap/extension-image";
+import Link from "@tiptap/extension-link";
+import Placeholder from "@tiptap/extension-placeholder";
+import { Toggle } from "@/components/ui/toggle";
+import {
+  Bold,
+  Italic,
   Strikethrough,
-  List, 
-  ListOrdered, 
-  Heading1, 
-  Heading2, 
+  List,
+  ListOrdered,
+  Heading1,
+  Heading2,
   Heading3,
-  Quote, 
-  Undo, 
-  Redo, 
+  Quote,
+  Undo,
+  Redo,
   Code,
   Link as LinkIcon,
   Unlink,
   Image as ImageIcon,
-  Minus
-} from "lucide-react"
-import { cn } from "@/lib/utils"
+  Minus,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { api } from "@/lib/api";
 
 interface TiptapEditorProps {
-  value: string
-  onChange: (value: string) => void
-  placeholder?: string
-  disabled?: boolean
-  minHeight?: string
-  onImageUpload?: (file: File) => Promise<{ url: string }>
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  disabled?: boolean;
+  minHeight?: string;
+  onImageUpload?: (file: File) => Promise<{ url: string }>;
 }
 
-export function TiptapEditor({ 
-  value, 
-  onChange, 
+export function TiptapEditor({
+  value,
+  onChange,
   placeholder = "İçeriğinizi buraya yazın...",
   disabled = false,
   minHeight = "400px",
-  onImageUpload
+  onImageUpload,
 }: TiptapEditorProps) {
-  const fileInputRef = React.useRef<HTMLInputElement>(null)
-  
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -55,13 +56,13 @@ export function TiptapEditor({
       }),
       Image.configure({
         HTMLAttributes: {
-          class: 'max-w-full h-auto rounded-lg my-4',
+          class: "max-w-full h-auto rounded-lg my-4",
         },
       }),
       Link.configure({
         openOnClick: false,
         HTMLAttributes: {
-          class: 'text-primary underline hover:text-primary/80',
+          class: "text-primary underline hover:text-primary/80",
         },
       }),
       Placeholder.configure({
@@ -74,104 +75,101 @@ export function TiptapEditor({
     editorProps: {
       attributes: {
         class: cn(
-          'prose prose-sm dark:prose-invert max-w-none focus:outline-none p-4',
-          'prose-headings:font-semibold',
-          'prose-a:text-primary prose-a:no-underline hover:prose-a:underline',
-          'prose-blockquote:border-l-primary prose-blockquote:bg-muted prose-blockquote:py-1 prose-blockquote:px-4 prose-blockquote:rounded-r',
-          'prose-code:bg-muted prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-sm prose-code:font-mono',
-          'prose-img:rounded-lg prose-img:shadow-md'
+          "prose prose-sm dark:prose-invert max-w-none focus:outline-none p-4",
+          "prose-headings:font-semibold",
+          "prose-a:text-primary prose-a:no-underline hover:prose-a:underline",
+          "prose-blockquote:border-l-primary prose-blockquote:bg-muted prose-blockquote:py-1 prose-blockquote:px-4 prose-blockquote:rounded-r",
+          "prose-code:bg-muted prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-sm prose-code:font-mono",
+          "prose-img:rounded-lg prose-img:shadow-md",
         ),
         style: `min-height: ${minHeight}`,
       },
     },
     onUpdate: ({ editor }) => {
-      onChange(editor.getHTML())
+      onChange(editor.getHTML());
     },
-  })
+  });
 
   // Sync content changes from outside
   React.useEffect(() => {
     if (editor && value !== editor.getHTML()) {
-      editor.commands.setContent(value)
+      editor.commands.setContent(value);
     }
-  }, [value, editor])
+  }, [value, editor]);
 
   // Update editable state
   React.useEffect(() => {
-    editor?.setEditable(!disabled)
-  }, [disabled, editor])
+    editor?.setEditable(!disabled);
+  }, [disabled, editor]);
 
   const addLink = () => {
-    if (!editor) return
-    const previousUrl = editor.getAttributes('link').href
-    const url = window.prompt('URL girin:', previousUrl)
-    if (url === null) return
-    if (url === '') {
-      editor.chain().focus().extendMarkRange('link').unsetLink().run()
-      return
+    if (!editor) return;
+    const previousUrl = editor.getAttributes("link").href;
+    const url = window.prompt("URL girin:", previousUrl);
+    if (url === null) return;
+    if (url === "") {
+      editor.chain().focus().extendMarkRange("link").unsetLink().run();
+      return;
     }
-    editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run()
-  }
+    editor.chain().focus().extendMarkRange("link").setLink({ href: url }).run();
+  };
 
-  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file || !editor) return
+  const handleImageUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file || !editor) return;
 
     try {
       if (onImageUpload) {
-        const result = await onImageUpload(file)
-        editor.chain().focus().setImage({ src: result.url }).run()
+        const result = await onImageUpload(file);
+        editor.chain().focus().setImage({ src: result.url }).run();
       } else {
-        // Default: use admin upload endpoint
-        const formData = new FormData()
-        formData.append('file', file)
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002'}/api/admin/upload`, {
-          method: 'POST',
-          body: formData,
-          credentials: 'include'
-        })
-        if (!response.ok) throw new Error('Upload failed')
-        const data = await response.json()
-        editor.chain().focus().setImage({ src: data.url }).run()
+        const result = await api.upload.single(file);
+        editor.chain().focus().setImage({ src: result.url }).run();
       }
     } catch (error) {
-      console.error('Image upload failed:', error)
+      console.error("Image upload failed:", error);
     }
 
     if (fileInputRef.current) {
-      fileInputRef.current.value = ''
+      fileInputRef.current.value = "";
     }
-  }
+  };
 
   const addImageFromUrl = () => {
-    const url = window.prompt('Görsel URL\'si girin:')
+    const url = window.prompt("Görsel URL'si girin:");
     if (url && editor) {
-      editor.chain().focus().setImage({ src: url }).run()
+      editor.chain().focus().setImage({ src: url }).run();
     }
-  }
+  };
 
   if (!editor) {
     return (
       <div className="flex items-center justify-center min-h-[200px] border rounded-md bg-muted/40">
         <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
       </div>
-    )
+    );
   }
 
-  const wordCount = editor.getText().split(/\s+/).filter(Boolean).length
+  const wordCount = editor.getText().split(/\s+/).filter(Boolean).length;
 
   return (
-    <div className={cn(
-      "flex flex-col border rounded-lg overflow-hidden bg-background",
-      disabled && "opacity-60"
-    )}>
+    <div
+      className={cn(
+        "flex flex-col border rounded-lg overflow-hidden bg-background",
+        disabled && "opacity-60",
+      )}
+    >
       {/* Toolbar */}
       <div className="flex flex-wrap gap-0.5 border-b p-2 bg-muted/40">
         {/* Headings */}
         <Toggle
           size="sm"
-          pressed={editor.isActive('heading', { level: 1 })}
-          onPressedChange={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
+          pressed={editor.isActive("heading", { level: 1 })}
+          onPressedChange={() =>
+            editor.chain().focus().toggleHeading({ level: 1 }).run()
+          }
           disabled={disabled}
           title="Başlık 1"
         >
@@ -179,8 +177,10 @@ export function TiptapEditor({
         </Toggle>
         <Toggle
           size="sm"
-          pressed={editor.isActive('heading', { level: 2 })}
-          onPressedChange={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+          pressed={editor.isActive("heading", { level: 2 })}
+          onPressedChange={() =>
+            editor.chain().focus().toggleHeading({ level: 2 }).run()
+          }
           disabled={disabled}
           title="Başlık 2"
         >
@@ -188,8 +188,10 @@ export function TiptapEditor({
         </Toggle>
         <Toggle
           size="sm"
-          pressed={editor.isActive('heading', { level: 3 })}
-          onPressedChange={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
+          pressed={editor.isActive("heading", { level: 3 })}
+          onPressedChange={() =>
+            editor.chain().focus().toggleHeading({ level: 3 }).run()
+          }
           disabled={disabled}
           title="Başlık 3"
         >
@@ -201,7 +203,7 @@ export function TiptapEditor({
         {/* Text formatting */}
         <Toggle
           size="sm"
-          pressed={editor.isActive('bold')}
+          pressed={editor.isActive("bold")}
           onPressedChange={() => editor.chain().focus().toggleBold().run()}
           disabled={disabled}
           title="Kalın"
@@ -210,7 +212,7 @@ export function TiptapEditor({
         </Toggle>
         <Toggle
           size="sm"
-          pressed={editor.isActive('italic')}
+          pressed={editor.isActive("italic")}
           onPressedChange={() => editor.chain().focus().toggleItalic().run()}
           disabled={disabled}
           title="İtalik"
@@ -219,7 +221,7 @@ export function TiptapEditor({
         </Toggle>
         <Toggle
           size="sm"
-          pressed={editor.isActive('strike')}
+          pressed={editor.isActive("strike")}
           onPressedChange={() => editor.chain().focus().toggleStrike().run()}
           disabled={disabled}
           title="Üstü Çizili"
@@ -228,7 +230,7 @@ export function TiptapEditor({
         </Toggle>
         <Toggle
           size="sm"
-          pressed={editor.isActive('code')}
+          pressed={editor.isActive("code")}
           onPressedChange={() => editor.chain().focus().toggleCode().run()}
           disabled={disabled}
           title="Kod"
@@ -241,8 +243,10 @@ export function TiptapEditor({
         {/* Lists */}
         <Toggle
           size="sm"
-          pressed={editor.isActive('bulletList')}
-          onPressedChange={() => editor.chain().focus().toggleBulletList().run()}
+          pressed={editor.isActive("bulletList")}
+          onPressedChange={() =>
+            editor.chain().focus().toggleBulletList().run()
+          }
           disabled={disabled}
           title="Madde Listesi"
         >
@@ -250,8 +254,10 @@ export function TiptapEditor({
         </Toggle>
         <Toggle
           size="sm"
-          pressed={editor.isActive('orderedList')}
-          onPressedChange={() => editor.chain().focus().toggleOrderedList().run()}
+          pressed={editor.isActive("orderedList")}
+          onPressedChange={() =>
+            editor.chain().focus().toggleOrderedList().run()
+          }
           disabled={disabled}
           title="Numaralı Liste"
         >
@@ -259,8 +265,10 @@ export function TiptapEditor({
         </Toggle>
         <Toggle
           size="sm"
-          pressed={editor.isActive('blockquote')}
-          onPressedChange={() => editor.chain().focus().toggleBlockquote().run()}
+          pressed={editor.isActive("blockquote")}
+          onPressedChange={() =>
+            editor.chain().focus().toggleBlockquote().run()
+          }
           disabled={disabled}
           title="Alıntı"
         >
@@ -268,7 +276,9 @@ export function TiptapEditor({
         </Toggle>
         <Toggle
           size="sm"
-          onPressedChange={() => editor.chain().focus().setHorizontalRule().run()}
+          onPressedChange={() =>
+            editor.chain().focus().setHorizontalRule().run()
+          }
           disabled={disabled}
           title="Yatay Çizgi"
         >
@@ -280,14 +290,14 @@ export function TiptapEditor({
         {/* Link */}
         <Toggle
           size="sm"
-          pressed={editor.isActive('link')}
+          pressed={editor.isActive("link")}
           onPressedChange={addLink}
           disabled={disabled}
           title="Bağlantı"
         >
           <LinkIcon className="h-4 w-4" />
         </Toggle>
-        {editor.isActive('link') && (
+        {editor.isActive("link") && (
           <Toggle
             size="sm"
             onPressedChange={() => editor.chain().focus().unsetLink().run()}
@@ -301,7 +311,9 @@ export function TiptapEditor({
         {/* Image */}
         <Toggle
           size="sm"
-          onPressedChange={() => onImageUpload ? fileInputRef.current?.click() : addImageFromUrl()}
+          onPressedChange={() =>
+            onImageUpload ? fileInputRef.current?.click() : addImageFromUrl()
+          }
           disabled={disabled}
           title="Görsel Ekle"
         >
@@ -345,5 +357,5 @@ export function TiptapEditor({
         <span>{editor.getText().length} karakter</span>
       </div>
     </div>
-  )
+  );
 }

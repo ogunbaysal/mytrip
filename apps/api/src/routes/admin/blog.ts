@@ -25,6 +25,19 @@ function parseJsonField(value: string | null | undefined): string[] {
   }
 }
 
+function parseTimestamp(value: unknown): Date | null | undefined {
+  if (value === null) return null;
+  if (typeof value === "undefined") return undefined;
+  if (value instanceof Date) return value;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    const parsed = new Date(trimmed);
+    return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+  }
+  return undefined;
+}
+
 // Transform blog post to have parsed arrays
 function transformBlogPost(post: any) {
   return {
@@ -248,6 +261,8 @@ app.post("/", async (c) => {
   try {
     const postData = await c.req.json();
 
+    const publishedAt = parseTimestamp(postData.publishedAt);
+
     const newBlogPost = {
       id: nanoid(),
       slug:
@@ -264,7 +279,7 @@ app.post("/", async (c) => {
       status: postData.status || "draft",
       featured: postData.featured || false,
       authorId: postData.authorId,
-      publishedAt: postData.publishedAt,
+      publishedAt,
       views: postData.views || 0,
       readTime: postData.readTime,
       likeCount: postData.likeCount || 0,
@@ -319,8 +334,17 @@ app.put("/:postId", async (c) => {
       ...allowedUpdates
     } = updates;
 
+    if ("publishedAt" in allowedUpdates) {
+      const parsedPublishedAt = parseTimestamp(allowedUpdates.publishedAt);
+      if (typeof parsedPublishedAt === "undefined") {
+        delete allowedUpdates.publishedAt;
+      } else {
+        allowedUpdates.publishedAt = parsedPublishedAt;
+      }
+    }
+
     // Set publishedAt if status is being changed to published
-    if (allowedUpdates.status === "published" && !updates.publishedAt) {
+    if (allowedUpdates.status === "published" && !allowedUpdates.publishedAt) {
       allowedUpdates.publishedAt = new Date();
     }
 

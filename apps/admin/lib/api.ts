@@ -1,4 +1,7 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://api.tatildesen.com";
+const API_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL ||
+  process.env.NEXT_PUBLIC_API_URL ||
+  "https://api.tatildesen.com";
 
 export async function apiFetch<T>(
   endpoint: string,
@@ -32,6 +35,42 @@ export async function apiFetch<T>(
 }
 
 export const api = {
+  upload: {
+    async single(file: File): Promise<{ url: string }> {
+      const formData = new FormData();
+      formData.append("file", file);
+      const response = await fetch(`${API_URL}/api/admin/upload`, {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+      if (!response.ok) {
+        const error = await response
+          .json()
+          .catch(() => ({ error: "Upload failed" }));
+        throw new Error(error.error || "Upload failed");
+      }
+      return response.json();
+    },
+    async multiple(
+      files: File[],
+    ): Promise<{ urls: string[]; errors?: string[] }> {
+      const formData = new FormData();
+      files.forEach((file) => formData.append("files", file));
+      const response = await fetch(`${API_URL}/api/admin/upload/multiple`, {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+      if (!response.ok) {
+        const error = await response
+          .json()
+          .catch(() => ({ error: "Upload failed" }));
+        throw new Error(error.error || "Upload failed");
+      }
+      return response.json();
+    },
+  },
   approvals: {
     places: {
       async list(params?: { status?: string }) {
