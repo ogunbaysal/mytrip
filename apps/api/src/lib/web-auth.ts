@@ -13,8 +13,7 @@ const trustedOrigins = process.env.ALLOWED_ORIGINS?.split(",")
 ];
 
 const cookieDomain = resolveCookieDomain();
-const isProduction = process.env.NODE_ENV === "production";
-const enableCrossSubDomain = isProduction && !!cookieDomain;
+const enableCrossSubDomain = !!cookieDomain;
 
 export const webAuth = betterAuth({
   appName: "TatilDesen",
@@ -55,13 +54,6 @@ export const webAuth = betterAuth({
       enabled: enableCrossSubDomain,
       domain: cookieDomain,
     },
-    ...(enableCrossSubDomain && {
-      defaultCookieAttributes: {
-        sameSite: "none" as const,
-        secure: true,
-        partitioned: true,
-      },
-    }),
     generateId: false,
   },
   user: {

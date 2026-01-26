@@ -4,10 +4,6 @@ export function resolveCookieDomain() {
     return envDomain;
   }
 
-  if (process.env.NODE_ENV !== "production") {
-    return undefined;
-  }
-
   const authUrl = process.env.BETTER_AUTH_URL;
   if (!authUrl) {
     return undefined;

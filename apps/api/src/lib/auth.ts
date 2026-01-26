@@ -14,8 +14,7 @@ const trustedOrigins = process.env.ALLOWED_ORIGINS?.split(",")
 
 // Check if we're in production (cross-origin scenario)
 const cookieDomain = resolveCookieDomain();
-const isProduction = process.env.NODE_ENV === "production";
-const enableCrossSubDomain = isProduction && !!cookieDomain;
+const enableCrossSubDomain = !!cookieDomain;
 
 export const auth = betterAuth({
   appName: "Admin Panel",
@@ -52,13 +51,6 @@ export const auth = betterAuth({
       enabled: enableCrossSubDomain,
       domain: cookieDomain,
     },
-    ...(enableCrossSubDomain && {
-      defaultCookieAttributes: {
-        sameSite: "none" as const,
-        secure: true,
-        partitioned: true,
-      },
-    }),
     generateId: false, // Use our own UUID generation
   },
   user: {
