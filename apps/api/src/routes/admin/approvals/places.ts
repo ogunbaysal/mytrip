@@ -2,9 +2,13 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { db } from "../../../db/index.ts";
-import { place, user } from "../../../db/schemas/index.ts";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { district, place, placeCategory, province, user } from "../../../db/schemas/index.ts";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { getSessionFromRequest } from "../../../lib/session.ts";
+import {
+  derivePlaceTypeFromCategorySlug,
+  hydratePlaceMediaAndAmenities,
+} from "../../../lib/place-relations.ts";
 
 const app = new Hono();
 
@@ -33,29 +37,42 @@ app.get("/places", async (c) => {
       .from(place)
       .where(and(...whereConditions));
 
-    const places = await db
+    const rows = await db
       .select({
         id: place.id,
         slug: place.slug,
         name: place.name,
-        type: place.type,
-        category: place.category,
         shortDescription: place.shortDescription,
         address: place.address,
-        city: place.city,
-        district: place.district,
+        cityId: place.cityId,
+        districtId: place.districtId,
         status: place.status,
         ownerId: place.ownerId,
         ownerName: user.name,
         ownerEmail: user.email,
         createdAt: place.createdAt,
+        categoryName: placeCategory.name,
+        categorySlug: placeCategory.slug,
+        cityName: province.name,
+        districtName: district.name,
       })
       .from(place)
       .innerJoin(user, eq(place.ownerId, user.id))
+      .leftJoin(placeCategory, eq(place.categoryId, placeCategory.id))
+      .leftJoin(province, eq(place.cityId, province.id))
+      .leftJoin(district, eq(place.districtId, district.id))
       .where(and(...whereConditions))
       .orderBy(desc(place.createdAt))
       .limit(limitInt)
       .offset(offset);
+
+    const places = rows.map((row) => ({
+      ...row,
+      type: derivePlaceTypeFromCategorySlug(row.categorySlug),
+      category: row.categoryName ?? "",
+      city: row.cityName ?? "",
+      district: row.districtName ?? "",
+    }));
 
     return c.json({
       places,
@@ -81,17 +98,62 @@ app.get("/places/:id", async (c) => {
 
     const id = c.req.param("id");
 
-    const [placeData] = await db
-      .select()
+    const rows = await db
+      .select({
+        id: place.id,
+        slug: place.slug,
+        name: place.name,
+        categoryId: place.categoryId,
+        description: place.description,
+        shortDescription: place.shortDescription,
+        address: place.address,
+        cityId: place.cityId,
+        districtId: place.districtId,
+        location: place.location,
+        contactInfo: place.contactInfo,
+        rating: place.rating,
+        reviewCount: place.reviewCount,
+        priceLevel: place.priceLevel,
+        nightlyPrice: place.nightlyPrice,
+        status: place.status,
+        verified: place.verified,
+        featured: place.featured,
+        ownerId: place.ownerId,
+        views: place.views,
+        bookingCount: place.bookingCount,
+        openingHours: place.openingHours,
+        checkInInfo: place.checkInInfo,
+        checkOutInfo: place.checkOutInfo,
+        createdAt: place.createdAt,
+        updatedAt: place.updatedAt,
+        categoryName: placeCategory.name,
+        categorySlug: placeCategory.slug,
+        cityName: province.name,
+        districtName: district.name,
+      })
       .from(place)
+      .leftJoin(placeCategory, eq(place.categoryId, placeCategory.id))
+      .leftJoin(province, eq(place.cityId, province.id))
+      .leftJoin(district, eq(place.districtId, district.id))
       .where(eq(place.id, id))
       .limit(1);
 
+    const placeData = rows[0];
     if (!placeData) {
       return c.json({ error: "Place not found" }, 404);
     }
 
-    return c.json({ place: placeData });
+    const [hydrated] = await hydratePlaceMediaAndAmenities([
+      {
+        ...placeData,
+        type: derivePlaceTypeFromCategorySlug(placeData.categorySlug),
+        category: placeData.categoryName ?? "",
+        city: placeData.cityName ?? "",
+        district: placeData.districtName ?? "",
+      },
+    ]);
+
+    return c.json({ place: hydrated });
   } catch (error) {
     console.error("Get place details error:", error);
     return c.json({ error: "Internal server error" }, 500);
@@ -159,7 +221,6 @@ app.put(
       }
 
       const id = c.req.param("id");
-      const data = c.req.valid("json");
 
       const [existingPlace] = await db
         .select({ status: place.status })

@@ -12,6 +12,12 @@ export type Admin = {
   lastLoginAt: string | null;
 };
 
+export type AdminRole = {
+  id: string;
+  name: string;
+  description?: string | null;
+};
+
 type AdminsResponse = {
   admins: Admin[];
 };
@@ -21,6 +27,17 @@ export function useAdmins() {
     queryKey: ["admins"],
     queryFn: async () => {
       return apiFetch<AdminsResponse>(`/api/admin/auth/admins`).then(res => res.admins);
+    },
+  });
+}
+
+export function useAdminRoles() {
+  return useQuery({
+    queryKey: ["admin-roles"],
+    queryFn: async () => {
+      return apiFetch<{ roles: AdminRole[] }>(`/api/admin/auth/roles`).then(
+        (res) => res.roles,
+      );
     },
   });
 }

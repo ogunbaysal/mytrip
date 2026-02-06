@@ -5,10 +5,6 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { Button } from "@/components/ui/button"
 
-  // Mock roles for now - should fetch from API
-  // TODO: Add useRoles hook to fetch dynamic roles
-  // const roles = [...] // Removed unused variables for lint
-
 import {
   Form,
   FormControl,
@@ -25,13 +21,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Admin } from "@/hooks/use-admins"
+import { Admin, useAdminRoles } from "@/hooks/use-admins"
 
 const adminFormSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
   email: z.string().email("Invalid email address"),
   roleId: z.string().min(1, "Role is required"),
-  status: z.enum(["active", "suspended", "pending"]).optional(),
+  status: z.enum(["active", "suspended"]).optional(),
   password: z.string().min(6, "Password must be at least 6 characters").optional(),
 })
 
@@ -45,24 +41,33 @@ interface AdminFormProps {
 }
 
 export function AdminForm({ initialData, onSubmit, isLoading, isEdit = false }: AdminFormProps) {
+  const { data: roleOptions = [], isLoading: isRolesLoading } = useAdminRoles()
+
   const form = useForm<AdminFormValues>({
-    resolver: zodResolver(adminFormSchema),
+    resolver: zodResolver(adminFormSchema) as any,
     defaultValues: {
       name: initialData?.name || "",
       email: initialData?.email || "",
       roleId: initialData?.roleId || "",
-      status: initialData?.status || "active",
+      status:
+        initialData?.status && initialData.status !== "pending"
+          ? initialData.status
+          : "active",
       password: "",
     },
   })
 
-  // Mock roles for now - should fetch from API
-  // TODO: Add useRoles hook to fetch dynamic roles
-  const roles = [
-    { id: initialData?.roleId || "role-id-placeholder", name: initialData?.role || "Current Role" }, // Fallback if roles not fetched
-    // We need a way to select roles. For now hardcoding or using the passed role.
-    // In a real scenario, we'd fetch db.adminRoles.
-  ]
+  const roles = [...roleOptions]
+  if (
+    initialData?.roleId &&
+    !roles.some((role) => role.id === initialData.roleId)
+  ) {
+    roles.push({
+      id: initialData.roleId,
+      name: initialData.role || "Mevcut Rol",
+      description: null,
+    })
+  }
 
   const handleSubmit = (data: AdminFormValues) => {
     // Remove password if empty in edit mode
@@ -125,20 +130,23 @@ export function AdminForm({ initialData, onSubmit, isLoading, isEdit = false }: 
           render={({ field }) => (
             <FormItem>
               <FormLabel>Rol</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
+              <Select onValueChange={field.onChange} value={field.value}>
                 <FormControl>
                   <SelectTrigger>
                     <SelectValue placeholder="Rol seçin" />
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  {/* TODO: Replace with dynamic roles */}
-                  <SelectItem value="super-admin-id">Super Admin</SelectItem> 
-                  <SelectItem value="admin-id">Admin</SelectItem>
-                  <SelectItem value="editor-id">Editör</SelectItem>
-                  {/* If we have an existing role ID that isn't in the hardcoded list, add it */}
-                  {initialData?.roleId && !["super-admin-id", "admin-id", "editor-id"].includes(initialData.roleId) && (
-                      <SelectItem value={initialData.roleId}>{initialData.role || "Mevcut Rol"}</SelectItem>
+                  {isRolesLoading ? (
+                    <SelectItem value="__loading__" disabled>
+                      Roller yükleniyor...
+                    </SelectItem>
+                  ) : (
+                    roles.map((role) => (
+                      <SelectItem key={role.id} value={role.id}>
+                        {role.name}
+                      </SelectItem>
+                    ))
                   )}
                 </SelectContent>
               </Select>
@@ -154,7 +162,7 @@ export function AdminForm({ initialData, onSubmit, isLoading, isEdit = false }: 
              render={({ field }) => (
                <FormItem>
                  <FormLabel>Durum</FormLabel>
-                 <Select onValueChange={field.onChange} defaultValue={field.value}>
+                 <Select onValueChange={field.onChange} value={field.value}>
                    <FormControl>
                      <SelectTrigger>
                        <SelectValue placeholder="Durum seçin" />
@@ -163,7 +171,6 @@ export function AdminForm({ initialData, onSubmit, isLoading, isEdit = false }: 
                    <SelectContent>
                      <SelectItem value="active">Aktif</SelectItem> 
                      <SelectItem value="suspended">Askıya Alınmış</SelectItem>
-                     <SelectItem value="pending">Beklemede</SelectItem>
                    </SelectContent>
                  </Select>
                  <FormMessage />

@@ -60,6 +60,34 @@ app.get("/admins", async (c) => {
 });
 
 /**
+ * Get admin roles
+ * GET /admin/auth/roles
+ */
+app.get("/roles", async (c) => {
+  try {
+    const roles = await db
+      .select({
+        id: adminRoles.id,
+        name: adminRoles.name,
+        description: adminRoles.description,
+      })
+      .from(adminRoles)
+      .orderBy(adminRoles.name);
+
+    return c.json({ roles });
+  } catch (error) {
+    console.error("Failed to fetch roles:", error);
+    return c.json(
+      {
+        error: "Failed to fetch roles",
+        message: "Unable to retrieve admin roles",
+      },
+      500,
+    );
+  }
+});
+
+/**
  * Get specific admin detail
  * GET /admin/auth/admins/:id
  */

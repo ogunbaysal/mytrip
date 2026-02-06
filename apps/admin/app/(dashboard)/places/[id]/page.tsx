@@ -21,22 +21,55 @@ import { formatDistanceToNow } from "date-fns"
 import { tr } from "date-fns/locale"
 import { toast } from "sonner"
 
+const statusLabels: Record<string, string> = {
+  active: "Aktif",
+  pending: "Beklemede",
+  suspended: "Askıya Alınmış",
+  inactive: "Pasif",
+  rejected: "Reddedildi",
+}
+
+const priceLevelLabels: Record<string, string> = {
+  budget: "$ (Ucuz)",
+  moderate: "$$ (Orta)",
+  expensive: "$$$ (Pahalı)",
+  luxury: "$$$$ (Lüks)",
+}
+
+const statusDotColor: Record<string, string> = {
+  active: "bg-green-500",
+  pending: "bg-yellow-500",
+  suspended: "bg-red-500",
+  inactive: "bg-gray-400",
+  rejected: "bg-red-500",
+}
+
 export default function PlaceDetailPage() {
   const params = useParams()
   const router = useRouter()
   const placeId = params.id as string
   
   const { data: place, isLoading, refetch } = usePlace(placeId)
-  const { mutate: updateStatus } = useUpdatePlaceStatus()
-  const { mutate: toggleVerify } = useTogglePlaceVerify()
-  const { mutate: toggleFeature } = useTogglePlaceFeature()
+  const { mutateAsync: updateStatus, isPending: isUpdatingStatus } = useUpdatePlaceStatus()
+  const { mutateAsync: toggleVerify, isPending: isTogglingVerify } = useTogglePlaceVerify()
+  const { mutateAsync: toggleFeature, isPending: isTogglingFeature } = useTogglePlaceFeature()
 
-  const handleAction = (action: () => void, successMsg: string) => {
-      action();
-      setTimeout(() => {
-          refetch(); // Ensure data is fresh
-          toast.success(successMsg);
-      }, 500);
+  const isActionPending =
+    isUpdatingStatus || isTogglingVerify || isTogglingFeature
+
+  const runAction = async (
+    action: () => Promise<unknown>,
+    successMsg: string,
+  ) => {
+    try {
+      await action()
+      await refetch()
+      toast.success(successMsg)
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "İşlem sırasında hata oluştu"
+      toast.error(message)
+    }
   }
 
   if (isLoading) {
@@ -91,7 +124,13 @@ export default function PlaceDetailPage() {
                {place.status !== "active" && (
                   <DropdownMenuItem 
                     className="text-green-600"
-                    onClick={() => handleAction(() => updateStatus({ placeId: place.id, status: "active" }), "Mekan aktifleştirildi")}
+                    disabled={isActionPending}
+                    onClick={() =>
+                      runAction(
+                        () => updateStatus({ placeId: place.id, status: "active" }),
+                        "Mekan aktifleştirildi",
+                      )
+                    }
                   >
                     Aktifleştir
                   </DropdownMenuItem>
@@ -99,16 +138,50 @@ export default function PlaceDetailPage() {
                 {place.status === "active" && (
                   <DropdownMenuItem 
                     className="text-orange-600"
-                    onClick={() => handleAction(() => updateStatus({ placeId: place.id, status: "suspended" }), "Mekan askıya alındı")}
+                    disabled={isActionPending}
+                    onClick={() =>
+                      runAction(
+                        () =>
+                          updateStatus({
+                            placeId: place.id,
+                            status: "suspended",
+                          }),
+                        "Mekan askıya alındı",
+                      )
+                    }
                   >
                     Askıya Al
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => handleAction(() => toggleVerify(placeId), place.verified ? "Doğrulama kaldırıldı" : "Mekan doğrulandı")}>
+                <DropdownMenuItem
+                  disabled={isActionPending}
+                  onClick={() =>
+                    runAction(
+                      () =>
+                        toggleVerify({
+                          placeId,
+                          verified: !place.verified,
+                        }),
+                      place.verified
+                        ? "Doğrulama kaldırıldı"
+                        : "Mekan doğrulandı",
+                    )
+                  }
+                >
                     {place.verified ? "Doğrulamayı Kaldır" : "Doğrula"}
                 </DropdownMenuItem>
-                 <DropdownMenuItem onClick={() => handleAction(() => toggleFeature(placeId), place.featured ? "Öne çıkarılanlardan kaldırıldı" : "Mekan öne çıkarıldı")}>
+                 <DropdownMenuItem
+                  disabled={isActionPending}
+                  onClick={() =>
+                    runAction(
+                      () => toggleFeature(placeId),
+                      place.featured
+                        ? "Öne çıkarılanlardan kaldırıldı"
+                        : "Mekan öne çıkarıldı",
+                    )
+                  }
+                 >
                     {place.featured ? "Öne Çıkarılanlardan Kaldır" : "Öne Çıkar"}
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -146,12 +219,14 @@ export default function PlaceDetailPage() {
           </CardContent>
         </Card>
         <Card>
-           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Durum</CardTitle>
-            <div className={`h-2 w-2 rounded-full ${place.status === "active" ? "bg-green-500" : "bg-gray-400"}`} />
+            <div className={`h-2 w-2 rounded-full ${statusDotColor[place.status] ?? "bg-gray-400"}`} />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold capitalize">{place.status}</div>
+            <div className="text-2xl font-bold">
+              {statusLabels[place.status] ?? place.status}
+            </div>
             <p className="text-xs text-muted-foreground">
                {formatDistanceToNow(new Date(place.createdAt), { addSuffix: true, locale: tr })} oluşturuldu
             </p>
@@ -219,7 +294,9 @@ export default function PlaceDetailPage() {
                         </div>
                         <div className="flex flex-col">
                              <span className="text-xs text-muted-foreground">Fiyat Seviyesi</span>
-                             <span className="font-medium">{"$".repeat(Number(place.priceLevel))}</span>
+                             <span className="font-medium">
+                               {priceLevelLabels[place.priceLevel] ?? "-"}
+                             </span>
                         </div>
                     </div>
                 </CardContent>

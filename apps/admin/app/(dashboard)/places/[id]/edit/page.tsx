@@ -33,6 +33,7 @@ import Link from "next/link"
 import { useEffect } from "react"
 import { GalleryUpload } from "@/components/ui/gallery-upload"
 import { Skeleton } from "@/components/ui/skeleton"
+import { CoordinateMapPicker } from "@/components/ui/coordinate-map-picker"
 
 const formSchema = z.object({
   images: z.array(z.string()).optional(),
@@ -49,7 +50,7 @@ const formSchema = z.object({
   longitude: z.string().optional(),
   priceLevel: z.string().optional(),
   nightlyPrice: z.string().optional(),
-  status: z.enum(["active", "inactive", "pending", "suspended"]),
+  status: z.enum(["active", "inactive", "pending", "suspended", "rejected"]),
   contactInfo: z.object({
       phone: z.string().optional(),
       email: z.string().email("Geçerli bir e-posta giriniz").optional().or(z.literal("")),
@@ -75,6 +76,45 @@ const COMMON_FEATURES = [
     { id: "wheelchair_accessible", label: "Engelli Erişimi" },
     { id: "family_friendly", label: "Aile Dostu" },
 ];
+
+const DEFAULT_COORDS = { lat: 39.0, lng: 35.0 };
+const TYPE_OPTIONS = [
+  { value: "hotel", label: "Otel" },
+  { value: "restaurant", label: "Restoran" },
+  { value: "cafe", label: "Kafe" },
+  { value: "activity", label: "Aktivite" },
+  { value: "attraction", label: "Gezi Noktası" },
+  { value: "transport", label: "Ulaşım" },
+];
+const PRICE_LEVEL_OPTIONS = ["budget", "moderate", "expensive", "luxury"];
+const STATUS_OPTIONS = ["active", "pending", "suspended", "inactive", "rejected"];
+
+function parseLocationInput(input: unknown): { lat: string; lng: string } {
+  if (!input) return { lat: "", lng: "" };
+
+  let value = input as any;
+  if (typeof input === "string") {
+    try {
+      value = JSON.parse(input);
+    } catch {
+      return { lat: "", lng: "" };
+    }
+  }
+
+  const directLat = Number(value?.lat);
+  const directLng = Number(value?.lng);
+  if (!Number.isNaN(directLat) && !Number.isNaN(directLng)) {
+    return { lat: String(directLat), lng: String(directLng) };
+  }
+
+  const coordLng = Number(value?.coordinates?.[0]);
+  const coordLat = Number(value?.coordinates?.[1]);
+  if (!Number.isNaN(coordLat) && !Number.isNaN(coordLng)) {
+    return { lat: String(coordLat), lng: String(coordLng) };
+  }
+
+  return { lat: "", lng: "" };
+}
 
 export default function EditPlacePage() {
   const router = useRouter()
@@ -119,21 +159,40 @@ export default function EditPlacePage() {
 
   useEffect(() => {
     if (place) {
+      const coords = parseLocationInput(place.location);
+      const normalizedType = TYPE_OPTIONS.some((opt) => opt.value === place.type)
+        ? place.type
+        : "activity";
+      const normalizedStatus: z.infer<typeof formSchema>["status"] =
+        STATUS_OPTIONS.includes(place.status)
+          ? (place.status as z.infer<typeof formSchema>["status"])
+          : "pending";
+      const normalizedPriceLevel = PRICE_LEVEL_OPTIONS.includes(place.priceLevel)
+        ? place.priceLevel
+        : "";
+      const matchedCategoryId =
+        place.categoryId ||
+        categories?.find(
+          (cat) =>
+            cat.name.toLowerCase() === (place.category || "").toLowerCase() ||
+            cat.slug.toLowerCase() === (place.categorySlug || "").toLowerCase(),
+        )?.id ||
+        "";
       form.reset({
         name: place.name,
-        type: place.type,
+        type: normalizedType,
         category: place.category,
-        categoryId: place.categoryId || "", // Set categoryId if available
+        categoryId: matchedCategoryId,
         description: place.description,
         shortDescription: place.shortDescription || "",
         address: place.address,
         city: place.city,
         district: place.district,
-        latitude: place.location?.coordinates?.[1]?.toString() || "",
-        longitude: place.location?.coordinates?.[0]?.toString() || "",
-        priceLevel: place.priceLevel?.toString() || "",
+        latitude: coords.lat,
+        longitude: coords.lng,
+        priceLevel: normalizedPriceLevel,
         nightlyPrice: place.nightlyPrice || "",
-        status: place.status,
+        status: normalizedStatus,
         images: place.images || [],
         contactInfo: {
             phone: place.contactInfo?.phone || "",
@@ -143,12 +202,19 @@ export default function EditPlacePage() {
         features: place.features || [],
       })
     }
-  }, [place, form])
+  }, [place, form, categories])
 
   function onSubmit(values: z.infer<typeof formSchema>) {
+    const parsedLat = Number(values.latitude);
+    const parsedLng = Number(values.longitude);
+    const hasValidCoordinates =
+      !Number.isNaN(parsedLat) && !Number.isNaN(parsedLng);
+
     const apiData = {
         ...values,
-        location: values.latitude && values.longitude ? { type: "Point", coordinates: [parseFloat(values.longitude), parseFloat(values.latitude)] } : undefined,
+        location: hasValidCoordinates
+          ? { lat: parsedLat, lng: parsedLng }
+          : undefined,
         priceLevel: values.priceLevel || undefined,
         category: categories?.find(c => c.id === values.categoryId)?.name || values.category || "", // Sync category name
     }
@@ -181,6 +247,33 @@ export default function EditPlacePage() {
        </div>
     )
   }
+
+  const latitudeText = form.watch("latitude");
+  const longitudeText = form.watch("longitude");
+  const selectedCategoryId = form.watch("categoryId");
+  const selectedCity = form.watch("city");
+  const selectedDistrict = form.watch("district");
+  const parsedLatitude = latitudeText ? Number(latitudeText) : Number.NaN;
+  const parsedLongitude = longitudeText ? Number(longitudeText) : Number.NaN;
+  const mapLatitude = Number.isNaN(parsedLatitude)
+    ? DEFAULT_COORDS.lat
+    : parsedLatitude;
+  const mapLongitude = Number.isNaN(parsedLongitude)
+    ? DEFAULT_COORDS.lng
+    : parsedLongitude;
+  const hasCurrentCategoryInOptions = Boolean(
+    selectedCategoryId &&
+      categories?.some((cat) => cat.id === selectedCategoryId),
+  );
+  const normalizedCityValue = selectedCity || "";
+  const normalizedDistrictValue = selectedDistrict || "";
+  const hasCurrentCityInOptions = Boolean(
+    normalizedCityValue && cities?.some((city) => city.name === normalizedCityValue),
+  );
+  const hasCurrentDistrictInOptions = Boolean(
+    normalizedDistrictValue &&
+      districts?.some((districtName) => districtName === normalizedDistrictValue),
+  );
 
   return (
     <div className="flex-1 space-y-4 p-8 pt-6">
@@ -244,13 +337,25 @@ export default function EditPlacePage() {
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>Tip</FormLabel>
-                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                        <Select
+                                          key={`type-${field.value ?? "empty"}`}
+                                          name={field.name}
+                                          onValueChange={field.onChange}
+                                          value={field.value || ""}
+                                        >
                                             <FormControl><SelectTrigger><SelectValue placeholder="Seçiniz" /></SelectTrigger></FormControl>
                                             <SelectContent>
-                                                <SelectItem value="hotel">Otel</SelectItem>
-                                                <SelectItem value="restaurant">Restoran</SelectItem>
-                                                <SelectItem value="activity">Aktivite</SelectItem>
-                                                <SelectItem value="museum">Müze</SelectItem>
+                                                {field.value &&
+                                                  !TYPE_OPTIONS.some((option) => option.value === field.value) && (
+                                                  <SelectItem value={field.value}>
+                                                    {field.value}
+                                                  </SelectItem>
+                                                )}
+                                                {TYPE_OPTIONS.map((option) => (
+                                                  <SelectItem key={option.value} value={option.value}>
+                                                    {option.label}
+                                                  </SelectItem>
+                                                ))}
                                             </SelectContent>
                                         </Select>
                                         <FormMessage />
@@ -263,13 +368,25 @@ export default function EditPlacePage() {
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>Durum</FormLabel>
-                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                        <Select
+                                          key={`status-${field.value ?? "empty"}`}
+                                          name={field.name}
+                                          onValueChange={field.onChange}
+                                          value={field.value || ""}
+                                        >
                                             <FormControl><SelectTrigger><SelectValue placeholder="Seçiniz" /></SelectTrigger></FormControl>
                                             <SelectContent>
+                                                {field.value &&
+                                                  !STATUS_OPTIONS.includes(field.value) && (
+                                                  <SelectItem value={field.value}>
+                                                    {field.value}
+                                                  </SelectItem>
+                                                )}
                                                 <SelectItem value="active">Aktif</SelectItem>
                                                 <SelectItem value="pending">Beklemede</SelectItem>
                                                 <SelectItem value="suspended">Askıya Alınmış</SelectItem>
                                                 <SelectItem value="inactive">Pasif</SelectItem>
+                                                <SelectItem value="rejected">Reddedildi</SelectItem>
                                             </SelectContent>
                                         </Select>
                                         <FormMessage />
@@ -280,17 +397,27 @@ export default function EditPlacePage() {
                         <FormField
                             control={form.control}
                             name="categoryId"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Kategori</FormLabel>
-                                    <Select onValueChange={field.onChange} value={field.value || ""}>
-                                        <FormControl><SelectTrigger><SelectValue placeholder="Kategori Seçiniz" /></SelectTrigger></FormControl>
-                                        <SelectContent>
-                                            {categories?.map((cat) => (
-                                                <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Kategori</FormLabel>
+                                        <Select
+                                          key={`category-${field.value ?? "empty"}-${categories?.length ?? 0}`}
+                                          name={field.name}
+                                          onValueChange={field.onChange}
+                                          value={field.value || ""}
+                                        >
+                                            <FormControl><SelectTrigger><SelectValue placeholder="Kategori Seçiniz" /></SelectTrigger></FormControl>
+                                            <SelectContent>
+                                                {field.value && !hasCurrentCategoryInOptions && (
+                                                  <SelectItem value={field.value}>
+                                                    {place.category || "Mevcut Kategori"}
+                                                  </SelectItem>
+                                                )}
+                                                {categories?.map((cat) => (
+                                                    <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
                                     <FormMessage />
                                 </FormItem>
                             )}
@@ -388,19 +515,29 @@ export default function EditPlacePage() {
                                 <FormField
                                     control={form.control}
                                     name="city"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>Şehir</FormLabel>
-                                            <Select onValueChange={(val) => {
-                                                field.onChange(val)
-                                                form.setValue("district", "") // Reset district when city changes
-                                            }} value={field.value}>
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Şehir</FormLabel>
+                                            <Select
+                                                key={`city-${field.value ?? "empty"}-${cities?.length ?? 0}`}
+                                                name={field.name}
+                                                onValueChange={(val) => {
+                                                    field.onChange(val)
+                                                    form.setValue("district", "") // Reset district when city changes
+                                                }}
+                                                value={field.value || ""}
+                                            >
                                                 <FormControl>
                                                     <SelectTrigger>
                                                         <SelectValue placeholder="Şehir seçin" />
                                                     </SelectTrigger>
                                                 </FormControl>
                                                 <SelectContent>
+                                                    {field.value && !hasCurrentCityInOptions && (
+                                                        <SelectItem value={field.value}>
+                                                            {field.value}
+                                                        </SelectItem>
+                                                    )}
                                                     {cities?.map((city) => (
                                                         <SelectItem key={city.id} value={city.name}>
                                                             {city.name}
@@ -415,16 +552,27 @@ export default function EditPlacePage() {
                                 <FormField
                                     control={form.control}
                                     name="district"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>İlçe</FormLabel>
-                                            <Select onValueChange={field.onChange} value={field.value} disabled={!watchedCity}>
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>İlçe</FormLabel>
+                                            <Select
+                                                key={`district-${field.value ?? "empty"}-${normalizedCityValue}-${districts?.length ?? 0}`}
+                                                name={field.name}
+                                                onValueChange={field.onChange}
+                                                value={field.value || ""}
+                                                disabled={!normalizedCityValue}
+                                            >
                                                 <FormControl>
                                                     <SelectTrigger>
-                                                        <SelectValue placeholder={watchedCity ? "İlçe seçin" : "Önce şehir seçin"} />
+                                                        <SelectValue placeholder={normalizedCityValue ? "İlçe seçin" : "Önce şehir seçin"} />
                                                     </SelectTrigger>
                                                 </FormControl>
                                                 <SelectContent>
+                                                    {field.value && !hasCurrentDistrictInOptions && (
+                                                        <SelectItem value={field.value}>
+                                                            {field.value}
+                                                        </SelectItem>
+                                                    )}
                                                     {districts?.map((district) => (
                                                         <SelectItem key={district} value={district}>
                                                             {district}
@@ -437,6 +585,25 @@ export default function EditPlacePage() {
                                     )}
                                 />
                             </div>
+                           <div className="space-y-3">
+                                <div className="text-sm text-muted-foreground">
+                                  Harita üzerinden konumu tıklayarak pin bırakın.
+                                </div>
+                                <CoordinateMapPicker
+                                  latitude={mapLatitude}
+                                  longitude={mapLongitude}
+                                  onChange={({ lat, lng }) => {
+                                    form.setValue("latitude", String(lat), {
+                                      shouldDirty: true,
+                                      shouldValidate: true,
+                                    })
+                                    form.setValue("longitude", String(lng), {
+                                      shouldDirty: true,
+                                      shouldValidate: true,
+                                    })
+                                  }}
+                                />
+                           </div>
                            <div className="grid grid-cols-2 gap-4">
                                 <FormField
                                     control={form.control}
@@ -476,7 +643,12 @@ export default function EditPlacePage() {
                                     render={({ field }) => (
                                         <FormItem>
                                             <FormLabel>Fiyat Seviyesi (1-4)</FormLabel>
-                                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                            <Select
+                                              key={`priceLevel-${field.value ?? "empty"}`}
+                                              name={field.name}
+                                              onValueChange={field.onChange}
+                                              value={field.value}
+                                            >
                                             <FormControl><SelectTrigger><SelectValue placeholder="Seviye" /></SelectTrigger></FormControl>
                                             <SelectContent>
                                                 <SelectItem value="budget">$ (Ucuz)</SelectItem>

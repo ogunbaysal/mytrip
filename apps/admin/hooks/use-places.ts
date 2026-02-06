@@ -21,7 +21,7 @@ export type Place = {
   reviewCount: number;
   priceLevel: string;
   nightlyPrice: string;
-  status: "active" | "inactive" | "pending" | "suspended";
+  status: "active" | "inactive" | "pending" | "suspended" | "rejected";
   verified: boolean;
   featured: boolean;
   views: number;
@@ -172,14 +172,23 @@ export function useTogglePlaceFeature() {
 export function useTogglePlaceVerify() {
     const queryClient = useQueryClient();
     return useMutation({
-      mutationFn: async (placeId: string) => {
+      mutationFn: async (
+        payload: string | { placeId: string; verified?: boolean },
+      ) => {
+        const placeId = typeof payload === "string" ? payload : payload.placeId;
+        const verified =
+          typeof payload === "string" ? undefined : payload.verified;
         return apiFetch<{ place: Place }>(`/api/admin/places/${placeId}/verify`, {
           method: "PATCH",
+          body: JSON.stringify(
+            verified === undefined ? {} : { verified },
+          ),
         });
       },
       onSuccess: (data, variables) => {
+          const placeId = typeof variables === "string" ? variables : variables.placeId;
           queryClient.invalidateQueries({ queryKey: ["places"] });
-          queryClient.invalidateQueries({ queryKey: ["places", variables] });
+          queryClient.invalidateQueries({ queryKey: ["places", placeId] });
       },
     });
 }

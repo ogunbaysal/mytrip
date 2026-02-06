@@ -2,6 +2,7 @@
 
 import { PlacesTable } from "@/components/tables/places-table"
 import { usePlaces } from "@/hooks/use-places"
+import { useCategories } from "@/hooks/use-categories"
 import { useState } from "react"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -12,14 +13,16 @@ import { Plus } from "lucide-react"
 export default function PlacesPage() {
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState("")
-  const [type, setType] = useState("")
+  const [category, setCategory] = useState("")
   const [status, setStatus] = useState("")
+  const { data: categories } = useCategories()
+  const hasActiveFilters = Boolean(search || category || status)
 
   const { data, isLoading } = usePlaces({
     page: page.toString(),
     limit: "10",
     search,
-    type,
+    category,
     status
   })
 
@@ -40,24 +43,39 @@ export default function PlacesPage() {
         <Input 
           placeholder="Mekan ara..." 
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => {
+            setSearch(e.target.value)
+            setPage(1)
+          }}
           className="max-w-sm"
         />
-        <Select value={type} onValueChange={(v) => setType(v === "all" ? "" : v)}>
+        <Select
+          value={category || "all"}
+          onValueChange={(v) => {
+            setCategory(v === "all" ? "" : v)
+            setPage(1)
+          }}
+        >
           <SelectTrigger className="w-[180px]">
-             <SelectValue placeholder="Tip Filtrele" />
+             <SelectValue placeholder="Kategori Filtrele" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Tüm Tipler</SelectItem>
-            <SelectItem value="hotel">Otel / Konaklama</SelectItem>
-            <SelectItem value="restaurant">Restoran</SelectItem>
-            <SelectItem value="activity">Aktivite</SelectItem>
-            <SelectItem value="historical">Tarihi Yer</SelectItem>
-            <SelectItem value="museum">Müze</SelectItem>
+            <SelectItem value="all">Tüm Kategoriler</SelectItem>
+            {categories?.map((cat) => (
+              <SelectItem key={cat.id} value={cat.id}>
+                {cat.name}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
 
-        <Select value={status} onValueChange={(v) => setStatus(v === "all" ? "" : v)}>
+        <Select
+          value={status || "all"}
+          onValueChange={(v) => {
+            setStatus(v === "all" ? "" : v)
+            setPage(1)
+          }}
+        >
           <SelectTrigger className="w-[180px]">
              <SelectValue placeholder="Durum Filtrele" />
           </SelectTrigger>
@@ -71,10 +89,15 @@ export default function PlacesPage() {
         </Select>
 
         {/* Reset Filters */}
-        {(search || type || status) && (
+        {hasActiveFilters && (
            <Button 
              variant="ghost" 
-             onClick={() => { setSearch(""); setType(""); setStatus(""); }}
+             onClick={() => {
+               setSearch("")
+               setCategory("")
+               setStatus("")
+               setPage(1)
+             }}
            >
              Sıfırla
            </Button>

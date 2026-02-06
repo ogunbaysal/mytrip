@@ -3,7 +3,44 @@
 import { useEffect, useState } from "react"
 import { SubscriptionsTable } from "@/components/tables/subscriptions-table"
 import { Subscription } from "@/types/subscriptions"
-import { toast } from "sonner" 
+import { toast } from "sonner"
+
+interface ApiSubscription {
+  id: string
+  userId: string
+  planId: string
+  status: Subscription["status"]
+  startDate: string
+  endDate: string
+  nextBillingDate?: string | null
+  cancelledAt?: string | null
+  trialEndsAt?: string | null
+  price: number | string
+  currency: Subscription["currency"]
+  billingCycle: Subscription["billingCycle"]
+  usage?: {
+    currentPlaces?: number
+    currentBlogs?: number
+  }
+  paymentMethod?: {
+    type?: string
+    lastFour?: string
+    brand?: string
+  }
+  user?: {
+    id?: string
+    name?: string
+    email?: string
+  }
+  plan?: {
+    id?: string
+    name?: string
+    maxPlaces?: number
+    maxBlogs?: number
+  }
+  createdAt?: string
+  updatedAt?: string
+}
 
 export default function SubscriptionsPage() {
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([])
@@ -18,33 +55,49 @@ export default function SubscriptionsPage() {
         
         const data = await res.json();
         if (data.subscriptions) {
-           const mappedSubs: Subscription[] = data.subscriptions.map((sub: any) => ({
-             id: sub.id,
-             userId: sub.user?.id || "",
-             planId: sub.plan?.id || "",
-             status: sub.status,
-             startDate: new Date(sub.startDate),
-             endDate: new Date(sub.endDate),
-             
-             // Flattened fields
-             ownerName: sub.user?.name || "Unknown",
-             ownerEmail: sub.user?.email || "Unknown",
-             planName: sub.plan?.name || "Unknown",
-             ownerId: sub.user?.id || "",
-
-             // Defaults for fields possibly missing from this specific API endpoint
-             price: sub.plan?.price ? parseFloat(sub.plan.price) : 0,
-             currency: "TRY",
-             billingCycle: "monthly",
-             features: [],
-             limits: { maxPlaces: 0, maxBlogs: 0, maxPhotos: 0, featuredListing: false, analyticsAccess: false, prioritySupport: false },
-             usage: { currentPlaces: 0, currentBlogs: 0, currentPhotos: 0, featuredListingsUsed: 0 },
-             paymentMethod: { type: "unknown" },
-             paymentHistory: [],
-             createdAt: sub.createdAt ? new Date(sub.createdAt) : new Date(),
-             updatedAt: sub.updatedAt ? new Date(sub.updatedAt) : new Date(),
-           }));
-           setSubscriptions(mappedSubs);
+          const mappedSubs: Subscription[] = data.subscriptions.map((sub: ApiSubscription) => ({
+            id: sub.id,
+            userId: sub.userId || sub.user?.id || "",
+            planId: sub.planId || sub.plan?.id || "",
+            status: sub.status,
+            startDate: new Date(sub.startDate),
+            endDate: new Date(sub.endDate),
+            nextBillingDate: sub.nextBillingDate ? new Date(sub.nextBillingDate) : undefined,
+            cancelledAt: sub.cancelledAt ? new Date(sub.cancelledAt) : undefined,
+            trialEndsAt: sub.trialEndsAt ? new Date(sub.trialEndsAt) : undefined,
+            ownerName: sub.user?.name || "Bilinmeyen Kullanıcı",
+            ownerEmail: sub.user?.email || "unknown@example.com",
+            planName: sub.plan?.name || "Bilinmeyen Plan",
+            ownerId: sub.user?.id || sub.userId || "",
+            price: typeof sub.price === "number" ? sub.price : parseFloat(sub.price || "0"),
+            currency: sub.currency || "TRY",
+            billingCycle: "yearly",
+            features: [],
+            limits: {
+              maxPlaces: sub.plan?.maxPlaces ?? 0,
+              maxBlogs: sub.plan?.maxBlogs ?? 0,
+            },
+            usage: {
+              currentPlaces: sub.usage?.currentPlaces ?? 0,
+              currentBlogs: sub.usage?.currentBlogs ?? 0,
+              currentPhotos: 0,
+              featuredListingsUsed: 0,
+            },
+            paymentMethod: {
+              type:
+                sub.paymentMethod?.type === "credit_card" ||
+                sub.paymentMethod?.type === "bank_transfer" ||
+                sub.paymentMethod?.type === "paypal"
+                  ? sub.paymentMethod.type
+                  : "unknown",
+              lastFour: sub.paymentMethod?.lastFour,
+              brand: sub.paymentMethod?.brand,
+            },
+            paymentHistory: [],
+            createdAt: sub.createdAt ? new Date(sub.createdAt) : undefined,
+            updatedAt: sub.updatedAt ? new Date(sub.updatedAt) : undefined,
+          }))
+          setSubscriptions(mappedSubs)
         }
       } catch (error) {
         console.error("Failed to fetch subscriptions:", error)

@@ -1,9 +1,74 @@
 import { Hono } from "hono";
 import { db } from "../db/index.ts";
-import { place, user, review, placeCategory } from "../db/schemas/index.ts";
-import { eq, desc, ilike, sql, and, gt } from "drizzle-orm";
+import {
+  amenity,
+  district,
+  place,
+  placeAmenity,
+  placeCategory,
+  province,
+  review,
+  user,
+} from "../db/schemas/index.ts";
+import { and, asc, desc, eq, gt, inArray, sql } from "drizzle-orm";
+import {
+  derivePlaceTypeFromCategorySlug,
+  hydratePlaceMediaAndAmenities,
+  resolveCategorySlugsForType,
+} from "../lib/place-relations.ts";
 
 const app = new Hono();
+
+type PlaceRow = {
+  id: string;
+  slug: string;
+  name: string;
+  categoryId: string | null;
+  description: string | null;
+  shortDescription: string | null;
+  address: string | null;
+  cityId: string | null;
+  districtId: string | null;
+  location: string | null;
+  contactInfo: string | null;
+  rating: string | null;
+  reviewCount: number;
+  priceLevel: "budget" | "moderate" | "expensive" | "luxury" | null;
+  nightlyPrice: string | null;
+  verified: boolean;
+  featured: boolean;
+  ownerId: string | null;
+  views: number;
+  bookingCount: number;
+  openingHours: string | null;
+  checkInInfo: string | null;
+  checkOutInfo: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  categoryName: string | null;
+  categorySlug: string | null;
+  cityName: string | null;
+  districtName: string | null;
+};
+
+function toLegacyPlace(row: PlaceRow) {
+  return {
+    ...row,
+    type: derivePlaceTypeFromCategorySlug(row.categorySlug),
+    category: row.categoryName ?? "",
+    city: row.cityName ?? "",
+    district: row.districtName ?? "",
+  };
+}
+
+const TYPE_NAMES: Record<string, string> = {
+  hotel: "Hotels",
+  restaurant: "Restaurants",
+  cafe: "Cafes",
+  activity: "Activities",
+  attraction: "Attractions",
+  transport: "Transportation",
+};
 
 /**
  * Get all places with filtering and pagination
@@ -18,7 +83,7 @@ app.get("/", async (c) => {
       type = "",
       category = "",
       city = "",
-      district = "",
+      district: districtQuery = "",
       priceLevel = "",
       featured = "",
       verified = "",
@@ -33,29 +98,41 @@ app.get("/", async (c) => {
     const offset = (parseInt(page) - 1) * parseInt(limit);
     const limitInt = parseInt(limit);
 
-    // Build where conditions for public API (only active places)
-    const conditions = [eq(place.status, "active")];
+    const conditions: any[] = [eq(place.status, "active")];
 
     if (search) {
       conditions.push(
-        sql`(LOWER(${place.name}) ILIKE ${"%" + search.toLowerCase() + "%"} OR LOWER(${place.description}) ILIKE ${"%" + search.toLowerCase() + "%"} OR LOWER(${place.shortDescription}) ILIKE ${"%" + search.toLowerCase() + "%"} OR LOWER(${place.category}) ILIKE ${"%" + search.toLowerCase() + "%"} OR LOWER(${place.address}) ILIKE ${"%" + search.toLowerCase() + "%"})`,
+        sql`(
+          LOWER(${place.name}) ILIKE ${"%" + search.toLowerCase() + "%"}
+          OR LOWER(COALESCE(${place.description}, '')) ILIKE ${"%" + search.toLowerCase() + "%"}
+          OR LOWER(COALESCE(${place.shortDescription}, '')) ILIKE ${"%" + search.toLowerCase() + "%"}
+          OR LOWER(COALESCE(${placeCategory.name}, '')) ILIKE ${"%" + search.toLowerCase() + "%"}
+          OR LOWER(COALESCE(${place.address}, '')) ILIKE ${"%" + search.toLowerCase() + "%"}
+        )`,
       );
     }
 
     if (type) {
-      conditions.push(eq(place.type, type as any));
+      const slugs = resolveCategorySlugsForType(type);
+      if (slugs.length > 0) {
+        conditions.push(inArray(placeCategory.slug, slugs));
+      }
     }
 
     if (category) {
-      conditions.push(ilike(place.category, `%${category}%`));
+      conditions.push(
+        sql`LOWER(COALESCE(${placeCategory.name}, '')) ILIKE ${"%" + category.toLowerCase() + "%"} OR LOWER(COALESCE(${placeCategory.slug}, '')) ILIKE ${"%" + category.toLowerCase() + "%"}`,
+      );
     }
 
     if (city) {
-      conditions.push(ilike(place.city, `%${city}%`));
+      conditions.push(sql`LOWER(COALESCE(${province.name}, '')) ILIKE ${"%" + city.toLowerCase() + "%"}`);
     }
 
-    if (district) {
-      conditions.push(ilike(place.district, `%${district}%`));
+    if (districtQuery) {
+      conditions.push(
+        sql`LOWER(COALESCE(${district.name}, '')) ILIKE ${"%" + districtQuery.toLowerCase() + "%"}`,
+      );
     }
 
     if (priceLevel) {
@@ -70,49 +147,42 @@ app.get("/", async (c) => {
       conditions.push(eq(place.verified, verified === "true"));
     }
 
-    // Price range filtering
     if (priceMin) {
       const minPrice = parseFloat(priceMin);
       if (!isNaN(minPrice)) {
-        conditions.push(
-          sql`CAST(${place.nightlyPrice} AS NUMERIC) >= ${minPrice}`,
-        );
+        conditions.push(sql`CAST(${place.nightlyPrice} AS NUMERIC) >= ${minPrice}`);
       }
     }
 
     if (priceMax) {
       const maxPrice = parseFloat(priceMax);
       if (!isNaN(maxPrice)) {
-        conditions.push(
-          sql`CAST(${place.nightlyPrice} AS NUMERIC) <= ${maxPrice}`,
-        );
+        conditions.push(sql`CAST(${place.nightlyPrice} AS NUMERIC) <= ${maxPrice}`);
       }
     }
 
-    // Amenities filtering - check if place.features JSON contains all requested amenities
     if (amenities) {
       const amenityList = amenities
         .split(",")
-        .map((a) => a.trim())
+        .map((item) => item.trim().toLowerCase())
         .filter(Boolean);
-      for (const amenity of amenityList) {
-        conditions.push(
-          sql`${place.features}::text ILIKE ${"%" + amenity + "%"}`,
-        );
+
+      for (const amenitySlug of amenityList) {
+        conditions.push(sql`
+          EXISTS (
+            SELECT 1
+            FROM place_amenity pa
+            INNER JOIN amenity a ON a.id = pa.amenity_id
+            WHERE pa.place_id = ${place.id}
+              AND a.slug = ${amenitySlug}
+          )
+        `);
       }
     }
 
-    // Bounds filtering for map - format: minLat,minLng,maxLat,maxLng
     if (bounds) {
-      const [minLat, minLng, maxLat, maxLng] = bounds
-        .split(",")
-        .map(parseFloat);
-      if (
-        !isNaN(minLat) &&
-        !isNaN(minLng) &&
-        !isNaN(maxLat) &&
-        !isNaN(maxLng)
-      ) {
+      const [minLat, minLng, maxLat, maxLng] = bounds.split(",").map(parseFloat);
+      if (!isNaN(minLat) && !isNaN(minLng) && !isNaN(maxLat) && !isNaN(maxLng)) {
         conditions.push(
           sql`(${place.location}::json->>'lat')::numeric BETWEEN ${minLat} AND ${maxLat}`,
         );
@@ -122,9 +192,8 @@ app.get("/", async (c) => {
       }
     }
 
-    const whereClause = conditions.length > 0 ? and(...conditions) : sql`1=1`;
+    const whereClause = and(...conditions);
 
-    // Build order by clause
     const orderByColumn =
       {
         name: place.name,
@@ -139,43 +208,58 @@ app.get("/", async (c) => {
 
     const orderDirection = sortOrder === "asc" ? sql`ASC` : sql`DESC`;
 
-    // Get total count
-    const [{ count }] = await db
-      .select({ count: sql`COUNT(*)::int` })
+    const countRows = await db
+      .select({ count: sql<number>`COUNT(*)::int` })
       .from(place)
+      .leftJoin(placeCategory, eq(place.categoryId, placeCategory.id))
+      .leftJoin(province, eq(place.cityId, province.id))
+      .leftJoin(district, eq(place.districtId, district.id))
       .where(whereClause);
 
-    // Get places with basic owner info and features
-    const places = await db
+    const count = countRows[0]?.count ?? 0;
+
+    const rows = await db
       .select({
         id: place.id,
         slug: place.slug,
         name: place.name,
-        type: place.type,
-        category: place.category,
+        categoryId: place.categoryId,
+        description: place.description,
         shortDescription: place.shortDescription,
         address: place.address,
-        city: place.city,
-        district: place.district,
+        cityId: place.cityId,
+        districtId: place.districtId,
         location: place.location,
+        contactInfo: place.contactInfo,
         rating: place.rating,
         reviewCount: place.reviewCount,
         priceLevel: place.priceLevel,
         nightlyPrice: place.nightlyPrice,
-        images: place.images,
-        features: place.features,
         verified: place.verified,
         featured: place.featured,
         ownerId: place.ownerId,
         views: place.views,
         bookingCount: place.bookingCount,
+        openingHours: place.openingHours,
+        checkInInfo: place.checkInInfo,
+        checkOutInfo: place.checkOutInfo,
         createdAt: place.createdAt,
+        updatedAt: place.updatedAt,
+        categoryName: placeCategory.name,
+        categorySlug: placeCategory.slug,
+        cityName: province.name,
+        districtName: district.name,
       })
       .from(place)
+      .leftJoin(placeCategory, eq(place.categoryId, placeCategory.id))
+      .leftJoin(province, eq(place.cityId, province.id))
+      .leftJoin(district, eq(place.districtId, district.id))
       .where(whereClause)
       .orderBy(sql`${orderByColumn} ${orderDirection}`)
       .limit(limitInt)
       .offset(offset);
+
+    const places = await hydratePlaceMediaAndAmenities(rows.map((row) => toLegacyPlace(row as PlaceRow)));
 
     return c.json({
       places,
@@ -190,6 +274,7 @@ app.get("/", async (c) => {
         type,
         category,
         city,
+        district: districtQuery,
         priceLevel,
         featured,
         verified,
@@ -220,38 +305,58 @@ app.get("/featured", async (c) => {
     const { limit = "12", type = "" } = c.req.query();
     const limitInt = parseInt(limit);
 
-    const conditions = [eq(place.status, "active"), eq(place.featured, true)];
+    const conditions: any[] = [eq(place.status, "active"), eq(place.featured, true)];
 
     if (type) {
-      conditions.push(eq(place.type, type as any));
+      const slugs = resolveCategorySlugsForType(type);
+      if (slugs.length > 0) {
+        conditions.push(inArray(placeCategory.slug, slugs));
+      }
     }
 
-    const whereClause = conditions.length > 0 ? and(...conditions) : sql`1=1`;
-
-    const featuredPlaces = await db
+    const rows = await db
       .select({
         id: place.id,
         slug: place.slug,
         name: place.name,
-        type: place.type,
-        category: place.category,
+        categoryId: place.categoryId,
+        description: place.description,
         shortDescription: place.shortDescription,
         address: place.address,
-        city: place.city,
+        cityId: place.cityId,
+        districtId: place.districtId,
         location: place.location,
+        contactInfo: place.contactInfo,
         rating: place.rating,
         reviewCount: place.reviewCount,
         priceLevel: place.priceLevel,
         nightlyPrice: place.nightlyPrice,
-        images: place.images,
         verified: place.verified,
+        featured: place.featured,
+        ownerId: place.ownerId,
         views: place.views,
         bookingCount: place.bookingCount,
+        openingHours: place.openingHours,
+        checkInInfo: place.checkInInfo,
+        checkOutInfo: place.checkOutInfo,
+        createdAt: place.createdAt,
+        updatedAt: place.updatedAt,
+        categoryName: placeCategory.name,
+        categorySlug: placeCategory.slug,
+        cityName: province.name,
+        districtName: district.name,
       })
       .from(place)
-      .where(whereClause)
+      .leftJoin(placeCategory, eq(place.categoryId, placeCategory.id))
+      .leftJoin(province, eq(place.cityId, province.id))
+      .leftJoin(district, eq(place.districtId, district.id))
+      .where(and(...conditions))
       .orderBy(desc(place.featured), desc(place.rating))
       .limit(limitInt);
+
+    const featuredPlaces = await hydratePlaceMediaAndAmenities(
+      rows.map((row) => toLegacyPlace(row as PlaceRow)),
+    );
 
     return c.json({
       places: featuredPlaces,
@@ -278,42 +383,58 @@ app.get("/popular", async (c) => {
     const { limit = "12", type = "" } = c.req.query();
     const limitInt = parseInt(limit);
 
-    const conditions = [eq(place.status, "active"), gt(place.reviewCount, 0)];
+    const conditions: any[] = [eq(place.status, "active"), gt(place.reviewCount, 0)];
 
     if (type) {
-      conditions.push(eq(place.type, type as any));
+      const slugs = resolveCategorySlugsForType(type);
+      if (slugs.length > 0) {
+        conditions.push(inArray(placeCategory.slug, slugs));
+      }
     }
 
-    const whereClause = conditions.length > 0 ? and(...conditions) : sql`1=1`;
-
-    const popularPlaces = await db
+    const rows = await db
       .select({
         id: place.id,
         slug: place.slug,
         name: place.name,
-        type: place.type,
-        category: place.category,
+        categoryId: place.categoryId,
+        description: place.description,
         shortDescription: place.shortDescription,
         address: place.address,
-        city: place.city,
+        cityId: place.cityId,
+        districtId: place.districtId,
         location: place.location,
+        contactInfo: place.contactInfo,
         rating: place.rating,
         reviewCount: place.reviewCount,
         priceLevel: place.priceLevel,
         nightlyPrice: place.nightlyPrice,
-        images: place.images,
         verified: place.verified,
+        featured: place.featured,
+        ownerId: place.ownerId,
         views: place.views,
         bookingCount: place.bookingCount,
+        openingHours: place.openingHours,
+        checkInInfo: place.checkInInfo,
+        checkOutInfo: place.checkOutInfo,
+        createdAt: place.createdAt,
+        updatedAt: place.updatedAt,
+        categoryName: placeCategory.name,
+        categorySlug: placeCategory.slug,
+        cityName: province.name,
+        districtName: district.name,
       })
       .from(place)
-      .where(whereClause)
-      .orderBy(
-        desc(place.rating),
-        desc(place.reviewCount),
-        desc(place.bookingCount),
-      )
+      .leftJoin(placeCategory, eq(place.categoryId, placeCategory.id))
+      .leftJoin(province, eq(place.cityId, province.id))
+      .leftJoin(district, eq(place.districtId, district.id))
+      .where(and(...conditions))
+      .orderBy(desc(place.rating), desc(place.reviewCount), desc(place.bookingCount))
       .limit(limitInt);
+
+    const popularPlaces = await hydratePlaceMediaAndAmenities(
+      rows.map((row) => toLegacyPlace(row as PlaceRow)),
+    );
 
     return c.json({
       places: popularPlaces,
@@ -335,10 +456,6 @@ app.get("/popular", async (c) => {
  * Get place categories
  * GET /places/categories
  */
-/**
- * Get place categories
- * GET /places/categories
- */
 app.get("/categories", async (c) => {
   try {
     const categories = await db
@@ -348,7 +465,7 @@ app.get("/categories", async (c) => {
         slug: placeCategory.slug,
         description: placeCategory.description,
         icon: placeCategory.icon,
-        count: sql`COUNT(${place.id})::int`,
+        count: sql<number>`COUNT(${place.id})::int`,
       })
       .from(placeCategory)
       .leftJoin(
@@ -386,19 +503,20 @@ app.get("/cities", async (c) => {
   try {
     const cities = await db
       .select({
-        city: place.city,
-        count: sql`COUNT(*)::int`,
+        city: province.name,
+        count: sql<number>`COUNT(*)::int`,
       })
       .from(place)
-      .where(and(eq(place.status, "active"), sql`${place.city} IS NOT NULL`))
-      .groupBy(place.city)
+      .innerJoin(province, eq(place.cityId, province.id))
+      .where(eq(place.status, "active"))
+      .groupBy(province.name)
       .orderBy(sql`COUNT(*) DESC`);
 
     return c.json({
-      cities: cities.map((city) => ({
-        name: city.city!,
-        count: Number(city.count),
-        slug: city.city!.toLowerCase().replace(/\s+/g, "-"),
+      cities: cities.map((row) => ({
+        name: row.city,
+        count: Number(row.count),
+        slug: row.city.toLowerCase().replace(/\s+/g, "-"),
       })),
     });
   } catch (error) {
@@ -419,84 +537,23 @@ app.get("/cities", async (c) => {
  */
 app.get("/amenities", async (c) => {
   try {
-    // Get all features from active places
-    const placesWithFeatures = await db
+    const rows = await db
       .select({
-        features: place.features,
+        key: amenity.slug,
+        label: amenity.label,
+        count: sql<number>`COUNT(${placeAmenity.placeId})::int`,
       })
-      .from(place)
-      .where(eq(place.status, "active"));
+      .from(placeAmenity)
+      .innerJoin(amenity, eq(placeAmenity.amenityId, amenity.id))
+      .innerJoin(place, and(eq(placeAmenity.placeId, place.id), eq(place.status, "active")))
+      .groupBy(amenity.slug, amenity.label)
+      .orderBy(desc(sql`COUNT(${placeAmenity.placeId})`), asc(amenity.slug));
 
-    // Count occurrences of each amenity
-    const amenityCounts: Record<string, number> = {};
-
-    for (const p of placesWithFeatures) {
-      if (!p.features) continue;
-
-      let features: string[] = [];
-      try {
-        features =
-          typeof p.features === "string" ? JSON.parse(p.features) : p.features;
-      } catch {
-        continue;
-      }
-
-      for (const feature of features) {
-        amenityCounts[feature] = (amenityCounts[feature] || 0) + 1;
-      }
-    }
-
-    // Turkish translations for common amenities
-    const amenityLabels: Record<string, string> = {
-      wifi: "Wifi",
-      parking: "Otopark",
-      free_parking: "Ücretsiz Otopark",
-      pool: "Havuz",
-      spa: "Spa",
-      gym: "Spor Salonu",
-      restaurant: "Restoran",
-      bar: "Bar",
-      room_service: "Oda Servisi",
-      air_conditioning: "Klima",
-      heating: "Isıtma",
-      sea_view: "Deniz Manzarası",
-      beach_access: "Plaj Erişimi",
-      pet_friendly: "Evcil Hayvan Dostu",
-      wheelchair_accessible: "Engelli Erişimi",
-      family_friendly: "Aile Dostu",
-      kitchen: "Mutfak",
-      washer: "Çamaşır Makinesi",
-      dryer: "Kurutma Makinesi",
-      iron: "Ütü",
-      dedicated_workspace: "Çalışma Alanı",
-      free_cancellation: "Ücretsiz İptal",
-      tv: "TV",
-      balcony: "Balkon",
-      terrace: "Teras",
-      garden: "Bahçe",
-      bbq: "Barbekü",
-      fireplace: "Şömine",
-      safe: "Kasa",
-      minibar: "Minibar",
-      coffee_maker: "Kahve Makinesi",
-      dishwasher: "Bulaşık Makinesi",
-      microwave: "Mikrodalga",
-      elevator: "Asansör",
-      concierge: "Konsiyerj",
-      laundry: "Çamaşırhane",
-      breakfast: "Kahvaltı",
-    };
-
-    // Sort by count and return
-    const amenities = Object.entries(amenityCounts)
-      .sort((a, b) => b[1] - a[1])
-      .map(([key, count]) => ({
-        key,
-        label:
-          amenityLabels[key] ||
-          key.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase()),
-        count,
-      }));
+    const amenities = rows.map((row) => ({
+      key: row.key,
+      label: row.label,
+      count: Number(row.count),
+    }));
 
     return c.json({ amenities });
   } catch (error) {
@@ -517,33 +574,36 @@ app.get("/amenities", async (c) => {
  */
 app.get("/types", async (c) => {
   try {
-    const placeTypes = await db
+    const rows = await db
       .select({
-        type: place.type,
-        count: sql`COUNT(*)::int`,
+        categorySlug: placeCategory.slug,
+        count: sql<number>`COUNT(*)::int`,
       })
       .from(place)
+      .leftJoin(placeCategory, eq(place.categoryId, placeCategory.id))
       .where(eq(place.status, "active"))
-      .groupBy(place.type)
+      .groupBy(placeCategory.slug)
       .orderBy(sql`COUNT(*) DESC`);
 
-    const typeNames = {
-      hotel: "Hotels",
-      restaurant: "Restaurants",
-      cafe: "Cafes",
-      activity: "Activities",
-      attraction: "Attractions",
-      transport: "Transportation",
-    };
+    const countsByType = rows.reduce(
+      (acc, row) => {
+        const type = derivePlaceTypeFromCategorySlug(row.categorySlug);
+        acc[type] = (acc[type] ?? 0) + Number(row.count);
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
 
-    return c.json({
-      types: placeTypes.map((pt) => ({
-        type: pt.type,
-        name: typeNames[pt.type as keyof typeof typeNames] || pt.type,
-        count: Number(pt.count),
-        slug: pt.type.toLowerCase(),
-      })),
-    });
+    const types = Object.entries(countsByType)
+      .sort((a, b) => b[1] - a[1])
+      .map(([type, count]) => ({
+        type,
+        name: TYPE_NAMES[type] || type,
+        count,
+        slug: type.toLowerCase(),
+      }));
+
+    return c.json({ types });
   } catch (error) {
     console.error("Failed to fetch place types:", error);
     return c.json(
@@ -564,40 +624,48 @@ app.get("/:slug", async (c) => {
   try {
     const { slug } = c.req.param();
 
-    const [placeData] = await db
+    const rows = await db
       .select({
         id: place.id,
         slug: place.slug,
         name: place.name,
-        type: place.type,
-        category: place.category,
+        categoryId: place.categoryId,
         description: place.description,
         shortDescription: place.shortDescription,
         address: place.address,
-        city: place.city,
-        district: place.district,
+        cityId: place.cityId,
+        districtId: place.districtId,
         location: place.location,
         contactInfo: place.contactInfo,
         rating: place.rating,
         reviewCount: place.reviewCount,
         priceLevel: place.priceLevel,
         nightlyPrice: place.nightlyPrice,
-        features: place.features,
-        images: place.images,
         verified: place.verified,
         featured: place.featured,
+        ownerId: place.ownerId,
         views: place.views,
         bookingCount: place.bookingCount,
         openingHours: place.openingHours,
         checkInInfo: place.checkInInfo,
         checkOutInfo: place.checkOutInfo,
         createdAt: place.createdAt,
+        updatedAt: place.updatedAt,
+        categoryName: placeCategory.name,
+        categorySlug: placeCategory.slug,
+        cityName: province.name,
+        districtName: district.name,
       })
       .from(place)
+      .leftJoin(placeCategory, eq(place.categoryId, placeCategory.id))
+      .leftJoin(province, eq(place.cityId, province.id))
+      .leftJoin(district, eq(place.districtId, district.id))
       .where(and(eq(place.slug, slug), eq(place.status, "active")))
       .limit(1);
 
-    if (!placeData) {
+    const placeRow = rows[0] as PlaceRow | undefined;
+
+    if (!placeRow) {
       return c.json(
         {
           error: "Place not found",
@@ -607,13 +675,11 @@ app.get("/:slug", async (c) => {
       );
     }
 
-    // Increment view count
     await db
       .update(place)
       .set({ views: sql`${place.views} + 1` })
-      .where(eq(place.id, placeData.id));
+      .where(eq(place.id, placeRow.id));
 
-    // Get recent reviews for this place
     const recentReviews = await db
       .select({
         id: review.id,
@@ -628,44 +694,68 @@ app.get("/:slug", async (c) => {
       })
       .from(review)
       .innerJoin(user, eq(review.userId, user.id))
-      .where(
-        and(eq(review.placeId, placeData.id), eq(review.status, "published")),
-      )
+      .where(and(eq(review.placeId, placeRow.id), eq(review.status, "published")))
       .orderBy(desc(review.createdAt))
       .limit(5);
 
-    // Get nearby places (same city, excluding current place)
-    const nearbyPlaces = await db
-      .select({
-        id: place.id,
-        slug: place.slug,
-        name: place.name,
-        type: place.type,
-        category: place.category,
-        shortDescription: place.shortDescription,
-        address: place.address,
-        rating: place.rating,
-        reviewCount: place.reviewCount,
-        priceLevel: place.priceLevel,
-        nightlyPrice: place.nightlyPrice,
-        images: place.images,
-        verified: place.verified,
-      })
-      .from(place)
-      .where(
-        and(
-          eq(place.city, placeData.city || ""),
-          eq(place.status, "active"),
-          sql`${place.id} != ${placeData.id}`,
-        ),
-      )
-      .orderBy(desc(place.rating), desc(place.reviewCount))
-      .limit(6);
+    let nearbyRows: PlaceRow[] = [];
+    if (placeRow.cityId) {
+      const rawNearby = await db
+        .select({
+          id: place.id,
+          slug: place.slug,
+          name: place.name,
+          categoryId: place.categoryId,
+          description: place.description,
+          shortDescription: place.shortDescription,
+          address: place.address,
+          cityId: place.cityId,
+          districtId: place.districtId,
+          location: place.location,
+          contactInfo: place.contactInfo,
+          rating: place.rating,
+          reviewCount: place.reviewCount,
+          priceLevel: place.priceLevel,
+          nightlyPrice: place.nightlyPrice,
+          verified: place.verified,
+          featured: place.featured,
+          ownerId: place.ownerId,
+          views: place.views,
+          bookingCount: place.bookingCount,
+          openingHours: place.openingHours,
+          checkInInfo: place.checkInInfo,
+          checkOutInfo: place.checkOutInfo,
+          createdAt: place.createdAt,
+          updatedAt: place.updatedAt,
+          categoryName: placeCategory.name,
+          categorySlug: placeCategory.slug,
+          cityName: province.name,
+          districtName: district.name,
+        })
+        .from(place)
+        .leftJoin(placeCategory, eq(place.categoryId, placeCategory.id))
+        .leftJoin(province, eq(place.cityId, province.id))
+        .leftJoin(district, eq(place.districtId, district.id))
+        .where(
+          and(
+            eq(place.cityId, placeRow.cityId),
+            eq(place.status, "active"),
+            sql`${place.id} != ${placeRow.id}`,
+          ),
+        )
+        .orderBy(desc(place.rating), desc(place.reviewCount))
+        .limit(6);
+
+      nearbyRows = rawNearby as PlaceRow[];
+    }
+
+    const [hydratedPlace] = await hydratePlaceMediaAndAmenities([toLegacyPlace(placeRow)]);
+    const nearbyPlaces = await hydratePlaceMediaAndAmenities(nearbyRows.map(toLegacyPlace));
 
     return c.json({
       place: {
-        ...placeData,
-        views: placeData.views + 1, // Return incremented count
+        ...hydratedPlace,
+        views: placeRow.views + 1,
       },
       recentReviews,
       nearbyPlaces,

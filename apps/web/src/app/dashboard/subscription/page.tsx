@@ -9,16 +9,11 @@ import {
   CheckCircle2,
   X,
   CreditCard,
-  Calendar,
   TrendingUp,
   Zap,
   Shield,
   Building2,
   FileText,
-  ImageIcon,
-  BarChart3,
-  Headphones,
-  Star,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,16 +24,6 @@ import {
   SectionHeader,
 } from "@/components/dashboard";
 import { api } from "@/lib/api";
-import { cn } from "@/lib/utils";
-
-const FEATURE_ICONS: Record<string, React.ReactNode> = {
-  places: <Building2 className="size-4" />,
-  blogs: <FileText className="size-4" />,
-  photos: <ImageIcon className="size-4" />,
-  analytics: <BarChart3 className="size-4" />,
-  support: <Headphones className="size-4" />,
-  featured: <Star className="size-4" />,
-};
 
 export default function SubscriptionPage() {
   const queryClient = useQueryClient();
@@ -132,11 +117,14 @@ export default function SubscriptionPage() {
 
   const plan = plans.find((p) => p.id === subscription.planId);
   const planLimits =
-    typeof plan?.limits === "string" ? JSON.parse(plan.limits) : plan?.limits;
-  const planFeatures =
-    typeof plan?.features === "string"
-      ? JSON.parse(plan.features)
-      : plan?.features;
+    plan?.limits ||
+    (plan
+      ? {
+          maxPlaces: plan.maxPlaces,
+          maxBlogs: plan.maxBlogs,
+        }
+      : undefined);
+  const planFeatures = plan?.features ?? subscription?.planFeatures ?? [];
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -236,11 +224,7 @@ export default function SubscriptionPage() {
                   <p className="mb-1 text-xs text-muted-foreground">
                     Fatura Dönemi
                   </p>
-                  <p className="font-medium text-foreground">
-                    {subscription.billingCycle === "monthly" && "Aylık"}
-                    {subscription.billingCycle === "quarterly" && "3 Aylık"}
-                    {subscription.billingCycle === "yearly" && "Yıllık"}
-                  </p>
+                  <p className="font-medium text-foreground">Yıllık</p>
                 </div>
                 <div>
                   <p className="mb-1 text-xs text-muted-foreground">
@@ -411,65 +395,9 @@ export default function SubscriptionPage() {
                   <span className="font-medium">{planLimits.maxBlogs}</span>
                 </div>
 
-                <div className="flex items-center justify-between text-sm">
-                  <span className="flex items-center gap-2 text-muted-foreground">
-                    <ImageIcon className="size-4" />
-                    Fotoğraf Limiti
-                  </span>
-                  <span className="font-medium">{planLimits.maxPhotos}</span>
-                </div>
-
-                <div className="h-px bg-border" />
-
-                <div className="flex items-center justify-between text-sm">
-                  <span className="flex items-center gap-2 text-muted-foreground">
-                    <Star className="size-4" />
-                    Öne Çıkarılan
-                  </span>
-                  <span
-                    className={cn(
-                      "font-medium",
-                      planLimits.featuredListing
-                        ? "text-emerald-600"
-                        : "text-slate-400",
-                    )}
-                  >
-                    {planLimits.featuredListing ? "Evet" : "Hayır"}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between text-sm">
-                  <span className="flex items-center gap-2 text-muted-foreground">
-                    <BarChart3 className="size-4" />
-                    Analytics
-                  </span>
-                  <span
-                    className={cn(
-                      "font-medium",
-                      planLimits.analyticsAccess
-                        ? "text-emerald-600"
-                        : "text-slate-400",
-                    )}
-                  >
-                    {planLimits.analyticsAccess ? "Evet" : "Hayır"}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between text-sm">
-                  <span className="flex items-center gap-2 text-muted-foreground">
-                    <Headphones className="size-4" />
-                    Öncelikli Destek
-                  </span>
-                  <span
-                    className={cn(
-                      "font-medium",
-                      planLimits.prioritySupport
-                        ? "text-emerald-600"
-                        : "text-slate-400",
-                    )}
-                  >
-                    {planLimits.prioritySupport ? "Evet" : "Hayır"}
-                  </span>
+                <div className="rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">
+                  Plan detaylari ve ek avantajlar icin "Plan Ozellikleri"
+                  bolumunu inceleyebilirsiniz.
                 </div>
               </div>
             </DashboardCard>

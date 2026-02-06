@@ -271,12 +271,33 @@ export const api = {
     async getPlans() {
       return await request<{ plans: any[] }>("/api/subscriptions/plans");
     },
+    async validateCoupon(planId: string, code: string) {
+      return await request<{
+        valid: boolean;
+        coupon?: {
+          id: string;
+          code: string;
+          discountType: "percent" | "fixed";
+          discountValue: string | number;
+        };
+        pricing?: {
+          basePrice: number;
+          discountAmount: number;
+          finalPrice: number;
+          currency: string;
+        };
+        error?: string;
+      }>("/api/subscriptions/coupons/validate", {
+        method: "POST",
+        body: JSON.stringify({ planId, code }),
+      });
+    },
     async getCurrent() {
       return await request<{ subscription: any; hasSubscription: boolean }>(
         "/api/subscriptions/current",
       );
     },
-    async create(planId: string, paymentData: any) {
+    async create(planId: string, paymentData?: any, couponCode?: string) {
       return await request<{
         success: boolean;
         subscriptionId: string;
@@ -284,7 +305,11 @@ export const api = {
         subscription: any;
       }>("/api/subscriptions/create", {
         method: "POST",
-        body: JSON.stringify({ planId, paymentMethod: paymentData }),
+        body: JSON.stringify({
+          planId,
+          paymentMethod: paymentData,
+          couponCode,
+        }),
       });
     },
     async cancel() {

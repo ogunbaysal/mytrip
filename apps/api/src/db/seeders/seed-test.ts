@@ -15,10 +15,11 @@
 import { db } from "../index.ts";
 import { nanoid } from "nanoid";
 import { eq } from "drizzle-orm";
+import { replacePlaceAmenities } from "../../lib/place-relations.ts";
 
 // Schemas
 import { user } from "../schemas/auth.ts";
-import { place, placeCategory } from "../schemas/index.ts";
+import { file, place, placeCategory, placeImage } from "../schemas/index.ts";
 import { blogPost } from "../schemas/blog.ts";
 import { collection } from "../schemas/collections.ts";
 import { province, district } from "../schemas/locations.ts";
@@ -513,9 +514,9 @@ async function seedTestSubscriptions(
 ): Promise<void> {
   logSection("Seeding Test Subscriptions");
 
-  // Get standard monthly plan for owners
+  // Get standard yearly plan for owners
   const standardPlan = await db.query.subscriptionPlan.findFirst({
-    where: eq(subscriptionPlan.id, "plan-standard-monthly"),
+    where: eq(subscriptionPlan.id, "plan-standard-yearly"),
   });
 
   if (!standardPlan) {
@@ -539,7 +540,7 @@ async function seedTestSubscriptions(
 
     const startDate = new Date();
     const endDate = new Date();
-    endDate.setMonth(endDate.getMonth() + 1);
+    endDate.setFullYear(endDate.getFullYear() + 1);
 
     await db.insert(subscription).values({
       id: nanoid(),
@@ -547,9 +548,11 @@ async function seedTestSubscriptions(
       planId: standardPlan.id,
       status: "active",
       provider: "mock",
+      basePrice: standardPlan.price,
+      discountAmount: "0",
       price: standardPlan.price,
       currency: "TRY",
-      billingCycle: "monthly",
+      billingCycle: standardPlan.billingCycle,
       startDate: startDate.toISOString().split("T")[0],
       endDate: endDate.toISOString().split("T")[0],
       nextBillingDate: endDate.toISOString().split("T")[0],
@@ -570,6 +573,26 @@ async function seedTestPlaces(userMap: Map<string, string>): Promise<string[]> {
   }
 
   const categoryMap = new Map(categories.map((c) => [c.slug, c]));
+  const [muglaProvince] = await db
+    .select({ id: province.id })
+    .from(province)
+    .where(eq(province.name, "Muğla"))
+    .limit(1);
+
+  if (!muglaProvince) {
+    logInfo('Muğla province not found, run "db:seed:core" first');
+    return [];
+  }
+
+  const provinceDistricts = await db
+    .select({ id: district.id, name: district.name })
+    .from(district)
+    .where(eq(district.provinceId, muglaProvince.id));
+
+  const districtMap = new Map(
+    provinceDistricts.map((d) => [slugify(d.name), d.id]),
+  );
+
   const ownerIds = TEST_USERS.filter((u) => u.role === "owner")
     .map((u) => userMap.get(u.email))
     .filter(Boolean) as string[];
@@ -592,8 +615,12 @@ async function seedTestPlaces(userMap: Map<string, string>): Promise<string[]> {
       "activity",
     ]) as keyof typeof PLACE_TEMPLATES;
     const template = random(PLACE_TEMPLATES[placeType]);
-    const district = random(MUGLA_DISTRICTS);
-    const neighborhood = random(district.neighborhoods);
+    const districtData = random(MUGLA_DISTRICTS);
+    const neighborhood = random(districtData.neighborhoods);
+    const districtId = districtMap.get(slugify(districtData.name));
+    if (!districtId) {
+      continue;
+    }
 
     // Select appropriate category
     const categorySlug = random(typeMapping[placeType]);
@@ -622,14 +649,12 @@ async function seedTestPlaces(userMap: Map<string, string>): Promise<string[]> {
       id,
       slug,
       name,
-      type: placeType as any,
       categoryId: category?.id,
-      category: categorySlug,
-      description: `${name}, ${district.name} bölgesinin en gözde mekanlarından biridir. ${neighborhood}'da yer alan bu işletme, eşsiz konumu ve kaliteli hizmetiyle öne çıkıyor. ${randomSubset(typeFeatures, 4).join(", ")} gibi olanaklarıyla konforlu bir deneyim sunuyoruz.`,
-      shortDescription: `${district.name}, ${neighborhood} bölgesinde eşsiz bir deneyim.`,
-      address: `${neighborhood} Mah. Atatürk Cad. No:${randomInt(1, 150)}, ${district.name}, Muğla`,
-      city: "Muğla",
-      district: district.name,
+      description: `${name}, ${districtData.name} bölgesinin en gözde mekanlarından biridir. ${neighborhood}'da yer alan bu işletme, eşsiz konumu ve kaliteli hizmetiyle öne çıkıyor. ${randomSubset(typeFeatures, 4).join(", ")} gibi olanaklarıyla konforlu bir deneyim sunuyoruz.`,
+      shortDescription: `${districtData.name}, ${neighborhood} bölgesinde eşsiz bir deneyim.`,
+      address: `${neighborhood} Mah. Atatürk Cad. No:${randomInt(1, 150)}, ${districtData.name}, Muğla`,
+      cityId: muglaProvince.id,
+      districtId,
       location: JSON.stringify({ lat: lat.toFixed(6), lng: lng.toFixed(6) }),
       contactInfo: JSON.stringify({
         phone: `+90 252 ${randomInt(100, 999)} ${randomInt(10, 99)} ${randomInt(10, 99)}`,
@@ -643,8 +668,6 @@ async function seedTestPlaces(userMap: Map<string, string>): Promise<string[]> {
         template.priceRange[0],
         template.priceRange[1],
       ).toString(),
-      features: JSON.stringify(randomSubset(typeFeatures, randomInt(5, 10))),
-      images: JSON.stringify(randomSubset(typeImages, randomInt(3, 5))),
       status: random(["active", "active", "active", "pending"]) as any, // Mostly active
       verified: Math.random() > 0.3,
       featured: Math.random() > 0.85,
@@ -661,6 +684,33 @@ async function seedTestPlaces(userMap: Map<string, string>): Promise<string[]> {
         sunday: "10:00-22:00",
       }),
     });
+
+    const placeFeatures = randomSubset(typeFeatures, randomInt(5, 10));
+    await replacePlaceAmenities(id, placeFeatures);
+
+    const imageUrls = randomSubset(typeImages, randomInt(3, 5));
+    const imageFiles = imageUrls.map((url, idx) => ({
+      id: nanoid(),
+      filename: `seed-place-${id}-${idx + 1}.jpg`,
+      storedFilename: `seed-place-${id}-${idx + 1}-${nanoid(6)}.jpg`,
+      url,
+      mimeType: "image/jpeg",
+      size: 0,
+      type: "image" as const,
+      usage: "place_image" as const,
+      uploadedById: random(ownerIds),
+    }));
+
+    if (imageFiles.length > 0) {
+      await db.insert(file).values(imageFiles);
+      await db.insert(placeImage).values(
+        imageFiles.map((img, idx) => ({
+          placeId: id,
+          fileId: img.id,
+          sortOrder: idx,
+        })),
+      );
+    }
 
     placeIds.push(id);
   }

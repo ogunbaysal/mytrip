@@ -13,7 +13,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table"
-import { ArrowUpDown, ChevronDown, MoreHorizontal, Search, Eye, Edit, CreditCard, Calendar, AlertCircle, CheckCircle, XCircle, Clock, DollarSign, User, BarChart } from "lucide-react"
+import { ArrowUpDown, ChevronDown, MoreHorizontal, Search, Eye, Edit, CreditCard, Calendar, AlertCircle, CheckCircle, XCircle, Clock, DollarSign, User } from "lucide-react"
 import { toast } from "sonner"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -41,7 +41,6 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Progress } from "@/components/ui/progress"
-import { subscriptionStatuses, billingCycles } from "@/lib/mock-data/subscriptions"
 import { Subscription } from "@/types/subscriptions"
 
 interface SubscriptionsTableProps {
@@ -56,12 +55,24 @@ export function SubscriptionsTable({ initialData }: SubscriptionsTableProps) {
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
   const [rowSelection, setRowSelection] = React.useState({})
 
-  // Update data if initialData changes (optional, depending on if we want full sync)
   React.useEffect(() => {
-    setData(initialData);
-  }, [initialData]);
+    setData(initialData)
+  }, [initialData])
 
-  const handleSubscriptionAction = (action: string, subscription: Subscription) => {
+  const statusLabels: Record<string, string> = {
+    active: "Aktif",
+    trial: "Deneme",
+    pending: "Beklemede",
+    expired: "Süresi Doldu",
+    cancelled: "İptal Edildi",
+    past_due: "Gecikmiş",
+  }
+
+  const billingCycleLabels: Record<string, string> = {
+    yearly: "Yıllık",
+  }
+
+  const handleSubscriptionAction = async (action: string, subscription: Subscription) => {
     switch (action) {
       case "view":
         router.push(`/subscriptions/${subscription.id}`)
@@ -69,68 +80,69 @@ export function SubscriptionsTable({ initialData }: SubscriptionsTableProps) {
       case "edit":
         router.push(`/subscriptions/${subscription.id}/edit`)
         break
-      case "upgrade":
-        toast.info(`Abonelik yükseltme: ${subscription.ownerName}`)
-        break
-      case "downgrade":
-        toast.info(`Abonelik düşürme: ${subscription.ownerName}`)
-        break
       case "cancel":
-        if (subscription.status === "cancelled") {
-          toast.info(`Abonelik zaten iptal edilmiş: ${subscription.ownerName}`)
-        } else {
-          setData(prev =>
-            prev.map(s => s.id === subscription.id ? {
-              ...s,
-              status: "cancelled" as const,
-              cancelledAt: new Date()
-            } : s)
-          )
-          toast.success(`Abonelik iptal edildi: ${subscription.ownerName}`)
-        }
+        await runSubscriptionMutation(subscription.id, "/cancel", "Abonelik iptal edildi")
         break
       case "reactivate":
-        if (subscription.status === "active") {
-          toast.info(`Abonelik zaten aktif: ${subscription.ownerName}`)
-        } else {
-          setData(prev =>
-            prev.map(s => s.id === subscription.id ? {
-              ...s,
-              status: "active" as const,
-              cancelledAt: undefined,
-              endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days from now
-            } : s)
-          )
-          toast.success(`Abonelik yeniden aktifleştirildi: ${subscription.ownerName}`)
-        }
-        break
-      case "extend_trial":
-        if (subscription.status !== "trial") {
-          toast.info(`Deneme sürümü değil: ${subscription.ownerName}`)
-        } else {
-          const newEndDate = new Date(subscription.endDate)
-          newEndDate.setDate(newEndDate.getDate() + 7) // extend trial by 7 days
-          setData(prev =>
-            prev.map(s => s.id === subscription.id ? {
-              ...s,
-              trialEndsAt: newEndDate,
-              endDate: newEndDate
-            } : s)
-          )
-          toast.success(`Deneme süresi uzatıldı: ${subscription.ownerName}`)
-        }
+        await runSubscriptionMutation(
+          subscription.id,
+          "/reactivate",
+          "Abonelik yeniden aktifleştirildi",
+        )
         break
     }
   }
 
+  const runSubscriptionMutation = async (
+    subscriptionId: string,
+    actionPath: "/cancel" | "/reactivate",
+    successMessage: string,
+  ) => {
+    try {
+      const res = await fetch(`/api/admin/subscriptions/${subscriptionId}${actionPath}`, {
+        method: "PUT",
+      })
+      const payload = await res.json()
+
+      if (!res.ok) {
+        throw new Error(payload.error || "İşlem başarısız")
+      }
+
+      setData((prev) =>
+        prev.map((item) =>
+          item.id === subscriptionId
+            ? {
+                ...item,
+                status: payload.subscription.status,
+                startDate: payload.subscription.startDate
+                  ? new Date(payload.subscription.startDate)
+                  : item.startDate,
+                endDate: payload.subscription.endDate
+                  ? new Date(payload.subscription.endDate)
+                  : item.endDate,
+                nextBillingDate: payload.subscription.nextBillingDate
+                  ? new Date(payload.subscription.nextBillingDate)
+                  : undefined,
+                cancelledAt: payload.subscription.cancelledAt
+                  ? new Date(payload.subscription.cancelledAt)
+                  : undefined,
+              }
+            : item,
+        ),
+      )
+      toast.success(successMessage)
+    } catch (error) {
+      console.error(error)
+      toast.error(error instanceof Error ? error.message : "İşlem sırasında hata oluştu")
+    }
+  }
+
   const getStatusLabel = (status: string) => {
-    const option = subscriptionStatuses.find(opt => opt.value === status)
-    return option?.label || status
+    return statusLabels[status] || status
   }
 
   const getBillingCycleLabel = (cycle: string) => {
-    const option = billingCycles.find(opt => opt.value === cycle)
-    return option?.label || cycle
+    return billingCycleLabels[cycle] || cycle
   }
 
   const getStatusBadgeVariant = (status: string) => {
@@ -180,6 +192,7 @@ export function SubscriptionsTable({ initialData }: SubscriptionsTableProps) {
       case "credit_card": return `Kredi Kartı •••• ${lastFour}`
       case "bank_transfer": return "Havale/EFT"
       case "paypal": return "PayPal"
+      case "manual_admin": return "Manuel (Admin)"
       default: return type
     }
   }
@@ -326,21 +339,6 @@ export function SubscriptionsTable({ initialData }: SubscriptionsTableProps) {
               )}
             </div>
 
-            {/* Photos Usage */}
-            <div className="space-y-1">
-              <div className="flex justify-between text-xs">
-                <span>Fotoğraflar</span>
-                <span className={getUsageColor(getUsagePercentage(usage.currentPhotos, limits.maxPhotos))}>
-                  {usage.currentPhotos} / {limits.maxPhotos === -1 ? "∞" : limits.maxPhotos}
-                </span>
-              </div>
-              {limits.maxPhotos !== -1 && (
-                <Progress
-                  value={getUsagePercentage(usage.currentPhotos, limits.maxPhotos)}
-                  className="h-1"
-                />
-              )}
-            </div>
           </div>
         )
       },
@@ -419,30 +417,6 @@ export function SubscriptionsTable({ initialData }: SubscriptionsTableProps) {
                 <Edit className="mr-2 h-4 w-4" />
                 Düzenle
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => handleSubscriptionAction("upgrade", subscription)}
-                className="cursor-pointer text-green-600"
-              >
-                <BarChart className="mr-2 h-4 w-4" />
-                Yükselt
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => handleSubscriptionAction("downgrade", subscription)}
-                className="cursor-pointer text-orange-600"
-              >
-                <BarChart className="mr-2 h-4 w-4" />
-                Düşür
-              </DropdownMenuItem>
-              {subscription.status === "trial" && (
-                <DropdownMenuItem
-                  onClick={() => handleSubscriptionAction("extend_trial", subscription)}
-                  className="cursor-pointer text-blue-600"
-                >
-                  <Clock className="mr-2 h-4 w-4" />
-                  Denemeyi Uzat
-                </DropdownMenuItem>
-              )}
               <DropdownMenuSeparator />
               {subscription.status === "active" || subscription.status === "trial" ? (
                 <DropdownMenuItem
@@ -563,7 +537,6 @@ export function SubscriptionsTable({ initialData }: SubscriptionsTableProps) {
             </div>
             <div className="flex items-center space-x-2">
               <Button variant="outline">
-                <BarChart className="mr-2 h-4 w-4" />
                 Gelir Raporları
               </Button>
               <Button asChild>

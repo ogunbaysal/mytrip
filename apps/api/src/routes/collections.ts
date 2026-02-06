@@ -1,7 +1,17 @@
 import { Hono } from "hono";
 import { db } from "../db/index.ts";
-import { collection, place } from "../db/schemas/index.ts";
+import {
+  collection,
+  district,
+  place,
+  placeCategory,
+  province,
+} from "../db/schemas/index.ts";
 import { eq, desc, ilike, sql, and, inArray, ne } from "drizzle-orm";
+import {
+  derivePlaceTypeFromCategorySlug,
+  hydratePlaceMediaAndAmenities,
+} from "../lib/place-relations.ts";
 
 const app = new Hono();
 
@@ -209,28 +219,44 @@ app.get("/:slug", async (c) => {
               id: place.id,
               slug: place.slug,
               name: place.name,
-              type: place.type,
-              category: place.category,
+              categoryId: place.categoryId,
               shortDescription: place.shortDescription,
               address: place.address,
-              city: place.city,
+              cityId: place.cityId,
+              districtId: place.districtId,
               location: place.location,
               rating: place.rating,
               reviewCount: place.reviewCount,
               priceLevel: place.priceLevel,
               nightlyPrice: place.nightlyPrice,
-              images: place.images,
               verified: place.verified,
+              categorySlug: placeCategory.slug,
+              categoryName: placeCategory.name,
+              cityName: province.name,
+              districtName: district.name,
             })
             .from(place)
+            .leftJoin(placeCategory, eq(place.categoryId, placeCategory.id))
+            .leftJoin(province, eq(place.cityId, province.id))
+            .leftJoin(district, eq(place.districtId, district.id))
             .where(and(
               inArray(place.id, featuredPlaceIds),
               eq(place.status, "active")
             ));
 
+          const hydrated = await hydratePlaceMediaAndAmenities(
+            fetchedPlaces.map((p) => ({
+              ...p,
+              type: derivePlaceTypeFromCategorySlug(p.categorySlug),
+              category: p.categoryName ?? "",
+              city: p.cityName ?? "",
+              district: p.districtName ?? "",
+            })),
+          );
+
           // Sort by order in featuredPlaceIds
           featuredPlacesDetails = featuredPlaceIds
-            .map((id: string) => fetchedPlaces.find((p) => p.id === id))
+            .map((id: string) => hydrated.find((p) => p.id === id))
             .filter((p: any) => !!p);
         }
       } catch (error) {

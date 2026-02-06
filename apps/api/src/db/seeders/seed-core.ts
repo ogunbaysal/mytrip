@@ -14,7 +14,7 @@
 
 import { db } from "../index.ts";
 import { nanoid } from "nanoid";
-import { eq } from "drizzle-orm";
+import { and, eq, ne, notInArray } from "drizzle-orm";
 
 // Schemas
 import {
@@ -23,7 +23,12 @@ import {
   adminPermissions,
   adminRolePermissions,
 } from "../schemas/auth.ts";
-import { subscriptionPlan } from "../schemas/subscriptions.ts";
+import {
+  coupon,
+  couponPlan,
+  subscriptionPlan,
+  subscriptionPlanFeature,
+} from "../schemas/subscriptions.ts";
 import { placeCategory } from "../schemas/categories.ts";
 import { province, district } from "../schemas/locations.ts";
 
@@ -129,230 +134,98 @@ const ROLES = [
 ] as const;
 
 const SUBSCRIPTION_PLANS = [
-  // Monthly Plans
   {
-    id: "plan-basic-monthly",
-    name: "Başlangıç",
-    description: "Küçük işletmeler için ideal başlangıç paketi",
-    price: 500,
-    currency: "TRY" as const,
-    billingCycle: "monthly" as const,
-    features: [
-      "3 Mekan",
-      "5 Blog yazısı",
-      "Temel istatistikler",
-      "E-posta desteği",
-    ],
-    limits: {
-      maxPlaces: 3,
-      maxBlogs: 5,
-      maxPhotos: 15,
-      featuredListing: false,
-      analyticsAccess: true,
-      prioritySupport: false,
-    },
-    sortOrder: 0,
-  },
-  {
-    id: "plan-standard-monthly",
-    name: "Standart",
-    description: "Büyüyen işletmeler için ideal paket",
-    price: 1000,
-    currency: "TRY" as const,
-    billingCycle: "monthly" as const,
-    features: [
-      "10 Mekan",
-      "20 Blog yazısı",
-      "Öne çıkan listeleme",
-      "Detaylı analitik",
-      "Öncelikli destek",
-    ],
-    limits: {
-      maxPlaces: 10,
-      maxBlogs: 20,
-      maxPhotos: 50,
-      featuredListing: true,
-      analyticsAccess: true,
-      prioritySupport: true,
-    },
-    sortOrder: 1,
-  },
-  {
-    id: "plan-pro-monthly",
-    name: "Profesyonel",
-    description: "Büyük işletmeler ve zincirler için premium paket",
-    price: 2500,
-    currency: "TRY" as const,
-    billingCycle: "monthly" as const,
-    features: [
-      "Sınırsız mekan",
-      "Sınırsız blog yazısı",
-      "Sınırsız fotoğraf",
-      "Premium analitik",
-      "7/24 destek",
-      "Özel markalama",
-    ],
-    limits: {
-      maxPlaces: 9999,
-      maxBlogs: 9999,
-      maxPhotos: 9999,
-      featuredListing: true,
-      analyticsAccess: true,
-      prioritySupport: true,
-    },
-    sortOrder: 2,
-  },
-  // Quarterly Plans
-  {
-    id: "plan-basic-quarterly",
-    name: "Başlangıç",
-    description: "Küçük işletmeler için ideal başlangıç paketi",
-    price: 1350, // 10% discount
-    currency: "TRY" as const,
-    billingCycle: "quarterly" as const,
-    features: [
-      "3 Mekan",
-      "5 Blog yazısı",
-      "Temel istatistikler",
-      "E-posta desteği",
-      "%10 tasarruf",
-    ],
-    limits: {
-      maxPlaces: 3,
-      maxBlogs: 5,
-      maxPhotos: 15,
-      featuredListing: false,
-      analyticsAccess: true,
-      prioritySupport: false,
-    },
-    sortOrder: 0,
-  },
-  {
-    id: "plan-standard-quarterly",
-    name: "Standart",
-    description: "Büyüyen işletmeler için ideal paket",
-    price: 2700, // 10% discount
-    currency: "TRY" as const,
-    billingCycle: "quarterly" as const,
-    features: [
-      "10 Mekan",
-      "20 Blog yazısı",
-      "Öne çıkan listeleme",
-      "Detaylı analitik",
-      "Öncelikli destek",
-      "%10 tasarruf",
-    ],
-    limits: {
-      maxPlaces: 10,
-      maxBlogs: 20,
-      maxPhotos: 50,
-      featuredListing: true,
-      analyticsAccess: true,
-      prioritySupport: true,
-    },
-    sortOrder: 1,
-  },
-  {
-    id: "plan-pro-quarterly",
-    name: "Profesyonel",
-    description: "Büyük işletmeler ve zincirler için premium paket",
-    price: 6750, // 10% discount
-    currency: "TRY" as const,
-    billingCycle: "quarterly" as const,
-    features: [
-      "Sınırsız mekan",
-      "Sınırsız blog yazısı",
-      "Sınırsız fotoğraf",
-      "Premium analitik",
-      "7/24 destek",
-      "Özel markalama",
-      "%10 tasarruf",
-    ],
-    limits: {
-      maxPlaces: 9999,
-      maxBlogs: 9999,
-      maxPhotos: 9999,
-      featuredListing: true,
-      analyticsAccess: true,
-      prioritySupport: true,
-    },
-    sortOrder: 2,
-  },
-  // Yearly Plans
-  {
-    id: "plan-basic-yearly",
-    name: "Başlangıç",
-    description: "Küçük işletmeler için ideal başlangıç paketi",
-    price: 5000, // ~17% discount (2 months free)
+    id: "plan-starter-yearly",
+    name: "Başlangıç Planı",
+    description: "Yeni başlayan işletmeler için yıllık temel paket",
+    price: 4990,
     currency: "TRY" as const,
     billingCycle: "yearly" as const,
+    maxPlaces: 1,
+    maxBlogs: 1,
     features: [
-      "3 Mekan",
-      "5 Blog yazısı",
-      "Temel istatistikler",
+      "1 mekan yayınlama hakkı",
+      "1 blog yazısı hakkı",
+      "Temel görünürlük",
       "E-posta desteği",
-      "2 ay ücretsiz",
     ],
-    limits: {
-      maxPlaces: 3,
-      maxBlogs: 5,
-      maxPhotos: 15,
-      featuredListing: false,
-      analyticsAccess: true,
-      prioritySupport: false,
-    },
     sortOrder: 0,
   },
   {
     id: "plan-standard-yearly",
-    name: "Standart",
-    description: "Büyüyen işletmeler için ideal paket",
-    price: 10000, // ~17% discount (2 months free)
+    name: "Standart Plan",
+    description: "Büyümek isteyen işletmeler için yıllık plan",
+    price: 11990,
     currency: "TRY" as const,
     billingCycle: "yearly" as const,
+    maxPlaces: 5,
+    maxBlogs: 10,
     features: [
-      "10 Mekan",
-      "20 Blog yazısı",
-      "Öne çıkan listeleme",
-      "Detaylı analitik",
+      "5 mekan yayınlama hakkı",
+      "10 blog yazısı hakkı",
+      "Öne çıkan listeleme desteği",
+      "Gelişmiş raporlama",
       "Öncelikli destek",
-      "2 ay ücretsiz",
     ],
-    limits: {
-      maxPlaces: 10,
-      maxBlogs: 20,
-      maxPhotos: 50,
-      featuredListing: true,
-      analyticsAccess: true,
-      prioritySupport: true,
-    },
     sortOrder: 1,
   },
   {
-    id: "plan-pro-yearly",
-    name: "Profesyonel",
-    description: "Büyük işletmeler ve zincirler için premium paket",
-    price: 25000, // ~17% discount (2 months free)
+    id: "plan-growth-yearly",
+    name: "Büyüme Planı",
+    description: "Birden fazla lokasyon yöneten işletmeler için yıllık plan",
+    price: 24990,
     currency: "TRY" as const,
     billingCycle: "yearly" as const,
+    maxPlaces: 20,
+    maxBlogs: 40,
     features: [
-      "Sınırsız mekan",
-      "Sınırsız blog yazısı",
-      "Sınırsız fotoğraf",
-      "Premium analitik",
-      "7/24 destek",
-      "Özel markalama",
-      "2 ay ücretsiz",
+      "20 mekan yayınlama hakkı",
+      "40 blog yazısı hakkı",
+      "Premium görünürlük",
+      "Detaylı performans paneli",
+      "Öncelikli operasyon desteği",
     ],
-    limits: {
-      maxPlaces: 9999,
-      maxBlogs: 9999,
-      maxPhotos: 9999,
-      featuredListing: true,
-      analyticsAccess: true,
-      prioritySupport: true,
-    },
     sortOrder: 2,
+  },
+] as const;
+
+type CouponSeed = {
+  id: string;
+  code: string;
+  description: string;
+  discountType: "percent" | "fixed";
+  discountValue: number;
+  scope: "all_plans" | "specific_plans";
+  maxRedemptions: number | null;
+  maxRedemptionsPerUser: number;
+  active: boolean;
+  planIds: string[];
+};
+
+const COUPONS: CouponSeed[] = [
+  {
+    id: "coupon-welcome-10",
+    code: "WELCOME10",
+    description: "İlk abonelikte %10 indirim",
+    discountType: "percent" as const,
+    discountValue: 10,
+    scope: "all_plans" as const,
+    maxRedemptions: 10000,
+    maxRedemptionsPerUser: 1,
+    active: true,
+    planIds: [],
+  },
+  {
+    id: "coupon-free-100",
+    code: "FREE100",
+    description: "Tam indirim kuponu (%100)",
+    discountType: "percent" as const,
+    discountValue: 100,
+    scope: "all_plans" as const,
+    maxRedemptions: 1000,
+    maxRedemptionsPerUser: 1,
+    active: true,
+    planIds: [],
   },
 ];
 
@@ -647,29 +520,141 @@ async function seedAdminUser(roleMap: Map<string, string>): Promise<void> {
 async function seedSubscriptionPlans(): Promise<void> {
   logSection("Seeding Subscription Plans");
 
+  const managedPlanIds = SUBSCRIPTION_PLANS.map((plan) => plan.id);
+
+  // Legacy monthly/quarterly plans stay in DB history, but are set inactive.
+  await db
+    .update(subscriptionPlan)
+    .set({ active: false, updatedAt: new Date() })
+    .where(
+      and(
+        ne(subscriptionPlan.billingCycle, "yearly"),
+        eq(subscriptionPlan.active, true),
+      ),
+    );
+
+  // Deactivate plans not present in the curated yearly catalog.
+  await db
+    .update(subscriptionPlan)
+    .set({ active: false, updatedAt: new Date() })
+    .where(
+      and(
+        notInArray(subscriptionPlan.id, managedPlanIds),
+        eq(subscriptionPlan.active, true),
+      ),
+    );
+
   for (const plan of SUBSCRIPTION_PLANS) {
     const existing = await db.query.subscriptionPlan.findFirst({
       where: eq(subscriptionPlan.id, plan.id),
     });
 
     if (existing) {
-      logSkip(`Plan "${plan.name} (${plan.billingCycle})" already exists`);
-      continue;
+      await db
+        .update(subscriptionPlan)
+        .set({
+          name: plan.name,
+          description: plan.description,
+          price: plan.price.toString(),
+          currency: plan.currency,
+          billingCycle: "yearly",
+          maxPlaces: plan.maxPlaces,
+          maxBlogs: plan.maxBlogs,
+          active: true,
+          sortOrder: plan.sortOrder,
+          updatedAt: new Date(),
+        })
+        .where(eq(subscriptionPlan.id, plan.id));
+
+      logSkip(`Plan "${plan.name}" already exists, updated`);
+    } else {
+      await db.insert(subscriptionPlan).values({
+        id: plan.id,
+        name: plan.name,
+        description: plan.description,
+        price: plan.price.toString(),
+        currency: plan.currency,
+        billingCycle: "yearly",
+        maxPlaces: plan.maxPlaces,
+        maxBlogs: plan.maxBlogs,
+        active: true,
+        sortOrder: plan.sortOrder,
+      });
+      logSuccess(`Created plan: ${plan.name}`);
     }
 
-    await db.insert(subscriptionPlan).values({
-      id: plan.id,
-      name: plan.name,
-      description: plan.description,
-      price: plan.price.toString(),
-      currency: plan.currency,
-      billingCycle: plan.billingCycle,
-      features: JSON.stringify(plan.features),
-      limits: JSON.stringify(plan.limits),
-      active: true,
-      sortOrder: plan.sortOrder,
+    await db
+      .delete(subscriptionPlanFeature)
+      .where(eq(subscriptionPlanFeature.planId, plan.id));
+
+    if (plan.features.length > 0) {
+      await db.insert(subscriptionPlanFeature).values(
+        plan.features.map((feature, index) => ({
+          id: nanoid(),
+          planId: plan.id,
+          label: feature,
+          sortOrder: index,
+        })),
+      );
+    }
+  }
+}
+
+async function seedCoupons(): Promise<void> {
+  logSection("Seeding Coupons");
+
+  for (const item of COUPONS) {
+    const normalizedCode = item.code.trim().toUpperCase();
+    const existing = await db.query.coupon.findFirst({
+      where: eq(coupon.code, normalizedCode),
     });
-    logSuccess(`Created plan: ${plan.name} (${plan.billingCycle})`);
+
+    let couponId = existing?.id;
+
+    if (existing) {
+      couponId = existing.id;
+      await db
+        .update(coupon)
+        .set({
+          description: item.description,
+          discountType: item.discountType,
+          discountValue: item.discountValue.toString(),
+          scope: item.scope,
+          maxRedemptions: item.maxRedemptions,
+          maxRedemptionsPerUser: item.maxRedemptionsPerUser,
+          active: item.active,
+          updatedAt: new Date(),
+        })
+        .where(eq(coupon.id, existing.id));
+      logSkip(`Coupon "${normalizedCode}" already exists, updated`);
+    } else {
+      couponId = item.id;
+      await db.insert(coupon).values({
+        id: item.id,
+        code: normalizedCode,
+        description: item.description,
+        discountType: item.discountType,
+        discountValue: item.discountValue.toString(),
+        scope: item.scope,
+        maxRedemptions: item.maxRedemptions,
+        maxRedemptionsPerUser: item.maxRedemptionsPerUser,
+        active: item.active,
+      });
+      logSuccess(`Created coupon: ${normalizedCode}`);
+    }
+
+    if (!couponId) continue;
+
+    await db.delete(couponPlan).where(eq(couponPlan.couponId, couponId));
+    if (item.scope === "specific_plans" && item.planIds.length > 0) {
+      await db.insert(couponPlan).values(
+        item.planIds.map((planId) => ({
+          id: nanoid(),
+          couponId: couponId!,
+          planId,
+        })),
+      );
+    }
   }
 }
 
@@ -817,13 +802,16 @@ async function main(): Promise<void> {
     // 4. Seed subscription plans
     await seedSubscriptionPlans();
 
-    // 5. Seed place categories
+    // 5. Seed coupons
+    await seedCoupons();
+
+    // 6. Seed place categories
     await seedPlaceCategories();
 
-    // 6. Seed provinces
+    // 7. Seed provinces
     const provinceMap = await seedProvinces();
 
-    // 7. Seed districts
+    // 8. Seed districts
     await seedDistricts(provinceMap);
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
@@ -835,6 +823,7 @@ async function main(): Promise<void> {
     console.log(`    • ${ROLES.length} roles`);
     console.log(`    • 1 admin user`);
     console.log(`    • ${SUBSCRIPTION_PLANS.length} subscription plans`);
+    console.log(`    • ${COUPONS.length} coupons`);
     console.log(`    • ${PLACE_CATEGORIES.length} place categories`);
     console.log(`    • 81 provinces`);
     console.log(`    • ~970 districts`);

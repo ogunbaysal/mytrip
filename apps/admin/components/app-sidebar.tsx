@@ -1,6 +1,6 @@
 "use client"
 
-import { Hotel, Users, MapPin, FileText, CreditCard, BarChart3, Settings, LogOut, ChevronDown, List, Package, Receipt, ShieldCheck } from "lucide-react"
+import { Hotel, Users, MapPin, FileText, CreditCard, BarChart3, Settings, LogOut, ChevronDown, List, Package, Receipt, ShieldCheck, TicketPercent } from "lucide-react"
 import { useAuth } from "@/hooks/use-auth"
 import { useRouter } from "next/navigation"
 
@@ -85,6 +85,11 @@ const adminMenuItems: MenuItem[] = [
     title: "Ödemeler",
     url: "/subscriptions/payments",
     icon: Receipt,
+  },
+  {
+    title: "Kuponlar",
+    url: "/subscriptions/coupons",
+    icon: TicketPercent,
   },
   {
     title: "Ayarlar",
@@ -253,4 +258,3 @@ export function AppSidebar() {
     </Sidebar>
   )
 }
-

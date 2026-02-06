@@ -4,16 +4,11 @@ export interface SubscriptionPlan {
   description?: string;
   price: string | number;
   currency: string;
-  billingCycle: "monthly" | "quarterly" | "yearly";
+  billingCycle: "yearly";
+  maxPlaces: number;
+  maxBlogs: number;
   features?: string[];
-  limits?: {
-    maxPlaces: number;
-    maxBlogs: number;
-    maxPhotos: number;
-    featuredListing: boolean;
-    analyticsAccess: boolean;
-    prioritySupport: boolean;
-  };
+  limits?: { maxPlaces: number; maxBlogs: number };
   active: boolean;
   sortOrder?: number;
 }
@@ -43,18 +38,11 @@ export interface Subscription {
   // Financials
   price: number;
   currency: "TRY" | "USD" | "EUR";
-  billingCycle: "monthly" | "quarterly" | "yearly";
+  billingCycle: "yearly";
 
   // Features & Usage
   features: string[];
-  limits: {
-    maxPlaces: number;
-    maxBlogs: number;
-    maxPhotos: number;
-    featuredListing: boolean;
-    analyticsAccess: boolean;
-    prioritySupport: boolean;
-  };
+  limits: { maxPlaces: number; maxBlogs: number };
   usage: {
     currentPlaces: number;
     currentBlogs: number;

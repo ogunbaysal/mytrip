@@ -36,7 +36,7 @@ export default function DashboardPage() {
     },
     {
       title: "Toplam Blog",
-      value: stats?.reviews.total.toLocaleString("tr-TR") || "0", // Map review stats or blog stats here? API returns reviews in overview, dashboard mock had blogs. Let's use reviews for now or placeholder
+      value: stats?.reviews.total.toLocaleString("tr-TR") || "0",
       change: stats?.reviews.new ? `+${stats.reviews.new}` : "0",
       trend: "up", // Assuming up
       icon: FileText,

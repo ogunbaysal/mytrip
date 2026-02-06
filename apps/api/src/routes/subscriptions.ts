@@ -1,57 +1,232 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { nanoid } from "nanoid";
 import { db } from "../db/index.ts";
 import {
+  blogPost,
+  coupon,
+  couponPlan,
+  couponRedemption,
+  payment,
+  place,
   subscription,
   subscriptionPlan,
+  subscriptionPlanFeature,
   user,
-  place,
-  blogPost,
 } from "../db/schemas/index.ts";
-import { eq, and, desc, sql, gte, lte } from "drizzle-orm";
 import { getSessionFromRequest } from "../lib/session.ts";
 import { paymentProvider } from "../lib/payment-provider.ts";
 
 const app = new Hono();
 
-const createSubscriptionSchema = z.object({
-  planId: z.string().min(1),
-  paymentMethod: z.object({
-    type: z.enum(["credit_card"]),
-    cardHolderName: z.string().min(2),
-    cardNumber: z.string().min(16).max(19),
-    expireMonth: z.string().min(2).max(2),
-    expireYear: z.string().min(2).max(2),
-    cvc: z.string().min(3).max(4),
-  }),
+const paymentMethodSchema = z.object({
+  type: z.enum(["credit_card"]),
+  cardHolderName: z.string().min(2),
+  cardNumber: z.string().min(16).max(19),
+  expireMonth: z.string().min(2).max(2),
+  expireYear: z.string().min(2).max(2),
+  cvc: z.string().min(3).max(4),
 });
 
+const createSubscriptionSchema = z.object({
+  planId: z.string().min(1),
+  couponCode: z.string().trim().min(1).optional(),
+  paymentMethod: paymentMethodSchema.optional(),
+});
+
+const validateCouponSchema = z.object({
+  planId: z.string().min(1),
+  code: z.string().trim().min(1),
+});
+
+type PlanRow = typeof subscriptionPlan.$inferSelect;
+type CouponRow = typeof coupon.$inferSelect;
+
+const normalizeCode = (code: string) => code.trim().toUpperCase();
+const roundCurrency = (value: number) => Math.round(value * 100) / 100;
+
+const parseNumeric = (value: string | number | null | undefined) => {
+  if (value === null || value === undefined) return 0;
+  return typeof value === "number" ? value : Number.parseFloat(value);
+};
+
+const hydratePlansWithFeatures = async (plans: PlanRow[]) => {
+  if (plans.length === 0) {
+    return [];
+  }
+
+  const planIds = plans.map((plan) => plan.id);
+  const features = await db
+    .select({
+      planId: subscriptionPlanFeature.planId,
+      label: subscriptionPlanFeature.label,
+    })
+    .from(subscriptionPlanFeature)
+    .where(inArray(subscriptionPlanFeature.planId, planIds))
+    .orderBy(
+      asc(subscriptionPlanFeature.planId),
+      asc(subscriptionPlanFeature.sortOrder),
+    );
+
+  const featureMap = new Map<string, string[]>();
+  for (const feature of features) {
+    if (!featureMap.has(feature.planId)) {
+      featureMap.set(feature.planId, []);
+    }
+    featureMap.get(feature.planId)!.push(feature.label);
+  }
+
+  return plans.map((plan) => {
+    const planFeatures = featureMap.get(plan.id) ?? [];
+    const limits = {
+      maxPlaces: plan.maxPlaces,
+      maxBlogs: plan.maxBlogs,
+    };
+    return {
+      ...plan,
+      billingCycle: "yearly" as const,
+      features: planFeatures,
+      limits,
+    };
+  });
+};
+
+const calculateCouponDiscount = ({
+  basePrice,
+  discountType,
+  discountValue,
+}: {
+  basePrice: number;
+  discountType: CouponRow["discountType"];
+  discountValue: number;
+}) => {
+  if (discountType === "percent") {
+    return roundCurrency((basePrice * discountValue) / 100);
+  }
+
+  return roundCurrency(Math.min(basePrice, discountValue));
+};
+
+const validateCouponForUser = async ({
+  code,
+  planId,
+  userId,
+  basePrice,
+}: {
+  code: string;
+  planId: string;
+  userId: string;
+  basePrice: number;
+}) => {
+  const normalizedCode = normalizeCode(code);
+  const now = new Date();
+
+  const [couponData] = await db
+    .select()
+    .from(coupon)
+    .where(eq(coupon.code, normalizedCode))
+    .limit(1);
+
+  if (!couponData || !couponData.active) {
+    return { valid: false as const, error: "Geçersiz kupon kodu" };
+  }
+
+  if (couponData.startsAt && now < new Date(couponData.startsAt)) {
+    return { valid: false as const, error: "Kupon henüz aktif değil" };
+  }
+
+  if (couponData.endsAt && now > new Date(couponData.endsAt)) {
+    return { valid: false as const, error: "Kuponun süresi dolmuş" };
+  }
+
+  if (couponData.scope === "specific_plans") {
+    const [allowedPlan] = await db
+      .select({ id: couponPlan.id })
+      .from(couponPlan)
+      .where(and(eq(couponPlan.couponId, couponData.id), eq(couponPlan.planId, planId)))
+      .limit(1);
+
+    if (!allowedPlan) {
+      return {
+        valid: false as const,
+        error: "Kupon bu plan için geçerli değil",
+      };
+    }
+  }
+
+  if (couponData.maxRedemptions !== null) {
+    const [totalUsage] = await db
+      .select({ count: sql<number>`COUNT(*)::int` })
+      .from(couponRedemption)
+      .where(eq(couponRedemption.couponId, couponData.id));
+
+    if ((totalUsage?.count ?? 0) >= couponData.maxRedemptions) {
+      return { valid: false as const, error: "Kupon kullanım limiti doldu" };
+    }
+  }
+
+  const [perUserUsage] = await db
+    .select({ count: sql<number>`COUNT(*)::int` })
+    .from(couponRedemption)
+    .where(
+      and(
+        eq(couponRedemption.couponId, couponData.id),
+        eq(couponRedemption.userId, userId),
+      ),
+    );
+
+  if ((perUserUsage?.count ?? 0) >= couponData.maxRedemptionsPerUser) {
+    return {
+      valid: false as const,
+      error: "Bu kuponu kullanım hakkınız doldu",
+    };
+  }
+
+  const discountValue = parseNumeric(couponData.discountValue);
+  const discountAmount = calculateCouponDiscount({
+    basePrice,
+    discountType: couponData.discountType,
+    discountValue,
+  });
+  const finalPrice = roundCurrency(Math.max(0, basePrice - discountAmount));
+
+  return {
+    valid: true as const,
+    coupon: couponData,
+    discountAmount,
+    finalPrice,
+    normalizedCode,
+  };
+};
+
+/**
+ * GET /subscriptions/plans
+ */
 app.get("/plans", async (c) => {
   try {
     const plans = await db
       .select()
       .from(subscriptionPlan)
-      .where(eq(subscriptionPlan.active, true))
+      .where(
+        and(
+          eq(subscriptionPlan.active, true),
+          eq(subscriptionPlan.billingCycle, "yearly"),
+        ),
+      )
       .orderBy(subscriptionPlan.sortOrder, desc(subscriptionPlan.createdAt));
 
-    const plansWithParsedData = plans.map((plan) => ({
-      ...plan,
-      features:
-        typeof plan.features === "string"
-          ? JSON.parse(plan.features)
-          : plan.features,
-      limits:
-        typeof plan.limits === "string" ? JSON.parse(plan.limits) : plan.limits,
-    }));
-
-    return c.json({ plans: plansWithParsedData });
+    return c.json({ plans: await hydratePlansWithFeatures(plans) });
   } catch (error) {
     console.error("Failed to fetch plans:", error);
     return c.json({ error: "Failed to fetch plans" }, 500);
   }
 });
 
+/**
+ * GET /subscriptions/current
+ */
 app.get("/current", async (c) => {
   try {
     const session = await getSessionFromRequest(c);
@@ -70,13 +245,16 @@ app.get("/current", async (c) => {
         nextBillingDate: subscription.nextBillingDate,
         cancelledAt: subscription.cancelledAt,
         planId: subscription.planId,
+        price: subscription.price,
+        basePrice: subscription.basePrice,
+        discountAmount: subscription.discountAmount,
+        couponCode: subscription.couponCode,
+        currency: subscription.currency,
+        billingCycle: subscription.billingCycle,
         planName: subscriptionPlan.name,
         planDescription: subscriptionPlan.description,
-        planPrice: subscriptionPlan.price,
-        planCurrency: subscriptionPlan.currency,
-        planBillingCycle: subscriptionPlan.billingCycle,
-        planFeatures: subscriptionPlan.features,
-        planLimits: subscriptionPlan.limits,
+        planMaxPlaces: subscriptionPlan.maxPlaces,
+        planMaxBlogs: subscriptionPlan.maxBlogs,
       })
       .from(subscription)
       .innerJoin(subscriptionPlan, eq(subscription.planId, subscriptionPlan.id))
@@ -88,20 +266,25 @@ app.get("/current", async (c) => {
       return c.json({ subscription: null, hasSubscription: false });
     }
 
-    const planLimits =
-      typeof currentSub.planLimits === "string"
-        ? JSON.parse(currentSub.planLimits)
-        : currentSub.planLimits;
-    const planFeatures =
-      typeof currentSub.planFeatures === "string"
-        ? JSON.parse(currentSub.planFeatures)
-        : currentSub.planFeatures;
+    const [featureRows] = await Promise.all([
+      db
+        .select({ label: subscriptionPlanFeature.label })
+        .from(subscriptionPlanFeature)
+        .where(eq(subscriptionPlanFeature.planId, currentSub.planId))
+        .orderBy(asc(subscriptionPlanFeature.sortOrder)),
+    ]);
+
+    const planFeatures = featureRows.map((item) => item.label);
+    const planLimits = {
+      maxPlaces: currentSub.planMaxPlaces,
+      maxBlogs: currentSub.planMaxBlogs,
+    };
 
     return c.json({
       subscription: {
         ...currentSub,
-        planLimits,
         planFeatures,
+        planLimits,
       },
       hasSubscription: true,
     });
@@ -111,6 +294,71 @@ app.get("/current", async (c) => {
   }
 });
 
+/**
+ * POST /subscriptions/coupons/validate
+ */
+app.post("/coupons/validate", zValidator("json", validateCouponSchema), async (c) => {
+  try {
+    const session = await getSessionFromRequest(c);
+    if (!session?.user?.id) {
+      return c.json({ error: "Unauthorized" }, 401);
+    }
+
+    const { planId, code } = c.req.valid("json");
+    const userId = session.user.id;
+
+    const [plan] = await db
+      .select()
+      .from(subscriptionPlan)
+      .where(
+        and(
+          eq(subscriptionPlan.id, planId),
+          eq(subscriptionPlan.active, true),
+          eq(subscriptionPlan.billingCycle, "yearly"),
+        ),
+      )
+      .limit(1);
+
+    if (!plan) {
+      return c.json({ error: "Plan not found or inactive" }, 404);
+    }
+
+    const basePrice = parseNumeric(plan.price);
+    const validation = await validateCouponForUser({
+      code,
+      planId,
+      userId,
+      basePrice,
+    });
+
+    if (!validation.valid) {
+      return c.json({ valid: false, error: validation.error }, 400);
+    }
+
+    return c.json({
+      valid: true,
+      coupon: {
+        id: validation.coupon.id,
+        code: validation.coupon.code,
+        discountType: validation.coupon.discountType,
+        discountValue: validation.coupon.discountValue,
+      },
+      pricing: {
+        basePrice,
+        discountAmount: validation.discountAmount,
+        finalPrice: validation.finalPrice,
+        currency: plan.currency,
+      },
+    });
+  } catch (error) {
+    console.error("Coupon validation failed:", error);
+    return c.json({ error: "Coupon validation failed" }, 500);
+  }
+});
+
+/**
+ * POST /subscriptions/create
+ */
 app.post("/create", zValidator("json", createSubscriptionSchema), async (c) => {
   try {
     const session = await getSessionFromRequest(c);
@@ -119,14 +367,17 @@ app.post("/create", zValidator("json", createSubscriptionSchema), async (c) => {
     }
 
     const userId = session.user.id;
-    const { planId, paymentMethod } = c.req.valid("json");
-    const { nanoid } = await import("nanoid");
+    const { planId, couponCode, paymentMethod } = c.req.valid("json");
 
     const [plan] = await db
       .select()
       .from(subscriptionPlan)
       .where(
-        and(eq(subscriptionPlan.id, planId), eq(subscriptionPlan.active, true)),
+        and(
+          eq(subscriptionPlan.id, planId),
+          eq(subscriptionPlan.active, true),
+          eq(subscriptionPlan.billingCycle, "yearly"),
+        ),
       )
       .limit(1);
 
@@ -136,38 +387,62 @@ app.post("/create", zValidator("json", createSubscriptionSchema), async (c) => {
 
     const startDate = new Date();
     const endDate = new Date(startDate);
-
-    switch (plan.billingCycle) {
-      case "monthly":
-        endDate.setMonth(endDate.getMonth() + 1);
-        break;
-      case "quarterly":
-        endDate.setMonth(endDate.getMonth() + 3);
-        break;
-      case "yearly":
-        endDate.setFullYear(endDate.getFullYear() + 1);
-        break;
-    }
-
+    endDate.setFullYear(endDate.getFullYear() + 1);
     const nextBillingDate = new Date(endDate);
 
-    const paymentResult = await paymentProvider.createSubscription({
-      userId,
-      planId,
-      price: parseFloat(plan.price.toString()),
-      currency: plan.currency,
-      billingCycle: plan.billingCycle,
-      paymentCard: paymentMethod,
-    });
+    const basePrice = parseNumeric(plan.price);
+    let discountAmount = 0;
+    let finalPrice = basePrice;
+    let appliedCouponId: string | null = null;
+    let appliedCouponCode: string | null = null;
 
-    if (paymentResult.status === "failed") {
+    if (couponCode) {
+      const validation = await validateCouponForUser({
+        code: couponCode,
+        planId,
+        userId,
+        basePrice,
+      });
+
+      if (!validation.valid) {
+        return c.json({ error: validation.error }, 400);
+      }
+
+      discountAmount = validation.discountAmount;
+      finalPrice = validation.finalPrice;
+      appliedCouponId = validation.coupon.id;
+      appliedCouponCode = validation.normalizedCode;
+    }
+
+    if (finalPrice > 0 && !paymentMethod) {
       return c.json(
-        {
-          error: "Payment failed",
-          message: "Ödeme işleminiz başarısız oldu. Lütfen tekrar deneyiniz.",
-        },
+        { error: "Payment method is required when payable amount is above zero" },
         400,
       );
+    }
+
+    let providerSubscriptionId: string | null = null;
+    if (finalPrice > 0 && paymentMethod) {
+      const paymentResult = await paymentProvider.createSubscription({
+        userId,
+        planId,
+        price: finalPrice,
+        currency: plan.currency,
+        billingCycle: "yearly",
+        paymentCard: paymentMethod,
+      });
+
+      if (paymentResult.status === "failed") {
+        return c.json(
+          {
+            error: "Payment failed",
+            message: "Ödeme işleminiz başarısız oldu. Lütfen tekrar deneyiniz.",
+          },
+          400,
+        );
+      }
+
+      providerSubscriptionId = paymentResult.providerSubscriptionId;
     }
 
     const [newSubscription] = await db
@@ -178,21 +453,72 @@ app.post("/create", zValidator("json", createSubscriptionSchema), async (c) => {
         planId,
         status: "active",
         provider: "mock",
-        providerSubscriptionId: paymentResult.providerSubscriptionId,
-        price: plan.price.toString(),
+        providerSubscriptionId,
+        basePrice: basePrice.toString(),
+        discountAmount: discountAmount.toString(),
+        price: finalPrice.toString(),
+        couponId: appliedCouponId,
+        couponCode: appliedCouponCode,
         currency: plan.currency,
-        billingCycle: plan.billingCycle,
+        billingCycle: "yearly",
         startDate: startDate.toISOString().split("T")[0],
         endDate: endDate.toISOString().split("T")[0],
         nextBillingDate: nextBillingDate.toISOString().split("T")[0],
-        paymentMethod: JSON.stringify({
-          type: "credit_card",
-          lastFour: paymentMethod.cardNumber.slice(-4),
-        }),
+        paymentMethod:
+          finalPrice > 0 && paymentMethod
+            ? JSON.stringify({
+                type: "credit_card",
+                lastFour: paymentMethod.cardNumber.slice(-4),
+              })
+            : JSON.stringify({
+                type: "coupon",
+                code: appliedCouponCode,
+              }),
         createdAt: new Date(),
         updatedAt: new Date(),
       })
       .returning();
+
+    await db.insert(payment).values({
+      id: nanoid(),
+      subscriptionId: newSubscription.id,
+      userId,
+      provider: "mock",
+      amount: finalPrice.toString(),
+      currency: plan.currency,
+      status: "success",
+      paymentMethod:
+        finalPrice > 0 && paymentMethod
+          ? JSON.stringify({
+              type: "credit_card",
+              lastFour: paymentMethod.cardNumber.slice(-4),
+            })
+          : JSON.stringify({
+              type: "coupon",
+              code: appliedCouponCode,
+            }),
+      gatewayResponse: JSON.stringify({
+        status: "success",
+        source: finalPrice > 0 ? "payment_provider" : "coupon",
+      }),
+      paidAt: new Date(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    if (appliedCouponId) {
+      await db.insert(couponRedemption).values({
+        id: nanoid(),
+        couponId: appliedCouponId,
+        userId,
+        subscriptionId: newSubscription.id,
+        planId: plan.id,
+        discountAmount: discountAmount.toString(),
+        finalAmount: finalPrice.toString(),
+        currency: plan.currency,
+        redeemedAt: new Date(),
+      });
+    }
 
     await db
       .update(user)
@@ -203,12 +529,7 @@ app.post("/create", zValidator("json", createSubscriptionSchema), async (c) => {
       })
       .where(eq(user.id, userId));
 
-    // Return fresh user data to update session
-    const [updatedUser] = await db
-      .select()
-      .from(user)
-      .where(eq(user.id, userId))
-      .limit(1);
+    const [hydratedPlan] = await hydratePlansWithFeatures([plan]);
 
     return c.json(
       {
@@ -217,7 +538,19 @@ app.post("/create", zValidator("json", createSubscriptionSchema), async (c) => {
         subscriptionId: newSubscription.id,
         subscription: {
           ...newSubscription,
-          plan,
+          plan: hydratedPlan,
+          coupon: appliedCouponCode
+            ? {
+                code: appliedCouponCode,
+                discountAmount,
+              }
+            : null,
+          pricing: {
+            basePrice,
+            discountAmount,
+            finalPrice,
+            currency: plan.currency,
+          },
         },
       },
       201,
@@ -231,6 +564,9 @@ app.post("/create", zValidator("json", createSubscriptionSchema), async (c) => {
   }
 });
 
+/**
+ * POST /subscriptions/cancel
+ */
 app.post("/cancel", async (c) => {
   try {
     const session = await getSessionFromRequest(c);
@@ -253,9 +589,7 @@ app.post("/cancel", async (c) => {
     }
 
     if (activeSub.providerSubscriptionId) {
-      await paymentProvider.cancelSubscription(
-        activeSub.providerSubscriptionId,
-      );
+      await paymentProvider.cancelSubscription(activeSub.providerSubscriptionId);
     }
 
     await db
@@ -278,6 +612,9 @@ app.post("/cancel", async (c) => {
   }
 });
 
+/**
+ * GET /subscriptions/usage
+ */
 app.get("/usage", async (c) => {
   try {
     const session = await getSessionFromRequest(c);
@@ -294,7 +631,8 @@ app.get("/usage", async (c) => {
         endDate: subscription.endDate,
         nextBillingDate: subscription.nextBillingDate,
         planId: subscription.planId,
-        planLimits: subscriptionPlan.limits,
+        planMaxPlaces: subscriptionPlan.maxPlaces,
+        planMaxBlogs: subscriptionPlan.maxBlogs,
       })
       .from(subscription)
       .innerJoin(subscriptionPlan, eq(subscription.planId, subscriptionPlan.id))
@@ -312,18 +650,13 @@ app.get("/usage", async (c) => {
       );
     }
 
-    const planLimits =
-      typeof subscriptionData.planLimits === "string"
-        ? JSON.parse(subscriptionData.planLimits)
-        : subscriptionData.planLimits;
-
     const [placeCount] = await db
-      .select({ count: sql`COUNT(*)::int` })
+      .select({ count: sql<number>`COUNT(*)::int` })
       .from(place)
       .where(eq(place.ownerId, userId));
 
     const [blogCount] = await db
-      .select({ count: sql`COUNT(*)::int` })
+      .select({ count: sql<number>`COUNT(*)::int` })
       .from(blogPost)
       .where(eq(blogPost.authorId, userId));
 
@@ -331,11 +664,11 @@ app.get("/usage", async (c) => {
       usage: {
         places: {
           current: placeCount.count,
-          max: planLimits?.maxPlaces || 0,
+          max: subscriptionData.planMaxPlaces,
         },
         blogs: {
           current: blogCount.count,
-          max: planLimits?.maxBlogs || 0,
+          max: subscriptionData.planMaxBlogs,
         },
       },
       subscription: {

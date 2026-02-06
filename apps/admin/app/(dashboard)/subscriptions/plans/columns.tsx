@@ -18,10 +18,12 @@ export const columns: ColumnDef<SubscriptionPlan>[] = [
     )
   },
   {
-    accessorKey: "billingCycle",
-    header: "Periyot",
+    id: "limits",
+    header: "Limitler",
     cell: ({ row }) => (
-        <Badge variant="outline">{row.original.billingCycle}</Badge>
+      <div className="text-sm">
+        {row.original.maxPlaces} mekan / {row.original.maxBlogs} blog
+      </div>
     )
   },
   {

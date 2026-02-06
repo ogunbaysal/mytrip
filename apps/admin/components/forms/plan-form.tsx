@@ -17,13 +17,7 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import { SubscriptionPlan } from "@/types/subscriptions"
 
@@ -32,7 +26,9 @@ const formSchema = z.object({
   description: z.string().optional(),
   price: z.coerce.number().min(0, "Fiyat 0 veya daha büyük olmalıdır"),
   currency: z.enum(["TRY", "USD", "EUR"]),
-  billingCycle: z.enum(["monthly", "quarterly", "yearly"]),
+  maxPlaces: z.coerce.number().int().min(0, "Mekan limiti 0 veya daha büyük olmalıdır"),
+  maxBlogs: z.coerce.number().int().min(0, "Blog limiti 0 veya daha büyük olmalıdır"),
+  featuresText: z.string().optional(),
   active: z.boolean().default(true),
 })
 
@@ -54,14 +50,18 @@ export const PlanForm: React.FC<PlanFormProps> = ({ initialData }) => {
     description: initialData.description || "",
     price: parseFloat(initialData.price.toString()),
     currency: initialData.currency as "TRY" | "USD" | "EUR",
-    billingCycle: initialData.billingCycle,
+    maxPlaces: initialData.maxPlaces ?? initialData.limits?.maxPlaces ?? 0,
+    maxBlogs: initialData.maxBlogs ?? initialData.limits?.maxBlogs ?? 0,
+    featuresText: (initialData.features ?? []).join("\n"),
     active: initialData.active,
   } : {
     name: "",
     description: "",
     price: 0,
     currency: "TRY",
-    billingCycle: "monthly",
+    maxPlaces: 1,
+    maxBlogs: 1,
+    featuresText: "",
     active: true,
   }
 
@@ -75,11 +75,19 @@ export const PlanForm: React.FC<PlanFormProps> = ({ initialData }) => {
       setLoading(true)
       const url = initialData ? `/api/admin/plans/${initialData.id}` : `/api/admin/plans`
       const method = initialData ? "PUT" : "POST"
+      const features = (data.featuresText || "")
+        .split("\n")
+        .map((item) => item.trim())
+        .filter(Boolean)
 
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          ...data,
+          billingCycle: "yearly",
+          features,
+        }),
       })
 
       if (!res.ok) throw new Error("Bir hata oluştu")
@@ -128,56 +136,42 @@ export const PlanForm: React.FC<PlanFormProps> = ({ initialData }) => {
             />
             <FormField
               control={form.control}
-              name="currency"
+              name="maxPlaces"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Para Birimi</FormLabel>
-                  <Select
-                    disabled={loading}
-                    onValueChange={field.onChange}
-                    value={field.value}
-                    defaultValue={field.value}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue defaultValue={field.value} placeholder="Para birimi seçin" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="TRY">TRY</SelectItem>
-                      <SelectItem value="USD">USD</SelectItem>
-                      <SelectItem value="EUR">EUR</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <FormLabel>Mekan Limiti</FormLabel>
+                  <FormControl>
+                    <Input type="number" disabled={loading} placeholder="1" {...field} />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
             <FormField
               control={form.control}
-              name="billingCycle"
+              name="maxBlogs"
               render={({ field }) => (
                   <FormItem>
-                  <FormLabel>Faturalandırma Periyodu</FormLabel>
-                  <Select
-                      disabled={loading}
-                      onValueChange={field.onChange}
-                      value={field.value}
-                      defaultValue={field.value}
-                  >
-                      <FormControl>
-                      <SelectTrigger>
-                          <SelectValue defaultValue={field.value} placeholder="Periyot seçin" />
-                      </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                      <SelectItem value="monthly">Aylık</SelectItem>
-                      <SelectItem value="quarterly">3 Aylık</SelectItem>
-                      <SelectItem value="yearly">Yıllık</SelectItem>
-                      </SelectContent>
-                  </Select>
+                  <FormLabel>Blog Limiti</FormLabel>
+                  <FormControl>
+                    <Input type="number" disabled={loading} placeholder="1" {...field} />
+                  </FormControl>
                   <FormMessage />
                   </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="currency"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Para Birimi</FormLabel>
+                  <FormControl>
+                    <Input disabled readOnly {...field} className="bg-muted" />
+                  </FormControl>
+                  <p className="text-xs text-muted-foreground">Şu an sadece yıllık TRY planları desteklenir.</p>
+                  <FormMessage />
+                </FormItem>
               )}
             />
              <FormField
@@ -189,6 +183,25 @@ export const PlanForm: React.FC<PlanFormProps> = ({ initialData }) => {
                   <FormControl>
                     <Input disabled={loading} placeholder="Plan açıklaması..." {...field} />
                   </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="featuresText"
+              render={({ field }) => (
+                <FormItem className="md:col-span-2">
+                  <FormLabel>Plan Özellikleri</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      disabled={loading}
+                      placeholder={"Her satıra bir özellik yazın\nÖrn: 5 mekan yayınlama hakkı"}
+                      rows={6}
+                      {...field}
+                    />
+                  </FormControl>
+                  <p className="text-xs text-muted-foreground">Her satır ayrı özellik olarak kaydedilir.</p>
                   <FormMessage />
                 </FormItem>
               )}

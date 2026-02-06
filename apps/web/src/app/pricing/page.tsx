@@ -1,9 +1,8 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { Check, Star, ArrowRight } from "lucide-react";
+import { Check, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { api } from "@/lib/api";
@@ -14,33 +13,28 @@ interface Plan {
   description?: string;
   price: string | number;
   currency: string;
-  billingCycle: "monthly" | "quarterly" | "yearly";
+  billingCycle: "yearly";
   features: string[];
-  limits: {
+  maxPlaces: number;
+  maxBlogs: number;
+  limits?: {
     maxPlaces: number;
     maxBlogs: number;
-    maxPhotos: number;
-    featuredListing: boolean;
-    analyticsAccess: boolean;
-    prioritySupport: boolean;
   };
   active: boolean;
   sortOrder: number;
 }
 
 export default function PricingPage() {
-  const [billingCycle, setBillingCycle] = useState<
-    "monthly" | "quarterly" | "yearly"
-  >("monthly");
-
   const { data: plansData, isLoading } = useQuery({
-    queryKey: ["plans", billingCycle],
+    queryKey: ["plans"],
     queryFn: () => api.subscriptions.getPlans(),
     staleTime: 1000 * 60 * 5,
   });
 
-  const plans =
-    plansData?.plans.filter((plan) => plan.billingCycle === billingCycle) || [];
+  const plans = (plansData?.plans as Plan[] | undefined)?.filter(
+    (plan) => plan.billingCycle === "yearly",
+  ) || [];
 
   const getDisplayPrice = (price: string | number) => {
     const priceNum = typeof price === "string" ? parseFloat(price) : price;
@@ -48,15 +42,6 @@ export default function PricingPage() {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });
-  };
-
-  const getCycleLabel = (cycle: string) => {
-    const labels = {
-      monthly: "Aylık",
-      quarterly: "3 Aylık",
-      yearly: "Yıllık",
-    };
-    return labels[cycle as keyof typeof labels] || cycle;
   };
 
   return (
@@ -70,22 +55,6 @@ export default function PricingPage() {
             Esnek abonelik seçenekleri ile işletmenizi TatilDesen platformunda
             büyütün. İstediğiniz zaman planı değiştirebilirsiniz.
           </p>
-        </div>
-
-        <div className="mb-8 flex justify-center gap-2">
-          {(["monthly", "quarterly", "yearly"] as const).map((cycle) => (
-            <button
-              key={cycle}
-              onClick={() => setBillingCycle(cycle)}
-              className={`rounded-lg px-6 py-3 font-medium transition ${
-                billingCycle === cycle
-                  ? "bg-primary text-primary-foreground shadow-md"
-                  : "bg-muted text-muted-foreground hover:bg-muted/80"
-              }`}
-            >
-              {getCycleLabel(cycle)}
-            </button>
-          ))}
         </div>
 
         {isLoading ? (
@@ -128,30 +97,24 @@ export default function PricingPage() {
                         {plan.currency}
                       </span>
                       <span className="text-sm text-muted-foreground">
-                        /{getCycleLabel(billingCycle)}
+                        /Yıllık
                       </span>
                     </div>
 
                     <div className="space-y-2 text-sm">
                       <div className="flex items-start gap-3">
                         <span className="font-semibold">
-                          {plan.limits.maxPlaces}
+                          {plan.maxPlaces}
                         </span>
                         <span className="text-muted-foreground">mekan</span>
                       </div>
                       <div className="flex items-start gap-3">
                         <span className="font-semibold">
-                          {plan.limits.maxBlogs}
+                          {plan.maxBlogs}
                         </span>
                         <span className="text-muted-foreground">
                           blog yazısı
                         </span>
-                      </div>
-                      <div className="flex items-start gap-3">
-                        <span className="font-semibold">
-                          {plan.limits.maxPhotos}
-                        </span>
-                        <span className="text-muted-foreground">fotoğraf</span>
                       </div>
                     </div>
                   </div>
@@ -167,9 +130,7 @@ export default function PricingPage() {
                     </ul>
 
                     <Link
-                      href={
-                        `/subscribe/checkout?plan=${plan.id}&cycle=${billingCycle}` as any
-                      }
+                      href={`/subscribe/checkout?plan=${plan.id}` as any}
                       className="w-full"
                     >
                       <Button
@@ -179,9 +140,7 @@ export default function PricingPage() {
                             : "bg-muted-foreground text-background"
                         }`}
                       >
-                        {plan.limits.maxPlaces === 0
-                          ? "İletişime Geç"
-                          : "Planı Seç"}
+                        {plan.maxPlaces === 0 ? "İletişime Geç" : "Planı Seç"}
                         <ArrowRight className="ml-2 size-4" />
                       </Button>
                     </Link>

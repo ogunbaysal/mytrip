@@ -56,7 +56,7 @@ async function checkBlogLimit(
 ): Promise<{ allowed: boolean; current: number; max: number }> {
   const [subscriptionData] = await db
     .select({
-      planLimits: subscriptionPlan.limits,
+      maxBlogs: subscriptionPlan.maxBlogs,
       endDate: subscription.endDate,
       status: subscription.status,
     })
@@ -75,17 +75,12 @@ async function checkBlogLimit(
     return { allowed: false, current: 0, max: 0 };
   }
 
-  const planLimits =
-    typeof subscriptionData.planLimits === "string"
-      ? JSON.parse(subscriptionData.planLimits)
-      : subscriptionData.planLimits;
-
   const [blogCount] = await db
     .select({ count: sql<number>`COUNT(*)::int` })
     .from(blogPost)
     .where(eq(blogPost.authorId, userId));
 
-  const maxBlogs = planLimits?.maxBlogs || 0;
+  const maxBlogs = subscriptionData.maxBlogs || 0;
   return {
     allowed: (blogCount.count as number) < maxBlogs,
     current: blogCount.count as number,

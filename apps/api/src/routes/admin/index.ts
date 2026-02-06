@@ -14,6 +14,7 @@ import categories from "./categories.ts";
 import { plansRoutes } from "./plans.ts";
 import { subscriptionsRoutes } from "./subscriptions.ts";
 import { paymentsRoutes } from "./payments.ts";
+import { couponsRoutes } from "./coupons.ts";
 import { approvalsRoutes } from "./approvals/places.ts";
 import { businessApprovalRoutes } from "./approvals/business.ts";
 
@@ -59,6 +60,7 @@ app.route("/upload", uploadRoutes);
 app.route("/settings", settings);
 app.route("/categories", categories);
 app.route("/plans", plansRoutes);
+app.route("/coupons", couponsRoutes);
 app.route("/subscriptions", subscriptionsRoutes);
 app.route("/payments", paymentsRoutes);
 app.route("/approvals/places", approvalsRoutes);

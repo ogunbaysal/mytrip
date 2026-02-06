@@ -3,12 +3,10 @@
 import * as React from "react"
 import {
   ColumnDef,
-  ColumnFiltersState,
   SortingState,
   VisibilityState,
   flexRender,
   getCoreRowModel,
-  getFilteredRowModel,
   getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
@@ -27,7 +25,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Input } from "@/components/ui/input"
 import {
   Table,
   TableBody,
@@ -38,7 +35,6 @@ import {
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
-import { placeTypes, placeStatuses, priceLevels } from "@/lib/mock-data/places"
 import { Place } from "@/hooks/use-places"
 import { useDeletePlace, useTogglePlaceFeature, useTogglePlaceVerify, useUpdatePlaceStatus } from "@/hooks/use-places"
 import {
@@ -53,20 +49,41 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Skeleton } from "@/components/ui/skeleton"
 
-// Helper functions defined outside component to remain static
+const PLACE_TYPE_LABELS: Record<string, string> = {
+  restaurant: "Restoran",
+  hotel: "Otel",
+  activity: "Aktivite",
+  attraction: "Gezilecek Yer",
+  service: "Hizmet",
+  shopping: "Mağaza",
+  cafe: "Kafe",
+}
+
+const PLACE_STATUS_LABELS: Record<string, string> = {
+  active: "Aktif",
+  inactive: "Pasif",
+  pending: "Beklemede",
+  suspended: "Askıda",
+  rejected: "Reddedildi",
+}
+
+const PRICE_LEVEL_LABELS: Record<string, string> = {
+  budget: "Uygun",
+  moderate: "Orta",
+  expensive: "Pahalı",
+  luxury: "Lüks",
+}
+
 const getTypeLabel = (type: string) => {
-  const option = placeTypes.find(opt => opt.value === type)
-  return option?.label || type
+  return PLACE_TYPE_LABELS[type] || type
 }
 
 const getStatusLabel = (status: string) => {
-  const option = placeStatuses.find(opt => opt.value === status)
-  return option?.label || status
+  return PLACE_STATUS_LABELS[status] || status
 }
 
 const getPriceLevelLabel = (level: string) => {
-  const option = priceLevels.find(opt => opt.value === level)
-  return option?.label || level
+  return PRICE_LEVEL_LABELS[level] || level
 }
 
 const getPriceLevelColor = (level: string) => {
@@ -94,22 +111,44 @@ const ActionsCell = ({ place }: { place: Place }) => {
   const router = useRouter()
   const [deleteId, setDeleteId] = React.useState<string | null>(null)
   
-  const { mutate: updatePlaceStatus } = useUpdatePlaceStatus()
-  const { mutate: toggleVerify } = useTogglePlaceVerify()
-  const { mutate: toggleFeature } = useTogglePlaceFeature()
-  const { mutate: deletePlace, isPending: isDeleting } = useDeletePlace()
+  const { mutateAsync: updatePlaceStatus, isPending: isUpdatingStatus } =
+    useUpdatePlaceStatus()
+  const { mutateAsync: toggleVerify, isPending: isTogglingVerify } =
+    useTogglePlaceVerify()
+  const { mutateAsync: toggleFeature, isPending: isTogglingFeature } =
+    useTogglePlaceFeature()
+  const { mutateAsync: deletePlace, isPending: isDeleting } = useDeletePlace()
 
-  const handleDelete = () => {
-    if (deleteId) {
-      deletePlace(deleteId, {
-        onSuccess: () => {
-          setDeleteId(null)
-          toast.success("Mekan başarıyla silindi")
-        },
-        onError: (error: Error) => {
-          toast.error(error.message || "Silme işlemi başarısız")
-        }
-      })
+  const isActionPending =
+    isUpdatingStatus || isTogglingVerify || isTogglingFeature || isDeleting
+
+  const runAction = async (
+    action: () => Promise<unknown>,
+    successMsg: string,
+  ) => {
+    try {
+      await action()
+      toast.success(successMsg)
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "İşlem sırasında hata oluştu"
+      toast.error(message)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!deleteId) {
+      return
+    }
+
+    try {
+      await deletePlace(deleteId)
+      setDeleteId(null)
+      toast.success("Mekan başarıyla silindi")
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Silme işlemi başarısız"
+      toast.error(message)
     }
   }
 
@@ -149,24 +188,68 @@ const ActionsCell = ({ place }: { place: Place }) => {
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           {place.status !== "active" && (
-            <DropdownMenuItem onClick={() => updatePlaceStatus({ placeId: place.id, status: "active" })}>
+            <DropdownMenuItem
+              disabled={isActionPending}
+              onClick={() =>
+                runAction(
+                  () =>
+                    updatePlaceStatus({ placeId: place.id, status: "active" }),
+                  "Mekan aktifleştirildi",
+                )
+              }
+            >
               <CheckCircle2 className="mr-2 h-4 w-4 text-green-600" /> Aktifleştir
             </DropdownMenuItem>
           )}
           {place.status === "active" && (
-            <DropdownMenuItem onClick={() => updatePlaceStatus({ placeId: place.id, status: "suspended" })}>
+            <DropdownMenuItem
+              disabled={isActionPending}
+              onClick={() =>
+                runAction(
+                  () =>
+                    updatePlaceStatus({ placeId: place.id, status: "suspended" }),
+                  "Mekan askıya alındı",
+                )
+              }
+            >
               <XCircle className="mr-2 h-4 w-4 text-orange-600" /> Askıya Al
             </DropdownMenuItem>
           )}
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => toggleVerify(place.id)}>
+          <DropdownMenuItem
+            disabled={isActionPending}
+            onClick={() =>
+              runAction(
+                () =>
+                  toggleVerify({
+                    placeId: place.id,
+                    verified: !place.verified,
+                  }),
+                place.verified ? "Doğrulama kaldırıldı" : "Mekan doğrulandı",
+              )
+            }
+          >
             {place.verified ? "Doğrulamayı Kaldır" : "Doğrula"}
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => toggleFeature(place.id)}>
+          <DropdownMenuItem
+            disabled={isActionPending}
+            onClick={() =>
+              runAction(
+                () => toggleFeature(place.id),
+                place.featured
+                  ? "Öne çıkarılanlardan kaldırıldı"
+                  : "Mekan öne çıkarıldı",
+              )
+            }
+          >
             {place.featured ? "Öne Çıkarılanlardan Kaldır" : "Öne Çıkar"}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem className="text-red-600" onClick={() => setDeleteId(place.id)}>
+          <DropdownMenuItem
+            className="text-red-600"
+            disabled={isActionPending}
+            onClick={() => setDeleteId(place.id)}
+          >
             <Trash2 className="mr-2 h-4 w-4" /> Sil
           </DropdownMenuItem>
         </DropdownMenuContent>
@@ -177,7 +260,6 @@ const ActionsCell = ({ place }: { place: Place }) => {
 
 export function PlacesTable({ data, isLoading }: { data: Place[], isLoading: boolean }) {
   const [sorting, setSorting] = React.useState<SortingState>([])
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
   const [rowSelection, setRowSelection] = React.useState({})
 
@@ -387,16 +469,13 @@ export function PlacesTable({ data, isLoading }: { data: Place[], isLoading: boo
     data: data || [],
     columns,
     onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
     state: {
       sorting,
-      columnFilters,
       columnVisibility,
       rowSelection,
     },
@@ -420,18 +499,10 @@ export function PlacesTable({ data, isLoading }: { data: Place[], isLoading: boo
 
   return (
     <div className="w-full">
-      <div className="flex items-center py-4">
-        <Input
-          placeholder="Mekan ara..."
-          value={(table.getColumn("name")?.getFilterValue() as string) ?? ""}
-          onChange={(event) =>
-            table.getColumn("name")?.setFilterValue(event.target.value)
-          }
-          className="max-w-sm"
-        />
+      <div className="flex items-center justify-end py-4">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="ml-auto">
+            <Button variant="outline">
               Sütunlar <ChevronDown className="ml-2 h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
@@ -522,28 +593,12 @@ export function PlacesTable({ data, isLoading }: { data: Place[], isLoading: boo
 
       <div className="flex items-center justify-between space-x-2 py-4">
         <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-          <span>
-            {table.getFilteredSelectedRowModel().rows.length} /{" "}
-            {table.getFilteredRowModel().rows.length} mekan seçildi
-          </span>
-        </div>
-        <div className="space-x-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => table.previousPage()}
-            disabled={!table.getCanPreviousPage()}
-          >
-            Önceki
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => table.nextPage()}
-            disabled={!table.getCanNextPage()}
-          >
-            Sonraki
-          </Button>
+          {table.getSelectedRowModel().rows.length > 0 && (
+            <span>
+              {table.getSelectedRowModel().rows.length} /{" "}
+              {table.getRowModel().rows.length} mekan seçildi
+            </span>
+          )}
         </div>
       </div>
     </div>

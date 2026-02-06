@@ -30,9 +30,8 @@ import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ArrowLeft } from "lucide-react"
 import Link from "next/link"
-// For a real app, we would want a map picker here, but for now we'll use text inputs for lat/lng
-
 import { GalleryUpload } from "@/components/ui/gallery-upload"
+import { CoordinateMapPicker } from "@/components/ui/coordinate-map-picker"
 
 const formSchema = z.object({
   images: z.array(z.string()).optional(),
@@ -50,6 +49,8 @@ const formSchema = z.object({
   priceLevel: z.string().optional(), // 1-4 scale usually
   nightlyPrice: z.string().optional(),
 })
+
+const DEFAULT_COORDS = { lat: 39.0, lng: 35.0 }
 
 export default function CreatePlacePage() {
   const router = useRouter()
@@ -81,11 +82,18 @@ export default function CreatePlacePage() {
   const { data: districts } = useDistricts(watchedCity)
 
   function onSubmit(values: z.infer<typeof formSchema>) {
+    const parsedLat = Number(values.latitude)
+    const parsedLng = Number(values.longitude)
+    const hasValidCoordinates =
+      !Number.isNaN(parsedLat) && !Number.isNaN(parsedLng)
+
     // Transform values for API
     const apiData = {
         ...values,
         category: categories?.find(c => c.id === values.categoryId)?.name || values.category || "", // Fallback
-        location: values.latitude && values.longitude ? { type: "Point", coordinates: [parseFloat(values.longitude), parseFloat(values.latitude)] } : undefined,
+        location: hasValidCoordinates
+          ? { lat: parsedLat, lng: parsedLng }
+          : undefined,
         priceLevel: values.priceLevel || undefined,
         // In a real app we would pick an owner. For this MVP we might need to handle owner assignment differently or set current admin as owner?
         // The API actually allows nullable ownerId for places (if the schema permits), or we might need to select a user first.
@@ -108,6 +116,17 @@ export default function CreatePlacePage() {
       }
     })
   }
+
+  const latitudeText = form.watch("latitude")
+  const longitudeText = form.watch("longitude")
+  const parsedLatitude = latitudeText ? Number(latitudeText) : Number.NaN
+  const parsedLongitude = longitudeText ? Number(longitudeText) : Number.NaN
+  const mapLatitude = Number.isNaN(parsedLatitude)
+    ? DEFAULT_COORDS.lat
+    : parsedLatitude
+  const mapLongitude = Number.isNaN(parsedLongitude)
+    ? DEFAULT_COORDS.lng
+    : parsedLongitude
 
   return (
     <div className="flex-1 space-y-4 p-8 pt-6">
@@ -171,7 +190,7 @@ export default function CreatePlacePage() {
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>Tip</FormLabel>
-                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                        <Select onValueChange={field.onChange} value={field.value}>
                                             <FormControl><SelectTrigger><SelectValue placeholder="Seçiniz" /></SelectTrigger></FormControl>
                                             <SelectContent>
                                                 <SelectItem value="hotel">Otel</SelectItem>
@@ -190,7 +209,7 @@ export default function CreatePlacePage() {
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>Kategori</FormLabel>
-                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                        <Select onValueChange={field.onChange} value={field.value}>
                                             <FormControl><SelectTrigger><SelectValue placeholder="Kategori Seçiniz" /></SelectTrigger></FormControl>
                                             <SelectContent>
                                                 {categories?.map((cat) => (
@@ -304,6 +323,25 @@ export default function CreatePlacePage() {
                                     )}
                                 />
                             </div>
+                           <div className="space-y-3">
+                                <div className="text-sm text-muted-foreground">
+                                  Harita üzerinden konumu tıklayarak pin bırakın.
+                                </div>
+                                <CoordinateMapPicker
+                                  latitude={mapLatitude}
+                                  longitude={mapLongitude}
+                                  onChange={({ lat, lng }) => {
+                                    form.setValue("latitude", String(lat), {
+                                      shouldDirty: true,
+                                      shouldValidate: true,
+                                    })
+                                    form.setValue("longitude", String(lng), {
+                                      shouldDirty: true,
+                                      shouldValidate: true,
+                                    })
+                                  }}
+                                />
+                           </div>
                            <div className="grid grid-cols-2 gap-4">
                                 <FormField
                                     control={form.control}
@@ -343,7 +381,7 @@ export default function CreatePlacePage() {
                                     render={({ field }) => (
                                         <FormItem>
                                             <FormLabel>Fiyat Seviyesi (1-4)</FormLabel>
-                                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                            <Select onValueChange={field.onChange} value={field.value}>
                                             <FormControl><SelectTrigger><SelectValue placeholder="Seviye" /></SelectTrigger></FormControl>
                                             <SelectContent>
                                                 <SelectItem value="budget">$ (Ucuz)</SelectItem>

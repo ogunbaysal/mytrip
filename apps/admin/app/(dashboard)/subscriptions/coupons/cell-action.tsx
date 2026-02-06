@@ -1,8 +1,10 @@
+"use client"
 
 import { Edit, MoreHorizontal, Trash } from "lucide-react"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 
+import { Coupon } from "@/types/coupons"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -11,27 +13,26 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { SubscriptionPlan } from "@/types/subscriptions"
 
 interface CellActionProps {
-  data: SubscriptionPlan
+  data: Coupon
 }
 
 export const CellAction: React.FC<CellActionProps> = ({ data }) => {
   const router = useRouter()
 
-  const onDelete = async () => {
+  const handleDeactivate = async () => {
     try {
-      const res = await fetch(`/api/admin/plans/${data.id}`, {
+      const res = await fetch(`/api/admin/coupons/${data.id}`, {
         method: "DELETE",
       })
       const response = await res.json()
 
       if (!res.ok) {
-        throw new Error(response.error || "Plan silinemedi")
+        throw new Error(response.error || "Kupon pasife alınamadı")
       }
 
-      toast.success("Plan silindi.")
+      toast.success("Kupon pasife alındı.")
       router.refresh()
     } catch (error) {
       console.error(error)
@@ -49,11 +50,11 @@ export const CellAction: React.FC<CellActionProps> = ({ data }) => {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuLabel>İşlemler</DropdownMenuLabel>
-        <DropdownMenuItem onClick={() => router.push(`/subscriptions/plans/${data.id}`)}>
+        <DropdownMenuItem onClick={() => router.push(`/subscriptions/coupons/${data.id}`)}>
           <Edit className="mr-2 h-4 w-4" /> Düzenle
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={onDelete}>
-          <Trash className="mr-2 h-4 w-4" /> Sil
+        <DropdownMenuItem onClick={handleDeactivate}>
+          <Trash className="mr-2 h-4 w-4" /> Pasife Al
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
