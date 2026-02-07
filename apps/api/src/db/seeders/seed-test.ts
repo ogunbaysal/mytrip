@@ -19,8 +19,15 @@ import { replacePlaceAmenities } from "../../lib/place-relations.ts";
 
 // Schemas
 import { user } from "../schemas/auth.ts";
-import { file, place, placeCategory, placeImage } from "../schemas/index.ts";
-import { blogPost } from "../schemas/blog.ts";
+import {
+  blog,
+  blogCategory,
+  blogImage,
+  file,
+  place,
+  placeCategory,
+  placeImage,
+} from "../schemas/index.ts";
 import { collection } from "../schemas/collections.ts";
 import { province, district } from "../schemas/locations.ts";
 import { subscription, subscriptionPlan } from "../schemas/subscriptions.ts";
@@ -723,13 +730,18 @@ async function seedTestBlogs(userMap: Map<string, string>): Promise<void> {
   logSection("Seeding Test Blog Posts");
 
   const authorIds = Array.from(userMap.values());
+  const categories = await db
+    .select({ id: blogCategory.id, slug: blogCategory.slug })
+    .from(blogCategory)
+    .where(eq(blogCategory.active, true));
+  const categoryBySlug = new Map(categories.map((item) => [item.slug, item.id]));
 
   for (const topic of BLOG_TOPICS) {
     const slug = `${slugify(topic.title)}-${nanoid(4)}`;
 
     // Check if exists
-    const existing = await db.query.blogPost.findFirst({
-      where: eq(blogPost.slug, slug),
+    const existing = await db.query.blog.findFirst({
+      where: eq(blog.slug, slug),
     });
 
     if (existing) {
@@ -737,18 +749,62 @@ async function seedTestBlogs(userMap: Map<string, string>): Promise<void> {
       continue;
     }
 
+    const categoryId = categoryBySlug.get(topic.category) ?? null;
     const publishedAt = new Date();
     publishedAt.setDate(publishedAt.getDate() - randomInt(1, 90));
 
-    await db.insert(blogPost).values({
+    const blogId = nanoid();
+
+    const heroFileId = nanoid();
+    const featuredFileId = nanoid();
+    const galleryImages = randomSubset(IMAGES.nature, 3);
+    const galleryFileRows = galleryImages.map((url, idx) => ({
       id: nanoid(),
+      filename: `seed-blog-${blogId}-gallery-${idx + 1}.jpg`,
+      storedFilename: `seed-blog-${blogId}-gallery-${idx + 1}-${nanoid(6)}.jpg`,
+      url,
+      mimeType: "image/jpeg",
+      size: 0,
+      type: "image" as const,
+      usage: "blog_content" as const,
+      uploadedById: random(authorIds),
+    }));
+
+    await db.insert(file).values([
+      {
+        id: heroFileId,
+        filename: `seed-blog-${blogId}-hero.jpg`,
+        storedFilename: `seed-blog-${blogId}-hero-${nanoid(6)}.jpg`,
+        url: random(IMAGES.nature),
+        mimeType: "image/jpeg",
+        size: 0,
+        type: "image" as const,
+        usage: "blog_hero" as const,
+        uploadedById: random(authorIds),
+      },
+      {
+        id: featuredFileId,
+        filename: `seed-blog-${blogId}-featured.jpg`,
+        storedFilename: `seed-blog-${blogId}-featured-${nanoid(6)}.jpg`,
+        url: random(IMAGES.nature),
+        mimeType: "image/jpeg",
+        size: 0,
+        type: "image" as const,
+        usage: "blog_featured" as const,
+        uploadedById: random(authorIds),
+      },
+      ...galleryFileRows,
+    ]);
+
+    await db.insert(blog).values({
+      id: blogId,
       slug,
       title: topic.title,
       excerpt: topic.excerpt,
       content: `<h2>${topic.title}</h2><p>${topic.excerpt}</p><p>Bu yazıda ${topic.tags.join(", ")} konularını detaylı olarak ele alacağız. Muğla bölgesinin eşsiz güzellikleri ve keşfedilmeyi bekleyen hazineleri hakkında bilmeniz gereken her şeyi bu rehberde bulabilirsiniz.</p><h3>Neden Muğla?</h3><p>Muğla, Türkiye'nin güneybatısında yer alan, doğal güzellikleri, tarihi zenginlikleri ve eşsiz mutfağıyla öne çıkan bir il. Bodrum'un canlı gece hayatından Datça'nın huzurlu koylarına, Fethiye'nin paraşüt turlarından Marmaris'in tekne gezilerine kadar her zevke hitap eden aktiviteler sunuyor.</p>`,
-      heroImage: random(IMAGES.nature),
-      images: JSON.stringify(randomSubset(IMAGES.nature, 3)),
-      category: topic.category,
+      heroImageId: heroFileId,
+      featuredImageId: featuredFileId,
+      categoryId,
       tags: JSON.stringify(topic.tags),
       status: "published",
       featured: Math.random() > 0.7,
@@ -757,14 +813,20 @@ async function seedTestBlogs(userMap: Map<string, string>): Promise<void> {
       views: randomInt(50, 3000),
       readTime: randomInt(3, 12),
       likeCount: randomInt(5, 150),
-      commentCount: randomInt(0, 30),
+      shareCount: randomInt(0, 25),
       language: "tr",
-      readingLevel: "medium",
-      targetAudience: "travelers",
       seoTitle: topic.title,
       seoDescription: topic.excerpt,
       seoKeywords: JSON.stringify(topic.tags),
     });
+
+    await db.insert(blogImage).values(
+      galleryFileRows.map((item, idx) => ({
+        blogId,
+        fileId: item.id,
+        sortOrder: idx,
+      })),
+    );
 
     logSuccess(`Created blog: ${topic.title}`);
   }

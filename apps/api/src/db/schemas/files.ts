@@ -19,6 +19,7 @@ export const fileUsageEnum = pgEnum("file_usage", [
   "blog_content",
   "place_image",
   "place_gallery",
+  "business_document",
   "profile_avatar",
   "profile_cover",
   "other",

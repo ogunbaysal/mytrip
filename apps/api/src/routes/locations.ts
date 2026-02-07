@@ -1,26 +1,70 @@
 
 import { Hono } from "hono";
-import { TR_LOCATIONS } from "../lib/locations.ts";
+import { asc, eq, ilike } from "drizzle-orm";
+import { db } from "../db/index.ts";
+import { district, province } from "../db/schemas/index.ts";
 
 export const locationsRoutes = new Hono();
 
 // Get all cities
-locationsRoutes.get("/cities", (c) => {
-    const cities = TR_LOCATIONS.map(({ id, name }) => ({ id, name }));
-    return c.json({ cities });
+locationsRoutes.get("/cities", async (c) => {
+  const cities = await db
+    .select({
+      id: province.id,
+      name: province.name,
+      slug: province.slug,
+    })
+    .from(province)
+    .orderBy(asc(province.name));
+
+  return c.json({ cities });
 });
 
 // Get districts by city name (since frontend might send name or id)
-// Let's support both ID or Name lookup for flexibility, but frontend usually selects by value.
-// We will look up by city name as place.city stores text name currently.
-locationsRoutes.get("/districts/:city", (c) => {
-    const cityParam = c.req.param("city");
-    // Try to find by ID first, then Name
-    const city = TR_LOCATIONS.find(l => l.id === cityParam || l.name.toLowerCase() === cityParam.toLowerCase());
+// Supports both province ID and province name for backward compatibility.
+locationsRoutes.get("/districts/:city", async (c) => {
+  const cityParam = c.req.param("city");
+  const cityText = cityParam.trim();
 
-    if (!city) {
-        return c.json({ districts: [] });
-    }
+  const [matchedProvince] = await db
+    .select({
+      id: province.id,
+      name: province.name,
+    })
+    .from(province)
+    .where(eq(province.id, cityText))
+    .limit(1);
 
-    return c.json({ districts: city.districts });
+  const [matchedByName] =
+    matchedProvince
+      ? [matchedProvince]
+      : await db
+          .select({
+            id: province.id,
+            name: province.name,
+          })
+          .from(province)
+          .where(ilike(province.name, cityText))
+          .limit(1);
+
+  const targetProvince = matchedByName;
+  if (!targetProvince) {
+    return c.json({ districts: [] });
+  }
+
+  const districtRows = await db
+    .select({
+      id: district.id,
+      name: district.name,
+      slug: district.slug,
+    })
+    .from(district)
+    .where(eq(district.provinceId, targetProvince.id))
+    .orderBy(asc(district.name));
+
+  return c.json({
+    city: targetProvince,
+    districts: districtRows.map((item) => item.name),
+    districtItems: districtRows,
+  });
 });

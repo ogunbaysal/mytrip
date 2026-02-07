@@ -6,17 +6,9 @@ import Link from "next/link";
 import { useLocalizedFormatting } from "@/lib/i18n";
 import type { BlogPost } from "@/types";
 
-const CATEGORY_LABELS: Record<string, string> = {
-  rehber: "Rehber",
-  deneyim: "Deneyim",
-  gurme: "Gurme",
-  mikrotrend: "Mikro Trend",
-};
-
 export function BlogPostCard({ post }: { post: BlogPost }) {
   const { formatDate } = useLocalizedFormatting();
-
-  const categoryLabel = post.category ? (CATEGORY_LABELS[post.category] || post.category) : "";
+  const categoryLabel = post.categoryName || post.categorySlug || "";
 
   return (
     <Link
@@ -39,7 +31,9 @@ export function BlogPostCard({ post }: { post: BlogPost }) {
                {categoryLabel}
              </span>
           )}
-          <span className="text-muted-foreground">{post.publishedAt ? formatDate(post.publishedAt) : ""}</span>
+          <span className="text-muted-foreground">
+            {post.publishedAt ? formatDate(post.publishedAt) : ""}
+          </span>
           {post.readTime && <span className="text-muted-foreground">• {post.readTime} dk</span>}
         </div>
         <h3 className="text-lg font-semibold leading-snug text-foreground group-hover:text-primary">

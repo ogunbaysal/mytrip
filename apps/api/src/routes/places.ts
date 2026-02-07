@@ -70,6 +70,21 @@ const TYPE_NAMES: Record<string, string> = {
   transport: "Transportation",
 };
 
+const normalizeFilterSlug = (value: string): string =>
+  value
+    .trim()
+    .toLocaleLowerCase("tr-TR")
+    .replace(/ı/g, "i")
+    .replace(/ğ/g, "g")
+    .replace(/ü/g, "u")
+    .replace(/ş/g, "s")
+    .replace(/ö/g, "o")
+    .replace(/ç/g, "c")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
 /**
  * Get all places with filtering and pagination
  * GET /places
@@ -95,8 +110,12 @@ app.get("/", async (c) => {
       priceMax = "",
     } = c.req.query();
 
-    const offset = (parseInt(page) - 1) * parseInt(limit);
-    const limitInt = parseInt(limit);
+    const pageInt = Math.max(1, Number.parseInt(page, 10) || 1);
+    const limitInt = Math.min(
+      100,
+      Math.max(1, Number.parseInt(limit, 10) || 20),
+    );
+    const offset = (pageInt - 1) * limitInt;
 
     const conditions: any[] = [eq(place.status, "active")];
 
@@ -126,12 +145,26 @@ app.get("/", async (c) => {
     }
 
     if (city) {
-      conditions.push(sql`LOWER(COALESCE(${province.name}, '')) ILIKE ${"%" + city.toLowerCase() + "%"}`);
+      const cityValue = city.trim();
+      const citySlug = normalizeFilterSlug(cityValue);
+      conditions.push(sql`(
+        ${place.cityId} = ${cityValue}
+        OR LOWER(COALESCE(${province.slug}, '')) = LOWER(${cityValue})
+        OR LOWER(COALESCE(${province.slug}, '')) = LOWER(${citySlug})
+        OR COALESCE(${province.name}, '') ILIKE ${"%" + cityValue + "%"}
+      )`);
     }
 
     if (districtQuery) {
+      const districtValue = districtQuery.trim();
+      const districtSlug = normalizeFilterSlug(districtValue);
       conditions.push(
-        sql`LOWER(COALESCE(${district.name}, '')) ILIKE ${"%" + districtQuery.toLowerCase() + "%"}`,
+        sql`(
+          ${place.districtId} = ${districtValue}
+          OR LOWER(COALESCE(${district.slug}, '')) = LOWER(${districtValue})
+          OR LOWER(COALESCE(${district.slug}, '')) = LOWER(${districtSlug})
+          OR COALESCE(${district.name}, '') ILIKE ${"%" + districtValue + "%"}
+        )`,
       );
     }
 
@@ -264,10 +297,11 @@ app.get("/", async (c) => {
     return c.json({
       places,
       pagination: {
-        page: parseInt(page),
+        page: pageInt,
         limit: limitInt,
         total: Number(count),
-        totalPages: Math.ceil(Number(count) / limitInt),
+        totalPages:
+          Number(count) > 0 ? Math.ceil(Number(count) / limitInt) : 0,
       },
       filters: {
         search,
@@ -503,20 +537,23 @@ app.get("/cities", async (c) => {
   try {
     const cities = await db
       .select({
+        cityId: province.id,
         city: province.name,
+        citySlug: province.slug,
         count: sql<number>`COUNT(*)::int`,
       })
       .from(place)
       .innerJoin(province, eq(place.cityId, province.id))
       .where(eq(place.status, "active"))
-      .groupBy(province.name)
+      .groupBy(province.id, province.name, province.slug)
       .orderBy(sql`COUNT(*) DESC`);
 
     return c.json({
       cities: cities.map((row) => ({
+        id: row.cityId,
         name: row.city,
         count: Number(row.count),
-        slug: row.city.toLowerCase().replace(/\s+/g, "-"),
+        slug: row.citySlug || normalizeFilterSlug(row.city),
       })),
     });
   } catch (error) {

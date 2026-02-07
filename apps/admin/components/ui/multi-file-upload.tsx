@@ -8,6 +8,11 @@ import { api } from "@/lib/api";
 interface MultiFileUploadProps {
   values: string[];
   onChange: (urls: string[]) => void;
+  onUploaded?: (result: {
+    urls: string[];
+    fileIds?: string[];
+    errors?: string[];
+  }) => void;
   maxFiles?: number;
   accept?: string;
   maxSize?: number;
@@ -15,12 +20,17 @@ interface MultiFileUploadProps {
   label?: string;
   description?: string;
   className?: string;
-  uploadFn?: (files: File[]) => Promise<{ urls: string[]; errors?: string[] }>;
+  uploadFn?: (files: File[]) => Promise<{
+    urls: string[];
+    fileIds?: string[];
+    errors?: string[];
+  }>;
 }
 
 export function MultiFileUpload({
   values = [],
   onChange,
+  onUploaded,
   maxFiles = 10,
   accept = "image/*",
   maxSize = 5 * 1024 * 1024,
@@ -84,6 +94,7 @@ export function MultiFileUpload({
       if (result.urls.length > 0) {
         onChange([...values, ...result.urls]);
       }
+      onUploaded?.(result);
 
       if (result.errors && result.errors.length > 0) {
         setError(result.errors.join(", "));

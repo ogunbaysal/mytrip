@@ -15,7 +15,7 @@ const companyLinks = [
 ] as const satisfies FooterLinkProps[];
 
 const exploreLinks = [
-  { label: "Seyahat dergisi", href: "/blog" },
+  { label: "Blog Listesi", href: "/blog" },
   { label: "Hediye kartları", href: "/collections" },
 ] as const satisfies FooterLinkProps[];
 

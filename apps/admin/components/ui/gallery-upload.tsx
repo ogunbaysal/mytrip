@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { ImagePlus, Loader2, Star, Trash2, ArrowLeft, ArrowRight } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
+import { api } from "@/lib/api"
 
 interface GalleryUploadProps {
   value?: string[]
@@ -24,24 +25,10 @@ export function GalleryUpload({ value = [], onChange, disabled }: GalleryUploadP
     const newUrls: string[] = []
 
     try {
-      // Upload files sequentially or in parallel
       for (let i = 0; i < files.length; i++) {
         const file = files[i]
-        const formData = new FormData()
-        formData.append("file", file)
-
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "https://api.tatildesen.com"}/api/admin/upload`, {
-            method: "POST",
-            body: formData,
-            credentials: 'include'
-        })
-        
-        if (!response.ok) {
-           throw new Error(`Upload failed for file ${file.name}`)
-        }
-
-        const data = await response.json()
-        newUrls.push(data.url)
+        const response = await api.upload.single(file, "place_image")
+        newUrls.push(response.url)
       }
 
       onChange([...value, ...newUrls])

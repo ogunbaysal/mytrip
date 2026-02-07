@@ -2,15 +2,9 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { BlogCommentsSection } from "@/components/blog/blog-comments-section";
 import { BlogPostCard } from "@/components/blog/blog-post-card";
 import { api } from "@/lib/api";
-
-const CATEGORY_LABELS: Record<string, string> = {
-  rehber: "Rehber",
-  deneyim: "Deneyim",
-  gurme: "Gurme",
-  mikrotrend: "Mikro Trend",
-};
 
 export const dynamic = "force-static";
 export const revalidate = 3600;
@@ -59,7 +53,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
   }
 
   const { blogPost: detail, relatedPosts } = data;
-  const categoryLabel = detail.category ? (CATEGORY_LABELS[detail.category] || detail.category) : "";
+  const categoryLabel = detail.categoryName || detail.categorySlug || "";
 
   return (
     <article className="space-y-16 pb-24">
@@ -92,6 +86,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
            className="prose prose-lg prose-neutral max-w-none prose-headings:font-semibold prose-a:text-primary"
            dangerouslySetInnerHTML={{ __html: detail.content || "" }} 
          />
+         <BlogCommentsSection slug={detail.slug} />
       </section>
 
       {relatedPosts && relatedPosts.length > 0 && (

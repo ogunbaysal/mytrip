@@ -9,6 +9,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { usePlaceTypes } from "@/hooks/use-place-types";
 import { cn } from "@/lib/utils";
 
 type PlaceType = {
@@ -29,17 +30,21 @@ type TypeFilterPopoverProps = {
   selectedType?: string;
   onTypeChange: (type: string | undefined) => void;
   types?: PlaceType[];
+  triggerClassName?: string;
 };
 
 export function TypeFilterPopover({
   selectedType,
   onTypeChange,
   types = PLACE_TYPES,
+  triggerClassName,
 }: TypeFilterPopoverProps) {
+  const { data: dynamicTypes = [] } = usePlaceTypes();
   const [open, setOpen] = useState(false);
 
   const hasActiveFilter = !!selectedType;
-  const selectedTypeData = types.find((t) => t.type === selectedType);
+  const options = dynamicTypes.length > 0 ? dynamicTypes : types;
+  const selectedTypeData = options.find((t) => t.type === selectedType);
 
   const handleSelect = (type: string) => {
     if (type === selectedType) {
@@ -58,9 +63,11 @@ export function TypeFilterPopover({
         <Button
           variant="outline"
           size="sm"
-          className={`h-9 gap-2 rounded-full border-gray-200 bg-white px-4 text-sm font-normal shadow-sm hover:border-gray-300 hover:bg-gray-50 ${
-            hasActiveFilter ? "border-gray-900 bg-gray-50 font-medium" : ""
-          }`}
+          className={cn(
+            "h-9 gap-2 rounded-full border-gray-200 bg-white px-4 text-sm font-normal shadow-sm hover:border-gray-300 hover:bg-gray-50",
+            hasActiveFilter && "border-gray-900 bg-gray-50 font-medium",
+            triggerClassName,
+          )}
         >
           {displayLabel}
           <ChevronDown className="size-4 text-gray-500" />
@@ -68,7 +75,7 @@ export function TypeFilterPopover({
       </PopoverTrigger>
       <PopoverContent className="w-56 p-2" align="start">
         <div className="space-y-1">
-          {types.map((type) => (
+          {options.map((type) => (
             <button
               key={type.type}
               onClick={() => handleSelect(type.type)}

@@ -15,6 +15,7 @@ import {
   derivePlaceTypeFromCategorySlug,
   hydratePlaceMediaAndAmenities,
   replacePlaceAmenities,
+  resolvePublicFileUrl,
   resolveCategorySlugsForType,
   resolveProvinceDistrictIds,
 } from "../../lib/place-relations.ts";
@@ -136,6 +137,7 @@ type JoinedPlace = {
   slug: string;
   name: string;
   categoryId: string | null;
+  businessDocumentFileId: string | null;
   description: string | null;
   shortDescription: string | null;
   address: string | null;
@@ -176,6 +178,32 @@ function toLegacyPlace(row: JoinedPlace) {
   };
 }
 
+async function getBusinessDocumentById(fileId: string | null) {
+  if (!fileId) return null;
+
+  const [doc] = await db
+    .select({
+      id: file.id,
+      filename: file.filename,
+      mimeType: file.mimeType,
+      size: file.size,
+      url: file.url,
+      usage: file.usage,
+      uploadedById: file.uploadedById,
+      createdAt: file.createdAt,
+    })
+    .from(file)
+    .where(eq(file.id, fileId))
+    .limit(1);
+
+  if (!doc || doc.usage !== "business_document") return null;
+
+  return {
+    ...doc,
+    url: resolvePublicFileUrl(doc.url),
+  };
+}
+
 async function fetchPlaceById(placeId: string) {
   const rows = await db
     .select({
@@ -183,6 +211,7 @@ async function fetchPlaceById(placeId: string) {
       slug: place.slug,
       name: place.name,
       categoryId: place.categoryId,
+      businessDocumentFileId: place.businessDocumentFileId,
       description: place.description,
       shortDescription: place.shortDescription,
       address: place.address,
@@ -224,8 +253,13 @@ async function fetchPlaceById(placeId: string) {
   if (!row) return null;
 
   const [hydrated] = await hydratePlaceMediaAndAmenities([toLegacyPlace(row)]);
+  const businessDocument = await getBusinessDocumentById(
+    row.businessDocumentFileId,
+  );
   return {
     ...hydrated,
+    businessDocumentFileId: row.businessDocumentFileId,
+    businessDocument,
     location: safeParse(hydrated.location, null),
     contactInfo: safeParse(hydrated.contactInfo, null),
     openingHours: safeParse(hydrated.openingHours, null),
@@ -330,6 +364,7 @@ app.get("/", async (c) => {
         slug: place.slug,
         name: place.name,
         categoryId: place.categoryId,
+        businessDocumentFileId: place.businessDocumentFileId,
         description: place.description,
         shortDescription: place.shortDescription,
         address: place.address,
@@ -556,6 +591,22 @@ app.post("/", async (c) => {
       district: placeData.district,
     });
 
+    const normalizedBusinessDocumentFileId = normalizeOptionalId(
+      placeData.businessDocumentFileId,
+    );
+    if (normalizedBusinessDocumentFileId) {
+      const doc = await getBusinessDocumentById(normalizedBusinessDocumentFileId);
+      if (!doc) {
+        return c.json(
+          {
+            error: "Invalid business document",
+            message: "Geçersiz işletme belgesi dosyası",
+          },
+          400,
+        );
+      }
+    }
+
     const id = nanoid();
 
     await db.insert(place).values({
@@ -570,6 +621,7 @@ app.post("/", async (c) => {
       districtId: resolvedLocation.districtId,
       location: safeStringify(placeData.location),
       contactInfo: safeStringify(placeData.contactInfo),
+      businessDocumentFileId: normalizedBusinessDocumentFileId,
       priceLevel: placeData.priceLevel,
       nightlyPrice:
         placeData.nightlyPrice !== undefined && placeData.nightlyPrice !== null
@@ -631,6 +683,7 @@ app.put("/:placeId", async (c) => {
         districtId: place.districtId,
         location: place.location,
         contactInfo: place.contactInfo,
+        businessDocumentFileId: place.businessDocumentFileId,
         nightlyPrice: place.nightlyPrice,
         openingHours: place.openingHours,
         checkInInfo: place.checkInInfo,
@@ -665,6 +718,7 @@ app.put("/:placeId", async (c) => {
       district,
       images,
       features,
+      businessDocumentFileId,
       ...allowedUpdates
     } = updates;
 
@@ -682,6 +736,24 @@ app.put("/:placeId", async (c) => {
       district,
     });
 
+    const normalizedBusinessDocumentFileId =
+      businessDocumentFileId === undefined
+        ? existingPlace.businessDocumentFileId
+        : normalizeOptionalId(businessDocumentFileId);
+
+    if (businessDocumentFileId !== undefined && normalizedBusinessDocumentFileId) {
+      const doc = await getBusinessDocumentById(normalizedBusinessDocumentFileId);
+      if (!doc) {
+        return c.json(
+          {
+            error: "Invalid business document",
+            message: "Geçersiz işletme belgesi dosyası",
+          },
+          400,
+        );
+      }
+    }
+
     const dbUpdates = {
       ...allowedUpdates,
       categoryId: resolvedCategory.id,
@@ -695,6 +767,7 @@ app.put("/:placeId", async (c) => {
         allowedUpdates.contactInfo !== undefined
           ? safeStringify(allowedUpdates.contactInfo)
           : existingPlace.contactInfo,
+      businessDocumentFileId: normalizedBusinessDocumentFileId,
       nightlyPrice:
         allowedUpdates.nightlyPrice !== undefined
           ? String(allowedUpdates.nightlyPrice)

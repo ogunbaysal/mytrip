@@ -1,113 +1,223 @@
 import { Hono } from "hono";
+import { and, asc, desc, eq, gt, ilike, inArray, or, sql } from "drizzle-orm";
 import { db } from "../db/index.ts";
-import { blogPost, user } from "../db/schemas/index.ts";
-import { eq, desc, ilike, sql, and, gt } from "drizzle-orm";
+import {
+  blog,
+  blogCategory,
+  blogComment,
+  file,
+  user,
+} from "../db/schemas/index.ts";
+import {
+  getBlogCommentCountMap,
+  getBlogImagesMap,
+  parseJsonStringArray,
+} from "../lib/blog-relations.ts";
+import { resolvePublicFileUrl } from "../lib/place-relations.ts";
+import { getSessionFromRequest } from "../lib/session.ts";
 
 const app = new Hono();
 
+function parsePositiveInt(value: string | undefined, fallback: number): number {
+  const parsed = Number.parseInt(value || "", 10);
+  if (Number.isNaN(parsed) || parsed <= 0) return fallback;
+  return parsed;
+}
+
+type PublicBlogRow = {
+  id: string;
+  slug: string;
+  title: string;
+  excerpt: string | null;
+  content: string | null;
+  heroImageId: string | null;
+  featuredImageId: string | null;
+  categoryId: string | null;
+  categorySlug: string | null;
+  categoryName: string | null;
+  tags: string | null;
+  featured: boolean;
+  publishedAt: Date | null;
+  views: number;
+  readTime: number | null;
+  likeCount: number;
+  shareCount: number;
+  seoTitle: string | null;
+  seoDescription: string | null;
+  seoKeywords: string | null;
+  language: "tr" | "en";
+  createdAt: Date;
+  updatedAt: Date;
+  authorId: string | null;
+  authorName: string | null;
+  authorAvatar: string | null;
+};
+
+type PublicBlogPayload = Omit<PublicBlogRow, "tags" | "seoKeywords"> & {
+  heroImage: string | null;
+  featuredImage: string | null;
+  images: string[];
+  tags: string[];
+  seoKeywords: string[];
+  commentCount: number;
+};
+
+async function getFileUrlMap(fileIds: string[]): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  if (fileIds.length === 0) return map;
+
+  const rows = await db
+    .select({ id: file.id, url: file.url })
+    .from(file)
+    .where(inArray(file.id, fileIds));
+
+  for (const row of rows) {
+    map.set(row.id, resolvePublicFileUrl(row.url));
+  }
+
+  return map;
+}
+
+async function hydratePublicBlogs(rows: PublicBlogRow[]): Promise<PublicBlogPayload[]> {
+  if (rows.length === 0) return [];
+
+  const blogIds = rows.map((row) => row.id);
+  const fileIds = Array.from(
+    new Set(
+      rows
+        .flatMap((row) => [row.heroImageId, row.featuredImageId])
+        .filter((value): value is string => Boolean(value)),
+    ),
+  );
+
+  const [imagesMap, commentCountMap, fileUrlMap] = await Promise.all([
+    getBlogImagesMap(blogIds),
+    getBlogCommentCountMap(blogIds, "published"),
+    getFileUrlMap(fileIds),
+  ]);
+
+  return rows.map((row) => ({
+    ...row,
+    heroImage: row.heroImageId ? (fileUrlMap.get(row.heroImageId) ?? null) : null,
+    featuredImage: row.featuredImageId
+      ? (fileUrlMap.get(row.featuredImageId) ?? null)
+      : null,
+    images: imagesMap.get(row.id) ?? [],
+    tags: parseJsonStringArray(row.tags),
+    seoKeywords: parseJsonStringArray(row.seoKeywords),
+    commentCount: commentCountMap.get(row.id) ?? 0,
+  }));
+}
+
+const basePublicSelect = {
+  id: blog.id,
+  slug: blog.slug,
+  title: blog.title,
+  excerpt: blog.excerpt,
+  content: blog.content,
+  heroImageId: blog.heroImageId,
+  featuredImageId: blog.featuredImageId,
+  categoryId: blog.categoryId,
+  categorySlug: blogCategory.slug,
+  categoryName: blogCategory.name,
+  tags: blog.tags,
+  featured: blog.featured,
+  authorId: blog.authorId,
+  publishedAt: blog.publishedAt,
+  views: blog.views,
+  readTime: blog.readTime,
+  likeCount: blog.likeCount,
+  shareCount: blog.shareCount,
+  seoTitle: blog.seoTitle,
+  seoDescription: blog.seoDescription,
+  seoKeywords: blog.seoKeywords,
+  language: blog.language,
+  createdAt: blog.createdAt,
+  updatedAt: blog.updatedAt,
+  authorName: user.name,
+  authorAvatar: user.avatar,
+};
+
 /**
- * Get all blog posts with pagination and filtering
  * GET /blog
  */
 app.get("/", async (c) => {
   try {
-    const {
-      page = "1",
-      limit = "12",
-      search = "",
-      category = "",
-      language = "tr",
-      featured = "",
-      sortBy = "publishedAt",
-      sortOrder = "desc",
-    } = c.req.query();
+    const page = parsePositiveInt(c.req.query("page"), 1);
+    const limit = parsePositiveInt(c.req.query("limit"), 12);
+    const offset = (page - 1) * limit;
 
-    const offset = (parseInt(page) - 1) * parseInt(limit);
-    const limitInt = parseInt(limit);
+    const search = (c.req.query("search") || "").trim();
+    const category = (c.req.query("category") || "").trim();
+    const language = (c.req.query("language") || "tr").trim();
+    const featured = c.req.query("featured");
+    const sortBy = (c.req.query("sortBy") || "publishedAt").trim();
+    const sortOrder = c.req.query("sortOrder") === "asc" ? "asc" : "desc";
 
-    // Build where conditions for public API (only published posts)
-    const conditions = [eq(blogPost.status, "published")];
+    const conditions: any[] = [eq(blog.status, "published")];
 
     if (search) {
       conditions.push(
-        sql`(LOWER(${blogPost.title}) ILIKE ${'%' + search.toLowerCase() + '%'} OR LOWER(${blogPost.excerpt}) ILIKE ${'%' + search.toLowerCase() + '%'} OR LOWER(${blogPost.content}) ILIKE ${'%' + search.toLowerCase() + '%'} OR LOWER(${blogPost.seoTitle}) ILIKE ${'%' + search.toLowerCase() + '%'} OR LOWER(${blogPost.seoDescription}) ILIKE ${'%' + search.toLowerCase() + '%'})`
+        or(
+          ilike(blog.title, `%${search}%`),
+          ilike(blog.excerpt, `%${search}%`),
+          ilike(blog.content, `%${search}%`),
+          ilike(blog.seoTitle, `%${search}%`),
+          ilike(blog.seoDescription, `%${search}%`),
+          ilike(blog.tags, `%${search}%`),
+        ),
       );
     }
 
     if (category) {
-      conditions.push(eq(blogPost.category, category as any));
+      conditions.push(or(eq(blog.categoryId, category), eq(blogCategory.slug, category)));
     }
 
     if (language) {
-      conditions.push(eq(blogPost.language, language as any));
+      conditions.push(eq(blog.language, language as any));
     }
 
-    if (featured !== "") {
-      conditions.push(eq(blogPost.featured, featured === "true"));
+    if (featured !== undefined && featured !== "") {
+      conditions.push(eq(blog.featured, featured === "true"));
     }
 
-    const whereClause = conditions.length > 0 ? and(...conditions) : sql`1=1`;
+    const whereClause = and(...conditions);
 
-    // Build order by clause
-    const orderByColumn = {
-      title: blogPost.title,
-      category: blogPost.category,
-      views: blogPost.views,
-      likeCount: blogPost.likeCount,
-      commentCount: blogPost.commentCount,
-      publishedAt: blogPost.publishedAt,
-      createdAt: blogPost.createdAt,
-    }[sortBy] || blogPost.publishedAt;
+    const orderByColumn =
+      {
+        title: blog.title,
+        category: blogCategory.name,
+        views: blog.views,
+        likeCount: blog.likeCount,
+        publishedAt: blog.publishedAt,
+        createdAt: blog.createdAt,
+      }[sortBy] || blog.publishedAt;
 
-    const orderDirection = sortOrder === "asc" ? sql`ASC` : sql`DESC`;
-
-    // Get total count
     const [{ count }] = await db
-      .select({ count: sql`COUNT(*)::int` })
-      .from(blogPost)
+      .select({ count: sql<number>`COUNT(*)::int` })
+      .from(blog)
+      .leftJoin(blogCategory, eq(blog.categoryId, blogCategory.id))
       .where(whereClause);
 
-    // Get blog posts with author info
-    const blogPosts = await db
-      .select({
-        id: blogPost.id,
-        slug: blogPost.slug,
-        title: blogPost.title,
-        excerpt: blogPost.excerpt,
-        heroImage: blogPost.heroImage,
-        featuredImage: blogPost.featuredImage,
-        category: blogPost.category,
-        tags: blogPost.tags,
-        featured: blogPost.featured,
-        publishedAt: blogPost.publishedAt,
-        views: blogPost.views,
-        readTime: blogPost.readTime,
-        likeCount: blogPost.likeCount,
-        commentCount: blogPost.commentCount,
-        shareCount: blogPost.shareCount,
-        seoTitle: blogPost.seoTitle,
-        seoDescription: blogPost.seoDescription,
-        language: blogPost.language,
-        readingLevel: blogPost.readingLevel,
-        targetAudience: blogPost.targetAudience,
-        createdAt: blogPost.createdAt,
-        authorName: user.name,
-        authorAvatar: user.avatar,
-      })
-      .from(blogPost)
-      .innerJoin(user, eq(blogPost.authorId, user.id))
+    const rows = await db
+      .select(basePublicSelect)
+      .from(blog)
+      .innerJoin(user, eq(blog.authorId, user.id))
+      .leftJoin(blogCategory, eq(blog.categoryId, blogCategory.id))
       .where(whereClause)
-      .orderBy(sql`${orderByColumn} ${orderDirection}`)
-      .limit(limitInt)
+      .orderBy(sortOrder === "asc" ? asc(orderByColumn) : desc(orderByColumn))
+      .limit(limit)
       .offset(offset);
+
+    const blogPosts = await hydratePublicBlogs(rows);
 
     return c.json({
       blogPosts,
       pagination: {
-        page: parseInt(page),
-        limit: limitInt,
-        total: Number(count),
-        totalPages: Math.ceil(Number(count) / limitInt),
+        page,
+        limit,
+        total: Number(count || 0),
+        totalPages: Math.ceil(Number(count || 0) / limit),
       },
       filters: {
         search,
@@ -119,260 +229,144 @@ app.get("/", async (c) => {
   } catch (error) {
     console.error("Failed to fetch blog posts:", error);
     return c.json(
-      {
-        error: "Failed to fetch blog posts",
-        message: "Unable to retrieve blog posts"
-      },
-      500
+      { error: "Failed to fetch blog posts", message: "Unable to retrieve blog posts" },
+      500,
     );
   }
 });
 
 /**
- * Get featured blog posts
  * GET /blog/featured
  */
 app.get("/featured", async (c) => {
   try {
-    const { limit = "6", language = "tr" } = c.req.query();
-    const limitInt = parseInt(limit);
+    const limit = parsePositiveInt(c.req.query("limit"), 6);
+    const language = (c.req.query("language") || "tr").trim();
 
-    const featuredPosts = await db
-      .select({
-        id: blogPost.id,
-        slug: blogPost.slug,
-        title: blogPost.title,
-        excerpt: blogPost.excerpt,
-        heroImage: blogPost.heroImage,
-        featuredImage: blogPost.featuredImage,
-        category: blogPost.category,
-        tags: blogPost.tags,
-        featured: blogPost.featured,
-        publishedAt: blogPost.publishedAt,
-        views: blogPost.views,
-        readTime: blogPost.readTime,
-        likeCount: blogPost.likeCount,
-        commentCount: blogPost.commentCount,
-        language: blogPost.language,
-        authorName: user.name,
-        authorAvatar: user.avatar,
-      })
-      .from(blogPost)
-      .innerJoin(user, eq(blogPost.authorId, user.id))
-      .where(and(eq(blogPost.status, "published"), eq(blogPost.featured, true), eq(blogPost.language, language as any)))
-      .orderBy(desc(blogPost.publishedAt))
-      .limit(limitInt);
+    const rows = await db
+      .select(basePublicSelect)
+      .from(blog)
+      .innerJoin(user, eq(blog.authorId, user.id))
+      .leftJoin(blogCategory, eq(blog.categoryId, blogCategory.id))
+      .where(
+        and(
+          eq(blog.status, "published"),
+          eq(blog.featured, true),
+          eq(blog.language, language as any),
+        ),
+      )
+      .orderBy(desc(blog.publishedAt))
+      .limit(limit);
+
+    const blogPosts = await hydratePublicBlogs(rows);
 
     return c.json({
-      blogPosts: featuredPosts,
-      count: featuredPosts.length,
+      blogPosts,
+      count: blogPosts.length,
     });
   } catch (error) {
     console.error("Failed to fetch featured blog posts:", error);
     return c.json(
       {
         error: "Failed to fetch featured blog posts",
-        message: "Unable to retrieve featured blog posts"
+        message: "Unable to retrieve featured blog posts",
       },
-      500
+      500,
     );
   }
 });
 
 /**
- * Get popular blog posts
  * GET /blog/popular
  */
 app.get("/popular", async (c) => {
   try {
-    const { limit = "6", language = "tr" } = c.req.query();
-    const limitInt = parseInt(limit);
+    const limit = parsePositiveInt(c.req.query("limit"), 6);
+    const language = (c.req.query("language") || "tr").trim();
 
-    const popularPosts = await db
-      .select({
-        id: blogPost.id,
-        slug: blogPost.slug,
-        title: blogPost.title,
-        excerpt: blogPost.excerpt,
-        heroImage: blogPost.heroImage,
-        featuredImage: blogPost.featuredImage,
-        category: blogPost.category,
-        tags: blogPost.tags,
-        publishedAt: blogPost.publishedAt,
-        views: blogPost.views,
-        readTime: blogPost.readTime,
-        likeCount: blogPost.likeCount,
-        commentCount: blogPost.commentCount,
-        shareCount: blogPost.shareCount,
-        language: blogPost.language,
-        authorName: user.name,
-        authorAvatar: user.avatar,
-      })
-      .from(blogPost)
-      .innerJoin(user, eq(blogPost.authorId, user.id))
-      .where(and(
-        eq(blogPost.status, "published"),
-        eq(blogPost.language, language as any),
-        gt(blogPost.views, 0)
-      ))
-      .orderBy(desc(blogPost.views), desc(blogPost.likeCount), desc(blogPost.publishedAt))
-      .limit(limitInt);
+    const rows = await db
+      .select(basePublicSelect)
+      .from(blog)
+      .innerJoin(user, eq(blog.authorId, user.id))
+      .leftJoin(blogCategory, eq(blog.categoryId, blogCategory.id))
+      .where(
+        and(
+          eq(blog.status, "published"),
+          eq(blog.language, language as any),
+          gt(blog.views, 0),
+        ),
+      )
+      .orderBy(desc(blog.views), desc(blog.likeCount), desc(blog.publishedAt))
+      .limit(limit);
+
+    const blogPosts = await hydratePublicBlogs(rows);
 
     return c.json({
-      blogPosts: popularPosts,
-      count: popularPosts.length,
+      blogPosts,
+      count: blogPosts.length,
     });
   } catch (error) {
     console.error("Failed to fetch popular blog posts:", error);
     return c.json(
       {
         error: "Failed to fetch popular blog posts",
-        message: "Unable to retrieve popular blog posts"
+        message: "Unable to retrieve popular blog posts",
       },
-      500
+      500,
     );
   }
 });
 
 /**
- * Get blog post by slug
- * GET /blog/:slug
- */
-app.get("/:slug", async (c) => {
-  try {
-    const { slug } = c.req.param();
-
-    const [postData] = await db
-      .select({
-        id: blogPost.id,
-        slug: blogPost.slug,
-        title: blogPost.title,
-        content: blogPost.content,
-        heroImage: blogPost.heroImage,
-        featuredImage: blogPost.featuredImage,
-        images: blogPost.images,
-        category: blogPost.category,
-        tags: blogPost.tags,
-        featured: blogPost.featured,
-        authorId: blogPost.authorId,
-        publishedAt: blogPost.publishedAt,
-        views: blogPost.views,
-        readTime: blogPost.readTime,
-        likeCount: blogPost.likeCount,
-        commentCount: blogPost.commentCount,
-        shareCount: blogPost.shareCount,
-        seoTitle: blogPost.seoTitle,
-        seoDescription: blogPost.seoDescription,
-        seoKeywords: blogPost.seoKeywords,
-        language: blogPost.language,
-        readingLevel: blogPost.readingLevel,
-        targetAudience: blogPost.targetAudience,
-        createdAt: blogPost.createdAt,
-        updatedAt: blogPost.updatedAt,
-        authorName: user.name,
-        authorAvatar: user.avatar,
-        authorBio: user.name, // You might want to add a bio field to user table
-      })
-      .from(blogPost)
-      .innerJoin(user, eq(blogPost.authorId, user.id))
-      .where(and(eq(blogPost.slug, slug), eq(blogPost.status, "published")))
-      .limit(1);
-
-    if (!postData) {
-      return c.json(
-        {
-          error: "Blog post not found",
-          message: "The specified blog post does not exist or is not available"
-        },
-        404
-      );
-    }
-
-    // Increment view count
-    await db
-      .update(blogPost)
-      .set({ views: sql`${blogPost.views} + 1` })
-      .where(eq(blogPost.id, postData.id));
-
-    // Get related posts (same category, excluding current post)
-    const relatedPosts = await db
-      .select({
-        id: blogPost.id,
-        slug: blogPost.slug,
-        title: blogPost.title,
-        excerpt: blogPost.excerpt,
-        heroImage: blogPost.heroImage,
-        category: blogPost.category,
-        tags: blogPost.tags,
-        publishedAt: blogPost.publishedAt,
-        readTime: blogPost.readTime,
-        language: blogPost.language,
-        authorName: user.name,
-      })
-      .from(blogPost)
-      .innerJoin(user, eq(blogPost.authorId, user.id))
-      .where(and(
-        eq(blogPost.status, "published"),
-        eq(blogPost.category, postData.category),
-        eq(blogPost.language, postData.language),
-        sql`${blogPost.id} != ${postData.id}`
-      ))
-      .orderBy(desc(blogPost.publishedAt))
-      .limit(4);
-
-    return c.json({
-      blogPost: {
-        ...postData,
-        views: postData.views + 1, // Return incremented count
-      },
-      relatedPosts,
-    });
-  } catch (error) {
-    console.error("Failed to fetch blog post:", error);
-    return c.json(
-      {
-        error: "Failed to fetch blog post",
-        message: "Unable to retrieve blog post details"
-      },
-      500
-    );
-  }
-});
-
-/**
- * Get blog categories
  * GET /blog/categories
  */
 app.get("/categories", async (c) => {
   try {
-    const { language = "tr" } = c.req.query();
-
-    const categories = await db
+    const language = (c.req.query("language") || "tr").trim();
+    const categoryRows = await db
       .select({
-        category: blogPost.category,
-        count: sql`COUNT(*)::int`,
+        id: blogCategory.id,
+        slug: blogCategory.slug,
+        name: blogCategory.name,
+        description: blogCategory.description,
+        sortOrder: blogCategory.sortOrder,
       })
-      .from(blogPost)
-      .where(and(eq(blogPost.status, "published"), eq(blogPost.language, language as any)))
-      .groupBy(blogPost.category)
-      .orderBy(sql`COUNT(*) DESC`);
+      .from(blogCategory)
+      .where(eq(blogCategory.active, true))
+      .orderBy(asc(blogCategory.sortOrder), asc(blogCategory.name));
 
-    const categoryNames = {
-      travel: "Travel",
-      food: "Food",
-      culture: "Culture",
-      history: "History",
-      activity: "Activities",
-      lifestyle: "Lifestyle",
-      business: "Business",
-    };
+    const categoryIds = categoryRows.map((row) => row.id);
+    const countRows =
+      categoryIds.length > 0
+        ? await db
+            .select({
+              categoryId: blog.categoryId,
+              count: sql<number>`COUNT(*)::int`,
+            })
+            .from(blog)
+            .where(
+              and(
+                inArray(blog.categoryId, categoryIds),
+                eq(blog.status, "published"),
+                eq(blog.language, language as any),
+              ),
+            )
+            .groupBy(blog.categoryId)
+        : [];
+
+    const countMap = new Map<string, number>();
+    for (const row of countRows) {
+      if (row.categoryId) countMap.set(row.categoryId, Number(row.count));
+    }
 
     return c.json({
-      categories: categories.map(cat => ({
-        name: cat.category,
-        displayName: categoryNames[cat.category as keyof typeof categoryNames] || cat.category,
-        count: Number(cat.count),
-        slug: cat.category.toLowerCase(),
+      categories: categoryRows.map((row) => ({
+        id: row.id,
+        name: row.slug,
+        slug: row.slug,
+        displayName: row.name,
+        description: row.description,
+        count: countMap.get(row.id) ?? 0,
       })),
     });
   } catch (error) {
@@ -380,113 +374,279 @@ app.get("/categories", async (c) => {
     return c.json(
       {
         error: "Failed to fetch blog categories",
-        message: "Unable to retrieve blog categories"
+        message: "Unable to retrieve blog categories",
       },
-      500
+      500,
     );
   }
 });
 
 /**
- * Get blog tags
  * GET /blog/tags
  */
 app.get("/tags", async (c) => {
   try {
-    const { language = "tr", limit = "50" } = c.req.query();
-    const limitInt = parseInt(limit);
+    const language = (c.req.query("language") || "tr").trim();
+    const limit = parsePositiveInt(c.req.query("limit"), 50);
 
-    // Get all posts with tags for the specified language
-    const posts = await db
-      .select({
-        tags: blogPost.tags,
-      })
-      .from(blogPost)
-      .where(and(
-        eq(blogPost.status, "published"),
-        eq(blogPost.language, language as any),
-        sql`${blogPost.tags} IS NOT NULL`
-      ));
+    const rows = await db
+      .select({ tags: blog.tags })
+      .from(blog)
+      .where(
+        and(
+          eq(blog.status, "published"),
+          eq(blog.language, language as any),
+          sql`${blog.tags} IS NOT NULL`,
+        ),
+      );
 
-    // Extract and count tags
-    const tagCounts = new Map<string, number>();
-    posts.forEach(post => {
-      try {
-        const tags = JSON.parse(post.tags || "[]");
-        tags.forEach((tag: string) => {
-          tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
-        });
-      } catch (error) {
-        // Skip invalid JSON
+    const tagCountMap = new Map<string, number>();
+    for (const row of rows) {
+      for (const tag of parseJsonStringArray(row.tags)) {
+        tagCountMap.set(tag, (tagCountMap.get(tag) || 0) + 1);
       }
-    });
+    }
 
-    // Sort by count and limit
-    const sortedTags = Array.from(tagCounts.entries())
+    const tags = Array.from(tagCountMap.entries())
       .sort((a, b) => b[1] - a[1])
-      .slice(0, limitInt)
-      .map(([tag, count]) => ({
-        name: tag,
+      .slice(0, limit)
+      .map(([name, count]) => ({
+        name,
         count,
-        slug: tag.toLowerCase().replace(/\s+/g, '-'),
+        slug: name.toLowerCase().replace(/\s+/g, "-"),
       }));
 
-    return c.json({
-      tags: sortedTags,
-    });
+    return c.json({ tags });
   } catch (error) {
     console.error("Failed to fetch blog tags:", error);
     return c.json(
-      {
-        error: "Failed to fetch blog tags",
-        message: "Unable to retrieve blog tags"
-      },
-      500
+      { error: "Failed to fetch blog tags", message: "Unable to retrieve blog tags" },
+      500,
     );
   }
 });
 
 /**
- * Get latest blog posts
  * GET /blog/latest
  */
 app.get("/latest", async (c) => {
   try {
-    const { limit = "4", language = "tr" } = c.req.query();
-    const limitInt = parseInt(limit);
+    const limit = parsePositiveInt(c.req.query("limit"), 4);
+    const language = (c.req.query("language") || "tr").trim();
 
-    const latestPosts = await db
-      .select({
-        id: blogPost.id,
-        slug: blogPost.slug,
-        title: blogPost.title,
-        excerpt: blogPost.excerpt,
-        heroImage: blogPost.heroImage,
-        category: blogPost.category,
-        publishedAt: blogPost.publishedAt,
-        readTime: blogPost.readTime,
-        language: blogPost.language,
-        authorName: user.name,
-        authorAvatar: user.avatar,
-      })
-      .from(blogPost)
-      .innerJoin(user, eq(blogPost.authorId, user.id))
-      .where(and(eq(blogPost.status, "published"), eq(blogPost.language, language as any)))
-      .orderBy(desc(blogPost.publishedAt))
-      .limit(limitInt);
+    const rows = await db
+      .select(basePublicSelect)
+      .from(blog)
+      .innerJoin(user, eq(blog.authorId, user.id))
+      .leftJoin(blogCategory, eq(blog.categoryId, blogCategory.id))
+      .where(and(eq(blog.status, "published"), eq(blog.language, language as any)))
+      .orderBy(desc(blog.publishedAt), desc(blog.createdAt))
+      .limit(limit);
+
+    const blogPosts = await hydratePublicBlogs(rows);
 
     return c.json({
-      blogPosts: latestPosts,
-      count: latestPosts.length,
+      blogPosts,
+      count: blogPosts.length,
     });
   } catch (error) {
     console.error("Failed to fetch latest blog posts:", error);
     return c.json(
       {
         error: "Failed to fetch latest blog posts",
-        message: "Unable to retrieve latest blog posts"
+        message: "Unable to retrieve latest blog posts",
       },
-      500
+      500,
+    );
+  }
+});
+
+/**
+ * GET /blog/:slug/comments
+ */
+app.get("/:slug/comments", async (c) => {
+  try {
+    const { slug } = c.req.param();
+    const page = parsePositiveInt(c.req.query("page"), 1);
+    const limit = parsePositiveInt(c.req.query("limit"), 20);
+    const offset = (page - 1) * limit;
+
+    const [post] = await db
+      .select({ id: blog.id })
+      .from(blog)
+      .where(and(eq(blog.slug, slug), eq(blog.status, "published")))
+      .limit(1);
+
+    if (!post) {
+      return c.json(
+        { error: "Blog post not found", message: "The specified blog post does not exist" },
+        404,
+      );
+    }
+
+    const [{ count }] = await db
+      .select({ count: sql<number>`COUNT(*)::int` })
+      .from(blogComment)
+      .where(and(eq(blogComment.blogId, post.id), eq(blogComment.status, "published")));
+
+    const rows = await db
+      .select({
+        id: blogComment.id,
+        userId: blogComment.userId,
+        userName: user.name,
+        guestName: blogComment.guestName,
+        content: blogComment.content,
+        createdAt: blogComment.createdAt,
+      })
+      .from(blogComment)
+      .leftJoin(user, eq(blogComment.userId, user.id))
+      .where(and(eq(blogComment.blogId, post.id), eq(blogComment.status, "published")))
+      .orderBy(desc(blogComment.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    return c.json({
+      comments: rows.map((row) => ({
+        id: row.id,
+        userId: row.userId,
+        authorName: row.userName || row.guestName || "Anonim",
+        content: row.content,
+        createdAt: row.createdAt,
+      })),
+      pagination: {
+        page,
+        limit,
+        total: Number(count || 0),
+        totalPages: Math.ceil(Number(count || 0) / limit),
+      },
+    });
+  } catch (error) {
+    console.error("Failed to fetch blog comments:", error);
+    return c.json(
+      { error: "Failed to fetch blog comments", message: "Unable to load comments" },
+      500,
+    );
+  }
+});
+
+/**
+ * POST /blog/:slug/comments
+ * Anonymous comments are allowed and always created as pending.
+ */
+app.post("/:slug/comments", async (c) => {
+  try {
+    const { slug } = c.req.param();
+    const payload = await c.req.json();
+    const content = String(payload.content || "").trim();
+
+    if (content.length < 2) {
+      return c.json(
+        { error: "Invalid content", message: "Comment must be at least 2 characters" },
+        400,
+      );
+    }
+
+    const [post] = await db
+      .select({ id: blog.id })
+      .from(blog)
+      .where(and(eq(blog.slug, slug), eq(blog.status, "published")))
+      .limit(1);
+
+    if (!post) {
+      return c.json(
+        { error: "Blog post not found", message: "The specified blog post does not exist" },
+        404,
+      );
+    }
+
+    const session = await getSessionFromRequest(c);
+    const userId = session?.user?.id || null;
+    const guestName = payload.guestName ? String(payload.guestName).trim() : null;
+    const guestEmail = payload.guestEmail ? String(payload.guestEmail).trim() : null;
+
+    await db.insert(blogComment).values({
+      id: crypto.randomUUID(),
+      blogId: post.id,
+      userId,
+      guestName: userId ? null : guestName || "Anonim",
+      guestEmail: userId ? null : guestEmail,
+      content,
+      status: "pending",
+      publishedAt: null,
+    });
+
+    return c.json({
+      success: true,
+      message: "Yorumunuz incelemeye alınmıştır.",
+    });
+  } catch (error) {
+    console.error("Failed to create blog comment:", error);
+    return c.json(
+      { error: "Failed to create blog comment", message: "Unable to create comment" },
+      500,
+    );
+  }
+});
+
+/**
+ * GET /blog/:slug
+ */
+app.get("/:slug", async (c) => {
+  try {
+    const { slug } = c.req.param();
+
+    const [row] = await db
+      .select(basePublicSelect)
+      .from(blog)
+      .innerJoin(user, eq(blog.authorId, user.id))
+      .leftJoin(blogCategory, eq(blog.categoryId, blogCategory.id))
+      .where(and(eq(blog.slug, slug), eq(blog.status, "published")))
+      .limit(1);
+
+    if (!row) {
+      return c.json(
+        {
+          error: "Blog post not found",
+          message: "The specified blog post does not exist or is not available",
+        },
+        404,
+      );
+    }
+
+    await db
+      .update(blog)
+      .set({ views: sql`${blog.views} + 1`, updatedAt: new Date() })
+      .where(eq(blog.id, row.id));
+
+    const [hydratedPost] = await hydratePublicBlogs([{ ...row, views: row.views + 1 }]);
+
+    const relatedRows = await db
+      .select(basePublicSelect)
+      .from(blog)
+      .innerJoin(user, eq(blog.authorId, user.id))
+      .leftJoin(blogCategory, eq(blog.categoryId, blogCategory.id))
+      .where(
+        and(
+          eq(blog.status, "published"),
+          eq(blog.language, row.language),
+          row.categoryId ? eq(blog.categoryId, row.categoryId) : sql`TRUE`,
+          sql`${blog.id} <> ${row.id}`,
+        ),
+      )
+      .orderBy(desc(blog.publishedAt), desc(blog.createdAt))
+      .limit(4);
+
+    const relatedPosts = await hydratePublicBlogs(relatedRows);
+
+    return c.json({
+      blogPost: hydratedPost,
+      relatedPosts,
+    });
+  } catch (error) {
+    console.error("Failed to fetch blog post:", error);
+    return c.json(
+      { error: "Failed to fetch blog post", message: "Unable to retrieve blog post details" },
+      500,
     );
   }
 });

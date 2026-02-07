@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Route } from "next";
-import { Search } from "lucide-react";
+import { Search, X } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { PlaceSearchForm } from "@/components/places/place-search-form";
@@ -56,7 +56,7 @@ export function SiteHeader() {
   if (!mounted) {
     return (
       <header className="sticky top-0 z-[100] border-b border-gray-200/80 bg-white">
-        <div className="mx-auto flex w-full max-w-[1440px] items-center gap-6 px-6 py-4">
+        <div className="mx-auto flex w-full max-w-[1440px] min-w-0 items-center gap-2 px-4 py-4 sm:gap-4 sm:px-6 md:gap-6">
           {/* Logo */}
           <Link
             href="/"
@@ -74,12 +74,12 @@ export function SiteHeader() {
           </div>
 
           {/* Mobile placeholder */}
-          <div className="flex flex-1 lg:hidden">
+          <div className="flex min-w-0 flex-1 lg:hidden">
             <div className="h-12 w-full max-w-xs animate-pulse rounded-full bg-gray-100" />
           </div>
 
           {/* Right placeholder */}
-          <div className="flex items-center gap-4">
+          <div className="flex shrink-0 items-center gap-2 sm:gap-4">
             <div className="hidden h-5 w-20 animate-pulse rounded bg-gray-100 md:block" />
             <div className="size-10 animate-pulse rounded-full bg-gray-100" />
           </div>
@@ -90,7 +90,7 @@ export function SiteHeader() {
 
   return (
     <header className="sticky top-0 z-[1000] border-b border-gray-200/80 bg-white">
-      <div className="mx-auto flex w-full max-w-[1440px] items-center gap-6 px-6 py-4">
+      <div className="mx-auto flex w-full max-w-[1440px] min-w-0 items-center gap-2 px-4 py-4 sm:gap-4 sm:px-6 md:gap-6">
         {/* Logo */}
         <Link
           href="/"
@@ -106,7 +106,7 @@ export function SiteHeader() {
         </div>
 
         {/* Mobile/Tablet Search Trigger */}
-        <div className="flex flex-1 lg:hidden">
+        <div className="flex min-w-0 flex-1 lg:hidden">
           <Dialog
             open={isMobileSearchOpen}
             onOpenChange={setIsMobileSearchOpen}
@@ -114,7 +114,7 @@ export function SiteHeader() {
             <DialogTrigger asChild>
               <button
                 type="button"
-                className="flex h-12 w-full max-w-md items-center justify-between rounded-full border border-gray-200 bg-white px-4 shadow-md transition-shadow hover:shadow-lg"
+                className="flex h-12 w-full min-w-0 max-w-md items-center justify-between rounded-full border border-gray-200 bg-white px-3 shadow-md transition-shadow hover:shadow-lg sm:px-4"
               >
                 <span className="truncate text-sm font-medium text-foreground">
                   Nereye gitmek istiyorsun?
@@ -124,16 +124,37 @@ export function SiteHeader() {
                 </span>
               </button>
             </DialogTrigger>
-            <DialogContent className="border-none bg-transparent p-0 shadow-none sm:max-w-2xl">
-              <PlaceSearchForm
-                onSubmitSuccess={() => setIsMobileSearchOpen(false)}
-              />
+            <DialogContent
+              showCloseButton={false}
+              className="left-0 top-0 z-[10000] h-[100dvh] w-screen max-w-none translate-x-0 translate-y-0 rounded-none border-none bg-white p-0 shadow-none"
+            >
+              <div className="flex h-full min-h-0 flex-col">
+                <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
+                  <p className="text-sm font-semibold text-foreground">
+                    Arama Filtreleri
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setIsMobileSearchOpen(false)}
+                    className="rounded-full p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
+                    aria-label="Kapat"
+                  >
+                    <X className="size-5" />
+                  </button>
+                </div>
+                <div className="min-h-0 flex-1 overflow-y-auto p-4">
+                  <PlaceSearchForm
+                    className="rounded-2xl border border-gray-200 bg-white p-4 shadow-none backdrop-blur-0 supports-[backdrop-filter]:bg-white"
+                    onSubmitSuccess={() => setIsMobileSearchOpen(false)}
+                  />
+                </div>
+              </div>
             </DialogContent>
           </Dialog>
         </div>
 
         {/* Right Section */}
-        <div className="flex shrink-0 items-center gap-4">
+        <div className="flex shrink-0 items-center gap-2 sm:gap-4">
           {/* İşletme Ol Link - Only show for non-owners or logged out users */}
           {(!user || user.role !== "owner") && (
             <Link

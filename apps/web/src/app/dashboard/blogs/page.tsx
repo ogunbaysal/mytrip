@@ -292,7 +292,7 @@ export default function BlogsPage() {
 
                   <div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
                     <span className="rounded-full bg-slate-100 px-2 py-0.5">
-                      {blog.category || "Genel"}
+                      {blog.categoryName || blog.category || "Genel"}
                     </span>
                     <span className="flex items-center gap-1">
                       <Calendar className="size-3" />

@@ -1,15 +1,27 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { nanoid } from "nanoid";
 import { db } from "../../db/index.ts";
 import {
-  blogPost,
+  blog,
+  blogCategory,
+  file,
   subscription,
   subscriptionPlan,
-  user,
 } from "../../db/schemas/index.ts";
-import { eq, and, desc, sql, gte, lte } from "drizzle-orm";
 import { getSessionFromRequest } from "../../lib/session.ts";
+import {
+  estimateReadTimeMinutes,
+  makeUniqueSlug,
+  parseJsonStringArray,
+  resolveBlogCategoryId,
+  resolveSingleFileId,
+  serializeJsonStringArray,
+  syncBlogImages,
+} from "../../lib/blog-relations.ts";
+import { resolvePublicFileUrl } from "../../lib/place-relations.ts";
 
 const app = new Hono();
 
@@ -28,28 +40,23 @@ const createBlogSchema = z.object({
   heroImage: z.string().optional(),
   featuredImage: z.string().optional(),
   images: z.array(z.string()).optional(),
-  category: z.enum([
-    "travel",
-    "food",
-    "culture",
-    "history",
-    "activity",
-    "lifestyle",
-    "business",
-  ]),
+  categoryId: z.string().optional(),
+  category: z.string().optional(),
   tags: z.array(z.string()).optional(),
   featured: z.boolean().optional(),
   seoTitle: z.string().max(100).optional(),
   seoDescription: z.string().max(300).optional(),
   seoKeywords: z.array(z.string()).optional(),
   language: z.enum(["tr", "en"]).default("tr"),
-  readingLevel: z.enum(["easy", "medium", "hard"]).default("medium"),
-  targetAudience: z
-    .enum(["travelers", "locals", "business_owners", "all"])
-    .default("travelers"),
 });
 
 const updateBlogSchema = createBlogSchema.partial();
+
+function parsePositiveInt(value: string | undefined, fallback: number): number {
+  const parsed = Number.parseInt(value || "", 10);
+  if (Number.isNaN(parsed) || parsed <= 0) return fallback;
+  return parsed;
+}
 
 async function checkBlogLimit(
   userId: string,
@@ -63,6 +70,7 @@ async function checkBlogLimit(
     .from(subscription)
     .innerJoin(subscriptionPlan, eq(subscription.planId, subscriptionPlan.id))
     .where(eq(subscription.userId, userId))
+    .orderBy(desc(subscription.createdAt))
     .limit(1);
 
   if (!subscriptionData) {
@@ -77,16 +85,132 @@ async function checkBlogLimit(
 
   const [blogCount] = await db
     .select({ count: sql<number>`COUNT(*)::int` })
-    .from(blogPost)
-    .where(eq(blogPost.authorId, userId));
+    .from(blog)
+    .where(eq(blog.authorId, userId));
 
   const maxBlogs = subscriptionData.maxBlogs || 0;
   return {
-    allowed: (blogCount.count as number) < maxBlogs,
-    current: blogCount.count as number,
+    allowed: Number(blogCount.count || 0) < maxBlogs,
+    current: Number(blogCount.count || 0),
     max: maxBlogs,
   };
 }
+
+type OwnerBlogRow = {
+  id: string;
+  slug: string;
+  title: string;
+  excerpt: string | null;
+  content: string | null;
+  heroImageId: string | null;
+  featuredImageId: string | null;
+  categoryId: string | null;
+  categorySlug: string | null;
+  categoryName: string | null;
+  tags: string | null;
+  status: "published" | "draft" | "archived" | "pending_review";
+  featured: boolean;
+  authorId: string | null;
+  publishedAt: Date | null;
+  views: number;
+  readTime: number | null;
+  likeCount: number;
+  shareCount: number;
+  seoTitle: string | null;
+  seoDescription: string | null;
+  seoKeywords: string | null;
+  language: "tr" | "en";
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+async function getFileUrlMap(fileIds: string[]): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  if (fileIds.length === 0) return map;
+
+  const rows = await db
+    .select({ id: file.id, url: file.url })
+    .from(file)
+    .where(inArray(file.id, fileIds));
+
+  for (const row of rows) {
+    map.set(row.id, resolvePublicFileUrl(row.url));
+  }
+
+  return map;
+}
+
+async function hydrateOwnerBlogs(rows: OwnerBlogRow[]) {
+  if (rows.length === 0) return [];
+
+  const fileIds = Array.from(
+    new Set(
+      rows
+        .flatMap((row) => [row.heroImageId, row.featuredImageId])
+        .filter((value): value is string => Boolean(value)),
+    ),
+  );
+  const fileUrlMap = await getFileUrlMap(fileIds);
+
+  return rows.map((row) => ({
+    ...row,
+    heroImage: row.heroImageId ? (fileUrlMap.get(row.heroImageId) ?? null) : null,
+    featuredImage: row.featuredImageId
+      ? (fileUrlMap.get(row.featuredImageId) ?? null)
+      : null,
+    category: row.categorySlug,
+    tags: parseJsonStringArray(row.tags),
+    seoKeywords: parseJsonStringArray(row.seoKeywords),
+  }));
+}
+
+const ownerBlogSelect = {
+  id: blog.id,
+  slug: blog.slug,
+  title: blog.title,
+  excerpt: blog.excerpt,
+  content: blog.content,
+  heroImageId: blog.heroImageId,
+  featuredImageId: blog.featuredImageId,
+  categoryId: blog.categoryId,
+  categorySlug: blogCategory.slug,
+  categoryName: blogCategory.name,
+  tags: blog.tags,
+  status: blog.status,
+  featured: blog.featured,
+  authorId: blog.authorId,
+  publishedAt: blog.publishedAt,
+  views: blog.views,
+  readTime: blog.readTime,
+  likeCount: blog.likeCount,
+  shareCount: blog.shareCount,
+  seoTitle: blog.seoTitle,
+  seoDescription: blog.seoDescription,
+  seoKeywords: blog.seoKeywords,
+  language: blog.language,
+  createdAt: blog.createdAt,
+  updatedAt: blog.updatedAt,
+};
+
+app.get("/categories", async (c) => {
+  try {
+    const categories = await db
+      .select({
+        id: blogCategory.id,
+        slug: blogCategory.slug,
+        name: blogCategory.name,
+        description: blogCategory.description,
+      })
+      .from(blogCategory)
+      .where(eq(blogCategory.active, true))
+      .orderBy(asc(blogCategory.sortOrder), asc(blogCategory.name));
+
+    return c.json({ categories });
+  } catch (error) {
+    console.error("Get owner blog categories error:", error);
+    return c.json({ error: "Internal server error" }, 500);
+  }
+});
 
 app.get("/", async (c) => {
   try {
@@ -96,35 +220,39 @@ app.get("/", async (c) => {
     }
 
     const userId = session.user.id;
-    const { page = "1", limit = "20", status } = c.req.query();
-    const offset = (parseInt(page) - 1) * parseInt(limit);
-    const limitInt = parseInt(limit);
+    const page = parsePositiveInt(c.req.query("page"), 1);
+    const limit = parsePositiveInt(c.req.query("limit"), 20);
+    const offset = (page - 1) * limit;
+    const status = c.req.query("status");
 
-    const whereConditions = [eq(blogPost.authorId, userId)];
+    const whereConditions = [eq(blog.authorId, userId)];
     if (status && blogStatusEnum.includes(status as any)) {
-      whereConditions.push(eq(blogPost.status, status as any));
+      whereConditions.push(eq(blog.status, status as any));
     }
 
     const [totalCount] = await db
       .select({ count: sql<number>`COUNT(*)::int` })
-      .from(blogPost)
+      .from(blog)
       .where(and(...whereConditions));
 
-    const blogs = await db
-      .select()
-      .from(blogPost)
+    const rows = await db
+      .select(ownerBlogSelect)
+      .from(blog)
+      .leftJoin(blogCategory, eq(blog.categoryId, blogCategory.id))
       .where(and(...whereConditions))
-      .orderBy(desc(blogPost.createdAt))
-      .limit(limitInt)
+      .orderBy(desc(blog.createdAt))
+      .limit(limit)
       .offset(offset);
+
+    const blogs = await hydrateOwnerBlogs(rows);
 
     return c.json({
       blogs,
       pagination: {
-        page: parseInt(page),
-        limit: limitInt,
-        total: totalCount.count,
-        totalPages: Math.ceil(totalCount.count / limitInt),
+        page,
+        limit,
+        total: Number(totalCount.count || 0),
+        totalPages: Math.ceil(Number(totalCount.count || 0) / limit),
       },
     });
   } catch (error) {
@@ -142,7 +270,6 @@ app.post("/", zValidator("json", createBlogSchema), async (c) => {
 
     const userId = session.user.id;
     const data = c.req.valid("json");
-    const { nanoid } = await import("nanoid");
 
     const limitCheck = await checkBlogLimit(userId);
     if (!limitCheck.allowed) {
@@ -157,42 +284,57 @@ app.post("/", zValidator("json", createBlogSchema), async (c) => {
       );
     }
 
-    const slug =
-      data.slug ||
-      data.title
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/(^-|-$)/g, "");
+    const categoryId = await resolveBlogCategoryId({
+      categoryId: data.categoryId,
+      categorySlug: data.category,
+    });
+    const heroImageId = await resolveSingleFileId(data.heroImage);
+    const featuredImageId = await resolveSingleFileId(data.featuredImage);
 
-    const [newBlog] = await db
-      .insert(blogPost)
+    const [created] = await db
+      .insert(blog)
       .values({
         id: nanoid(),
-        slug,
-        authorId: userId,
-        ...data,
-        images: data.images ? JSON.stringify(data.images) : null,
-        tags: data.tags ? JSON.stringify(data.tags) : null,
-        seoKeywords: data.seoKeywords ? JSON.stringify(data.seoKeywords) : null,
+        slug: data.slug ? data.slug.trim() : makeUniqueSlug(data.title),
+        title: data.title.trim(),
+        excerpt: data.excerpt || null,
+        content: data.content,
+        heroImageId,
+        featuredImageId,
+        categoryId,
+        tags: serializeJsonStringArray(data.tags),
         status: "pending_review",
         featured: false,
+        authorId: userId,
         publishedAt: null,
         views: 0,
-        readTime: Math.ceil(data.content.split(/\s+/).length / 200),
+        readTime: estimateReadTimeMinutes(data.content),
         likeCount: 0,
-        commentCount: 0,
         shareCount: 0,
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        seoTitle: data.seoTitle || null,
+        seoDescription: data.seoDescription || null,
+        seoKeywords: serializeJsonStringArray(data.seoKeywords),
+        language: data.language || "tr",
       })
-      .returning();
+      .returning({ id: blog.id });
+
+    await syncBlogImages(created.id, data.images);
+
+    const [savedRow] = await db
+      .select(ownerBlogSelect)
+      .from(blog)
+      .leftJoin(blogCategory, eq(blog.categoryId, blogCategory.id))
+      .where(eq(blog.id, created.id))
+      .limit(1);
+
+    const [saved] = await hydrateOwnerBlogs(savedRow ? [savedRow] : []);
 
     return c.json(
       {
         success: true,
         message:
           "Blog yazınız başarıyla oluşturuldu. İncelendikten sonra yayınlanacaktır.",
-        blog: newBlog,
+        blog: saved,
       },
       201,
     );
@@ -215,17 +357,19 @@ app.get("/:id", async (c) => {
     const userId = session.user.id;
     const id = c.req.param("id");
 
-    const [blogData] = await db
-      .select()
-      .from(blogPost)
-      .where(and(eq(blogPost.id, id), eq(blogPost.authorId, userId)))
+    const [row] = await db
+      .select(ownerBlogSelect)
+      .from(blog)
+      .leftJoin(blogCategory, eq(blog.categoryId, blogCategory.id))
+      .where(and(eq(blog.id, id), eq(blog.authorId, userId)))
       .limit(1);
 
-    if (!blogData) {
+    if (!row) {
       return c.json({ error: "Blog post not found" }, 404);
     }
 
-    return c.json({ blog: blogData });
+    const [hydrated] = await hydrateOwnerBlogs([row]);
+    return c.json({ blog: hydrated });
   } catch (error) {
     console.error("Get blog error:", error);
     return c.json({ error: "Internal server error" }, 500);
@@ -243,37 +387,93 @@ app.put("/:id", zValidator("json", updateBlogSchema), async (c) => {
     const id = c.req.param("id");
     const data = c.req.valid("json");
 
-    const [existingBlog] = await db
+    const [existing] = await db
       .select()
-      .from(blogPost)
-      .where(and(eq(blogPost.id, id), eq(blogPost.authorId, userId)))
+      .from(blog)
+      .where(and(eq(blog.id, id), eq(blog.authorId, userId)))
       .limit(1);
 
-    if (!existingBlog) {
+    if (!existing) {
       return c.json({ error: "Blog post not found" }, 404);
     }
 
-    const [updatedBlog] = await db
-      .update(blogPost)
+    const categoryId =
+      "categoryId" in data || "category" in data
+        ? await resolveBlogCategoryId({
+            categoryId: data.categoryId,
+            categorySlug: data.category,
+          })
+        : existing.categoryId;
+
+    const heroImageId =
+      "heroImage" in data ? await resolveSingleFileId(data.heroImage) : existing.heroImageId;
+    const featuredImageId =
+      "featuredImage" in data
+        ? await resolveSingleFileId(data.featuredImage)
+        : existing.featuredImageId;
+
+    const nextContent =
+      "content" in data ? String(data.content || "") : existing.content || "";
+
+    await db
+      .update(blog)
       .set({
-        ...data,
-        images: data.images ? JSON.stringify(data.images) : existingBlog.images,
-        tags: data.tags ? JSON.stringify(data.tags) : existingBlog.tags,
-        seoKeywords: data.seoKeywords
-          ? JSON.stringify(data.seoKeywords)
-          : existingBlog.seoKeywords,
-        readTime: data.content
-          ? Math.ceil(data.content.split(/\s+/).length / 200)
-          : existingBlog.readTime,
+        title: "title" in data ? String(data.title || "") : existing.title,
+        slug:
+          "slug" in data
+            ? String(data.slug || existing.slug).trim()
+            : existing.slug,
+        excerpt:
+          "excerpt" in data
+            ? data.excerpt
+              ? String(data.excerpt)
+              : null
+            : existing.excerpt,
+        content: "content" in data ? nextContent : existing.content,
+        heroImageId,
+        featuredImageId,
+        categoryId,
+        tags:
+          "tags" in data ? serializeJsonStringArray(data.tags) : existing.tags,
+        seoTitle:
+          "seoTitle" in data
+            ? data.seoTitle
+              ? String(data.seoTitle)
+              : null
+            : existing.seoTitle,
+        seoDescription:
+          "seoDescription" in data
+            ? data.seoDescription
+              ? String(data.seoDescription)
+              : null
+            : existing.seoDescription,
+        seoKeywords:
+          "seoKeywords" in data
+            ? serializeJsonStringArray(data.seoKeywords)
+            : existing.seoKeywords,
+        language: "language" in data ? data.language || "tr" : existing.language,
+        readTime: estimateReadTimeMinutes(nextContent),
         updatedAt: new Date(),
       })
-      .where(and(eq(blogPost.id, id), eq(blogPost.authorId, userId)))
-      .returning();
+      .where(and(eq(blog.id, id), eq(blog.authorId, userId)));
+
+    if ("images" in data) {
+      await syncBlogImages(id, data.images);
+    }
+
+    const [row] = await db
+      .select(ownerBlogSelect)
+      .from(blog)
+      .leftJoin(blogCategory, eq(blog.categoryId, blogCategory.id))
+      .where(and(eq(blog.id, id), eq(blog.authorId, userId)))
+      .limit(1);
+
+    const [saved] = await hydrateOwnerBlogs(row ? [row] : []);
 
     return c.json({
       success: true,
       message: "Blog yazınız başarıyla güncellendi",
-      blog: updatedBlog,
+      blog: saved,
     });
   } catch (error) {
     console.error("Update blog error:", error);
@@ -295,9 +495,9 @@ app.post("/:id/publish", async (c) => {
     const id = c.req.param("id");
 
     const [existingBlog] = await db
-      .select({ status: blogPost.status })
-      .from(blogPost)
-      .where(and(eq(blogPost.id, id), eq(blogPost.authorId, userId)))
+      .select({ status: blog.status })
+      .from(blog)
+      .where(and(eq(blog.id, id), eq(blog.authorId, userId)))
       .limit(1);
 
     if (!existingBlog) {
@@ -316,9 +516,9 @@ app.post("/:id/publish", async (c) => {
     }
 
     await db
-      .update(blogPost)
+      .update(blog)
       .set({ status: "pending_review", updatedAt: new Date() })
-      .where(and(eq(blogPost.id, id), eq(blogPost.authorId, userId)));
+      .where(and(eq(blog.id, id), eq(blog.authorId, userId)));
 
     return c.json({
       success: true,
@@ -340,19 +540,17 @@ app.delete("/:id", async (c) => {
     const userId = session.user.id;
     const id = c.req.param("id");
 
-    const [existingBlog] = await db
-      .select()
-      .from(blogPost)
-      .where(and(eq(blogPost.id, id), eq(blogPost.authorId, userId)))
+    const [existing] = await db
+      .select({ id: blog.id })
+      .from(blog)
+      .where(and(eq(blog.id, id), eq(blog.authorId, userId)))
       .limit(1);
 
-    if (!existingBlog) {
+    if (!existing) {
       return c.json({ error: "Blog post not found" }, 404);
     }
 
-    await db
-      .delete(blogPost)
-      .where(and(eq(blogPost.id, id), eq(blogPost.authorId, userId)));
+    await db.delete(blog).where(and(eq(blog.id, id), eq(blog.authorId, userId)));
 
     return c.json({
       success: true,

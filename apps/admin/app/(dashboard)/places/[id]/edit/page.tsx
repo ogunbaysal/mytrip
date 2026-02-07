@@ -28,12 +28,13 @@ import { useCategories } from "@/hooks/use-categories"
 import { useCities, useDistricts } from "@/hooks/use-locations"
 import { useParams, useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, FileText, Loader2, Upload } from "lucide-react"
 import Link from "next/link"
-import { useEffect } from "react"
+import { useEffect, useState, type ChangeEvent } from "react"
 import { GalleryUpload } from "@/components/ui/gallery-upload"
 import { Skeleton } from "@/components/ui/skeleton"
 import { CoordinateMapPicker } from "@/components/ui/coordinate-map-picker"
+import { api } from "@/lib/api"
 
 const formSchema = z.object({
   images: z.array(z.string()).optional(),
@@ -50,6 +51,7 @@ const formSchema = z.object({
   longitude: z.string().optional(),
   priceLevel: z.string().optional(),
   nightlyPrice: z.string().optional(),
+  businessDocumentFileId: z.string().optional(),
   status: z.enum(["active", "inactive", "pending", "suspended", "rejected"]),
   contactInfo: z.object({
       phone: z.string().optional(),
@@ -124,6 +126,12 @@ export default function EditPlacePage() {
   const { data: place, isLoading: isPlaceLoading } = usePlace(placeId)
   const { mutate: updatePlace, isPending: isUpdating } = useUpdatePlace()
   const { data: categories } = useCategories()
+  const [isBusinessDocumentUploading, setIsBusinessDocumentUploading] = useState(false)
+  const [businessDocument, setBusinessDocument] = useState<{
+    fileId: string
+    url: string
+    filename: string
+  } | null>(null)
 
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -143,6 +151,7 @@ export default function EditPlacePage() {
       latitude: "",
       longitude: "",
       nightlyPrice: "",
+      businessDocumentFileId: "",
       status: "pending",
       contactInfo: {
           phone: "",
@@ -178,6 +187,15 @@ export default function EditPlacePage() {
             cat.slug.toLowerCase() === (place.categorySlug || "").toLowerCase(),
         )?.id ||
         "";
+      setBusinessDocument(
+        place.businessDocument
+          ? {
+              fileId: place.businessDocument.id,
+              url: place.businessDocument.url,
+              filename: place.businessDocument.filename,
+            }
+          : null,
+      )
       form.reset({
         name: place.name,
         type: normalizedType,
@@ -192,6 +210,7 @@ export default function EditPlacePage() {
         longitude: coords.lng,
         priceLevel: normalizedPriceLevel,
         nightlyPrice: place.nightlyPrice || "",
+        businessDocumentFileId: place.businessDocumentFileId || "",
         status: normalizedStatus,
         images: place.images || [],
         contactInfo: {
@@ -203,6 +222,34 @@ export default function EditPlacePage() {
       })
     }
   }, [place, form, categories])
+
+  const handleBusinessDocumentUpload = async (
+    event: ChangeEvent<HTMLInputElement>,
+  ) => {
+    const selectedFile = event.target.files?.[0]
+    if (!selectedFile) return
+
+    try {
+      setIsBusinessDocumentUploading(true)
+      const response = await api.upload.single(selectedFile, "business_document")
+      setBusinessDocument({
+        fileId: response.fileId,
+        url: response.url,
+        filename: selectedFile.name,
+      })
+      form.setValue("businessDocumentFileId", response.fileId, {
+        shouldDirty: true,
+      })
+      toast.success("İşletme belgesi yüklendi")
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Belge yüklenemedi"
+      toast.error(message)
+    } finally {
+      setIsBusinessDocumentUploading(false)
+      event.target.value = ""
+    }
+  }
 
   function onSubmit(values: z.infer<typeof formSchema>) {
     const parsedLat = Number(values.latitude);
@@ -216,6 +263,8 @@ export default function EditPlacePage() {
           ? { lat: parsedLat, lng: parsedLng }
           : undefined,
         priceLevel: values.priceLevel || undefined,
+        businessDocumentFileId:
+          businessDocument?.fileId || values.businessDocumentFileId || undefined,
         category: categories?.find(c => c.id === values.categoryId)?.name || values.category || "", // Sync category name
     }
 
@@ -454,6 +503,79 @@ export default function EditPlacePage() {
                 </div>
 
                 <div className="space-y-4">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>İşletme Belgesi (PDF)</CardTitle>
+                            <CardDescription>
+                              Mekan doğrulama süreci için işletme belgesini görüntüleyin veya güncelleyin.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          <FormField
+                            control={form.control}
+                            name="businessDocumentFileId"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormControl>
+                                  <Input type="hidden" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          {businessDocument ? (
+                            <div className="rounded-lg border p-3">
+                              <div className="flex items-center gap-2 text-sm font-medium">
+                                <FileText className="h-4 w-4 text-muted-foreground" />
+                                <span className="truncate">{businessDocument.filename}</span>
+                              </div>
+                              <div className="mt-3 flex gap-2">
+                                <Button type="button" size="sm" variant="outline" asChild>
+                                  <a href={businessDocument.url} target="_blank" rel="noreferrer">
+                                    Görüntüle
+                                  </a>
+                                </Button>
+                                <Button type="button" size="sm" variant="outline" asChild>
+                                  <a href={businessDocument.url} download>
+                                    İndir
+                                  </a>
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+                              Henüz işletme belgesi yüklenmemiş.
+                            </div>
+                          )}
+
+                          <label className="inline-flex">
+                            <Input
+                              type="file"
+                              accept="application/pdf"
+                              className="hidden"
+                              onChange={handleBusinessDocumentUpload}
+                              disabled={isBusinessDocumentUploading}
+                            />
+                            <Button type="button" variant="outline" disabled={isBusinessDocumentUploading} asChild>
+                              <span>
+                                {isBusinessDocumentUploading ? (
+                                  <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Yükleniyor...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Upload className="mr-2 h-4 w-4" />
+                                    Belge Güncelle
+                                  </>
+                                )}
+                              </span>
+                            </Button>
+                          </label>
+                        </CardContent>
+                    </Card>
+
                     <Card>
                         <CardHeader>
                             <CardTitle>İletişim Bilgileri</CardTitle>

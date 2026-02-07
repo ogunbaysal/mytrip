@@ -4,21 +4,21 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  Save,
-  Eye,
-  Send,
+  AlertTriangle,
+  CheckCircle,
   ChevronLeft,
+  Clock,
+  Eye,
   FileText,
   ImageIcon,
+  PanelRightClose,
+  PanelRightOpen,
+  Save,
   Search,
+  Send,
   Settings,
   Tag,
   X,
-  Clock,
-  CheckCircle,
-  AlertTriangle,
-  PanelRightClose,
-  PanelRightOpen,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,60 +29,47 @@ import { StatusBadge } from "@/components/dashboard";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
-const CATEGORY_OPTIONS = [
-  { value: "travel", label: "Seyahat" },
-  { value: "food", label: "Yemek" },
-  { value: "culture", label: "Kültür" },
-  { value: "history", label: "Tarih" },
-  { value: "activity", label: "Aktivite" },
-  { value: "lifestyle", label: "Yaşam Tarzı" },
-  { value: "business", label: "İşletme" },
-] as const;
-
-const READING_LEVEL_OPTIONS = [
-  { value: "easy", label: "Kolay (2 dk)" },
-  { value: "medium", label: "Orta (5 dk)" },
-  { value: "hard", label: "Zor (10 dk)" },
-] as const;
-
-const TARGET_AUDIENCE_OPTIONS = [
-  { value: "travelers", label: "Gezginler" },
-  { value: "locals", label: "Yereliler" },
-  { value: "business_owners", label: "İşletme Sahipleri" },
-  { value: "all", label: "Herkes" },
-] as const;
-
 const STATUS_CONFIG = {
   draft: {
-    label: "Taslak",
     icon: FileText,
     color: "bg-slate-100 text-slate-600",
     message: "Bu blog taslak durumunda. İncelemeye gönderilebilir.",
   },
   pending_review: {
-    label: "İnceleniyor",
     icon: Clock,
     color: "bg-amber-100 text-amber-600",
     message: "Blog inceleniyor. 24-48 saat içinde sonuçlanır.",
   },
   published: {
-    label: "Yayında",
     icon: CheckCircle,
     color: "bg-emerald-100 text-emerald-600",
     message: "Blog yayında. Düzenleme için taslağa alın.",
   },
   rejected: {
-    label: "Reddedildi",
     icon: AlertTriangle,
     color: "bg-red-100 text-red-600",
     message: "Blog reddedildi. Geribildirime göre düzenleyin.",
   },
   archived: {
-    label: "Arşiv",
     icon: FileText,
     color: "bg-slate-100 text-slate-600",
     message: "Blog arşivlenmiş durumda.",
   },
+} as const;
+
+type BlogEditorForm = {
+  title: string;
+  slug: string;
+  excerpt: string;
+  content: string;
+  heroImage: string;
+  featuredImage: string;
+  categoryId: string;
+  tags: string[];
+  seoTitle: string;
+  seoDescription: string;
+  seoKeywords: string[];
+  language: "tr" | "en";
 };
 
 interface BlogEditorProps {
@@ -90,25 +77,44 @@ interface BlogEditorProps {
   blogId?: string;
 }
 
+function normalizeStringArray(value: unknown): string[] {
+  if (!value) return [];
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item)).filter(Boolean);
+  }
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) {
+        return parsed.map((item) => String(item)).filter(Boolean);
+      }
+    } catch {
+      return value
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean);
+    }
+  }
+  return [];
+}
+
 export function BlogEditor({ mode, blogId }: BlogEditorProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
 
-  const [formData, setFormData] = React.useState({
+  const [formData, setFormData] = React.useState<BlogEditorForm>({
     title: "",
     slug: "",
     excerpt: "",
     content: "",
     heroImage: "",
     featuredImage: "",
-    category: "travel" as (typeof CATEGORY_OPTIONS)[number]["value"],
-    tags: [] as string[],
+    categoryId: "",
+    tags: [],
     seoTitle: "",
     seoDescription: "",
-    seoKeywords: [] as string[],
-    language: "tr" as "tr" | "en",
-    readingLevel: "medium" as (typeof READING_LEVEL_OPTIONS)[number]["value"],
-    targetAudience: "travelers" as (typeof TARGET_AUDIENCE_OPTIONS)[number]["value"],
+    seoKeywords: [],
+    language: "tr",
   });
 
   const [isSubmitting, setIsSubmitting] = React.useState(false);
@@ -117,47 +123,57 @@ export function BlogEditor({ mode, blogId }: BlogEditorProps) {
   const [keywordsInput, setKeywordsInput] = React.useState("");
   const [sidebarOpen, setSidebarOpen] = React.useState(true);
 
-  // Fetch existing blog for edit mode
   const { data: blogData, isLoading: isBlogLoading } = useQuery({
     queryKey: ["blog-detail", blogId],
     queryFn: () => api.owner.blogs.getById(blogId!),
     enabled: mode === "edit" && !!blogId,
   });
 
+  const { data: categoriesData } = useQuery({
+    queryKey: ["owner-blog-categories"],
+    queryFn: () => api.owner.blogs.categories(),
+  });
+
+  const categories = categoriesData?.categories || [];
   const blog = blogData?.blog;
   const blogStatus = (blog?.status || "draft") as keyof typeof STATUS_CONFIG;
   const isPublished = blogStatus === "published";
   const statusConfig = STATUS_CONFIG[blogStatus] || STATUS_CONFIG.draft;
   const StatusIcon = statusConfig.icon;
 
-  // Load blog data into form
   React.useEffect(() => {
-    if (blog) {
-      setFormData({
-        title: blog.title || "",
-        slug: blog.slug || "",
-        excerpt: blog.excerpt || "",
-        content: blog.content || "",
-        heroImage: blog.heroImage || "",
-        featuredImage: blog.featuredImage || "",
-        category: blog.category || "travel",
-        tags: typeof blog.tags === "string" ? JSON.parse(blog.tags) : blog.tags || [],
-        seoTitle: blog.seoTitle || "",
-        seoDescription: blog.seoDescription || "",
-        seoKeywords:
-          typeof blog.seoKeywords === "string"
-            ? JSON.parse(blog.seoKeywords)
-            : blog.seoKeywords || [],
-        language: blog.language || "tr",
-        readingLevel: blog.readingLevel || "medium",
-        targetAudience: blog.targetAudience || "travelers",
-      });
-    }
+    if (!blog) return;
+
+    setFormData({
+      title: blog.title || "",
+      slug: blog.slug || "",
+      excerpt: blog.excerpt || "",
+      content: blog.content || "",
+      heroImage: blog.heroImage || "",
+      featuredImage: blog.featuredImage || "",
+      categoryId: blog.categoryId || "",
+      tags: normalizeStringArray(blog.tags),
+      seoTitle: blog.seoTitle || "",
+      seoDescription: blog.seoDescription || "",
+      seoKeywords: normalizeStringArray(blog.seoKeywords),
+      language: blog.language || "tr",
+    });
   }, [blog]);
 
-  // Mutations
+  React.useEffect(() => {
+    if (mode !== "create") return;
+    if (formData.categoryId) return;
+    if (categories.length === 0) return;
+
+    setFormData((prev) => ({ ...prev, categoryId: categories[0].id }));
+  }, [categories, formData.categoryId, mode]);
+
   const createBlogMutation = useMutation({
-    mutationFn: (data: typeof formData) => api.owner.blogs.create(data),
+    mutationFn: (data: BlogEditorForm) =>
+      api.owner.blogs.create({
+        ...data,
+        categoryId: data.categoryId || undefined,
+      }),
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["owner-blogs"] });
       queryClient.invalidateQueries({ queryKey: ["usage"] });
@@ -171,7 +187,11 @@ export function BlogEditor({ mode, blogId }: BlogEditorProps) {
   });
 
   const updateBlogMutation = useMutation({
-    mutationFn: (data: typeof formData) => api.owner.blogs.update(blogId!, data),
+    mutationFn: (data: BlogEditorForm) =>
+      api.owner.blogs.update(blogId!, {
+        ...data,
+        categoryId: data.categoryId || undefined,
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["blog-detail", blogId] });
       queryClient.invalidateQueries({ queryKey: ["owner-blogs"] });
@@ -197,14 +217,22 @@ export function BlogEditor({ mode, blogId }: BlogEditorProps) {
     },
   });
 
-  // Generate slug from title
   const generateSlug = (title: string) => {
-    // Turkish character mappings
     const turkishMap: Record<string, string> = {
-      ç: "c", ğ: "g", ı: "i", ö: "o", ş: "s", ü: "u",
-      Ç: "c", Ğ: "g", İ: "i", Ö: "o", Ş: "s", Ü: "u",
+      ç: "c",
+      ğ: "g",
+      ı: "i",
+      ö: "o",
+      ş: "s",
+      ü: "u",
+      Ç: "c",
+      Ğ: "g",
+      İ: "i",
+      Ö: "o",
+      Ş: "s",
+      Ü: "u",
     };
-    
+
     return title
       .toLowerCase()
       .replace(/[çğıöşüÇĞİÖŞÜ]/g, (char) => turkishMap[char] || char)
@@ -212,15 +240,20 @@ export function BlogEditor({ mode, blogId }: BlogEditorProps) {
       .replace(/(^-|-$)/g, "");
   };
 
-  const handleChange = (field: keyof typeof formData, value: any) => {
+  const handleChange = <K extends keyof BlogEditorForm>(
+    field: K,
+    value: BlogEditorForm[K],
+  ) => {
     setFormData((prev) => {
       const updated = { ...prev, [field]: value };
-      
-      // Auto-generate slug when title changes (only if slug is empty or matches old slug pattern)
-      if (field === "title" && (mode === "create" || !prev.slug || prev.slug === generateSlug(prev.title))) {
-        updated.slug = generateSlug(value);
+
+      if (
+        field === "title" &&
+        (mode === "create" || !prev.slug || prev.slug === generateSlug(prev.title))
+      ) {
+        updated.slug = generateSlug(String(value));
       }
-      
+
       return updated;
     });
     setHasChanges(true);
@@ -229,6 +262,11 @@ export function BlogEditor({ mode, blogId }: BlogEditorProps) {
   const handleSave = async () => {
     if (!formData.title.trim()) {
       alert("Blog başlığı gereklidir");
+      return;
+    }
+
+    if (!formData.categoryId) {
+      alert("Kategori seçimi zorunludur");
       return;
     }
 
@@ -261,7 +299,10 @@ export function BlogEditor({ mode, blogId }: BlogEditorProps) {
   };
 
   const handleRemoveTag = (tagToRemove: string) => {
-    handleChange("tags", formData.tags.filter((t) => t !== tagToRemove));
+    handleChange(
+      "tags",
+      formData.tags.filter((item) => item !== tagToRemove),
+    );
   };
 
   const handleAddKeyword = () => {
@@ -273,11 +314,14 @@ export function BlogEditor({ mode, blogId }: BlogEditorProps) {
   };
 
   const handleRemoveKeyword = (keywordToRemove: string) => {
-    handleChange("seoKeywords", formData.seoKeywords.filter((k) => k !== keywordToRemove));
+    handleChange(
+      "seoKeywords",
+      formData.seoKeywords.filter((item) => item !== keywordToRemove),
+    );
   };
 
-  const handleImageUpload = async (file: File) => {
-    return api.owner.upload.single(file);
+  const handleEditorImageUpload = async (file: File) => {
+    return api.owner.upload.single(file, "blog_content");
   };
 
   if (mode === "edit" && isBlogLoading) {
@@ -290,7 +334,6 @@ export function BlogEditor({ mode, blogId }: BlogEditorProps) {
 
   return (
     <div className="flex h-[calc(100vh-4rem)] flex-col">
-      {/* Header */}
       <header className="flex shrink-0 items-center justify-between gap-4 border-b border-border bg-white px-6 py-4">
         <div className="flex items-center gap-4">
           <Button
@@ -306,7 +349,7 @@ export function BlogEditor({ mode, blogId }: BlogEditorProps) {
               {mode === "create" ? "Yeni Blog Yazısı" : "Blog Düzenle"}
             </h1>
             {mode === "edit" && (
-              <div className="flex items-center gap-2 mt-1">
+              <div className="mt-1 flex items-center gap-2">
                 <StatusBadge status={blogStatus} />
                 {hasChanges && (
                   <span className="text-xs text-amber-600">• Kaydedilmemiş değişiklikler</span>
@@ -323,8 +366,7 @@ export function BlogEditor({ mode, blogId }: BlogEditorProps) {
               size="sm"
               onClick={() => window.open(`/blog/${blog.slug}`, "_blank")}
             >
-              <Eye className="mr-2 size-4" />
-              Önizle
+              <Eye className="mr-2 size-4" /> Önizle
             </Button>
           )}
 
@@ -348,10 +390,7 @@ export function BlogEditor({ mode, blogId }: BlogEditorProps) {
           </Button>
 
           {mode === "edit" && blogStatus === "draft" && (
-            <Button
-              onClick={handlePublish}
-              disabled={publishBlogMutation.isPending || hasChanges}
-            >
+            <Button onClick={handlePublish} disabled={publishBlogMutation.isPending || hasChanges}>
               {publishBlogMutation.isPending ? (
                 <>
                   <span className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
@@ -359,8 +398,7 @@ export function BlogEditor({ mode, blogId }: BlogEditorProps) {
                 </>
               ) : (
                 <>
-                  <Send className="mr-2 size-4" />
-                  İncelemeye Gönder
+                  <Send className="mr-2 size-4" /> İncelemeye Gönder
                 </>
               )}
             </Button>
@@ -372,12 +410,15 @@ export function BlogEditor({ mode, blogId }: BlogEditorProps) {
             onClick={() => setSidebarOpen(!sidebarOpen)}
             className="lg:hidden"
           >
-            {sidebarOpen ? <PanelRightClose className="size-5" /> : <PanelRightOpen className="size-5" />}
+            {sidebarOpen ? (
+              <PanelRightClose className="size-5" />
+            ) : (
+              <PanelRightOpen className="size-5" />
+            )}
           </Button>
         </div>
       </header>
 
-      {/* Status Message */}
       {mode === "edit" && (
         <div className={cn("flex items-center gap-2 px-4 py-2 text-sm", statusConfig.color)}>
           <StatusIcon className="size-4" />
@@ -385,41 +426,35 @@ export function BlogEditor({ mode, blogId }: BlogEditorProps) {
         </div>
       )}
 
-      {/* Main Content */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Editor Panel */}
         <div className="flex-1 overflow-y-auto p-6">
           <div className="space-y-6">
-            {/* Title */}
             <Input
               value={formData.title}
               onChange={(e) => handleChange("title", e.target.value)}
               placeholder="Blog başlığını girin..."
               disabled={isPublished}
-              className="border-0 bg-transparent px-0 text-3xl font-bold focus-visible:ring-0 placeholder:text-slate-300"
+              className="border-0 bg-transparent px-0 text-3xl font-bold placeholder:text-slate-300 focus-visible:ring-0"
             />
 
-            {/* Content Editor */}
             <TipTapEditor
               content={formData.content}
               onChange={(content) => handleChange("content", content)}
               placeholder="Hikayenizi buraya yazın..."
               disabled={isPublished}
               minHeight="600px"
-              onImageUpload={handleImageUpload}
+              onImageUpload={handleEditorImageUpload}
             />
           </div>
         </div>
 
-        {/* Sidebar */}
         <aside
           className={cn(
             "w-[440px] shrink-0 overflow-y-auto border-l border-border bg-slate-50 transition-all lg:block",
-            sidebarOpen ? "block" : "hidden"
+            sidebarOpen ? "block" : "hidden",
           )}
         >
-          <div className="p-5 space-y-6">
-            {/* URL Slug */}
+          <div className="space-y-6 p-5">
             <div className="space-y-2">
               <Label className="text-xs font-semibold uppercase text-muted-foreground">
                 URL Slug
@@ -433,11 +468,9 @@ export function BlogEditor({ mode, blogId }: BlogEditorProps) {
               />
             </div>
 
-            {/* Hero Image */}
             <div className="space-y-2">
               <Label className="text-xs font-semibold uppercase text-muted-foreground">
-                <ImageIcon className="mr-1 inline size-3" />
-                Kapak Görseli
+                <ImageIcon className="mr-1 inline size-3" /> Kapak Görseli
               </Label>
               <FileUpload
                 value={formData.heroImage}
@@ -446,10 +479,10 @@ export function BlogEditor({ mode, blogId }: BlogEditorProps) {
                 disabled={isPublished}
                 aspectRatio="video"
                 label="Kapak görseli yükle"
+                uploadFn={(file) => api.owner.upload.single(file, "blog_hero")}
               />
             </div>
 
-            {/* Featured Image */}
             <div className="space-y-2">
               <Label className="text-xs font-semibold uppercase text-muted-foreground">
                 Öne Çıkan Görsel
@@ -461,14 +494,12 @@ export function BlogEditor({ mode, blogId }: BlogEditorProps) {
                 disabled={isPublished}
                 aspectRatio="square"
                 label="Öne çıkan görsel yükle"
+                uploadFn={(file) => api.owner.upload.single(file, "blog_featured")}
               />
             </div>
 
-            {/* Excerpt */}
             <div className="space-y-2">
-              <Label className="text-xs font-semibold uppercase text-muted-foreground">
-                Özet
-              </Label>
+              <Label className="text-xs font-semibold uppercase text-muted-foreground">Özet</Label>
               <textarea
                 value={formData.excerpt}
                 onChange={(e) => handleChange("excerpt", e.target.value)}
@@ -481,28 +512,26 @@ export function BlogEditor({ mode, blogId }: BlogEditorProps) {
               <p className="text-xs text-muted-foreground">{formData.excerpt.length}/500</p>
             </div>
 
-            {/* Category */}
             <div className="space-y-2">
-              <Label className="text-xs font-semibold uppercase text-muted-foreground">
-                Kategori
-              </Label>
+              <Label className="text-xs font-semibold uppercase text-muted-foreground">Kategori</Label>
               <select
-                value={formData.category}
-                onChange={(e) => handleChange("category", e.target.value)}
+                value={formData.categoryId}
+                onChange={(e) => handleChange("categoryId", e.target.value)}
                 disabled={isPublished}
                 className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none disabled:opacity-60"
               >
-                {CATEGORY_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                <option value="">Kategori seçin</option>
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
                 ))}
               </select>
             </div>
 
-            {/* Tags */}
             <div className="space-y-2">
               <Label className="text-xs font-semibold uppercase text-muted-foreground">
-                <Tag className="mr-1 inline size-3" />
-                Etiketler
+                <Tag className="mr-1 inline size-3" /> Etiketler
               </Label>
               <div className="flex gap-2">
                 <Input
@@ -547,11 +576,9 @@ export function BlogEditor({ mode, blogId }: BlogEditorProps) {
               )}
             </div>
 
-            {/* SEO Section */}
             <div className="space-y-4 rounded-lg border border-slate-200 bg-white p-3">
               <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                <Search className="size-4" />
-                SEO Ayarları
+                <Search className="size-4" /> SEO Ayarları
               </div>
 
               <div className="space-y-2">
@@ -607,14 +634,14 @@ export function BlogEditor({ mode, blogId }: BlogEditorProps) {
                 </div>
                 {formData.seoKeywords.length > 0 && (
                   <div className="flex flex-wrap gap-1.5">
-                    {formData.seoKeywords.map((kw) => (
+                    {formData.seoKeywords.map((keyword) => (
                       <span
-                        key={kw}
+                        key={keyword}
                         className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs"
                       >
-                        {kw}
+                        {keyword}
                         {!isPublished && (
-                          <button type="button" onClick={() => handleRemoveKeyword(kw)}>
+                          <button type="button" onClick={() => handleRemoveKeyword(keyword)}>
                             <X className="size-3" />
                           </button>
                         )}
@@ -625,51 +652,21 @@ export function BlogEditor({ mode, blogId }: BlogEditorProps) {
               </div>
             </div>
 
-            {/* Publishing Settings */}
             <div className="space-y-4 rounded-lg border border-slate-200 bg-white p-3">
               <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                <Settings className="size-4" />
-                Yayın Ayarları
+                <Settings className="size-4" /> Yayın Ayarları
               </div>
 
               <div className="space-y-2">
                 <Label className="text-xs text-muted-foreground">Dil</Label>
                 <select
                   value={formData.language}
-                  onChange={(e) => handleChange("language", e.target.value)}
+                  onChange={(e) => handleChange("language", e.target.value as "tr" | "en")}
                   disabled={isPublished}
                   className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none disabled:opacity-60"
                 >
                   <option value="tr">Türkçe</option>
                   <option value="en">English</option>
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">Okuma Seviyesi</Label>
-                <select
-                  value={formData.readingLevel}
-                  onChange={(e) => handleChange("readingLevel", e.target.value)}
-                  disabled={isPublished}
-                  className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none disabled:opacity-60"
-                >
-                  {READING_LEVEL_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">Hedef Kitle</Label>
-                <select
-                  value={formData.targetAudience}
-                  onChange={(e) => handleChange("targetAudience", e.target.value)}
-                  disabled={isPublished}
-                  className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none disabled:opacity-60"
-                >
-                  {TARGET_AUDIENCE_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
                 </select>
               </div>
             </div>

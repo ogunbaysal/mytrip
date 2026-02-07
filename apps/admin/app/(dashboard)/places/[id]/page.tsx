@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { CalendarDays, MapPin, MoreHorizontal, CheckCircle2, Star, EyeIcon, BookOpen, User } from "lucide-react"
+import { CalendarDays, MapPin, MoreHorizontal, CheckCircle2, Star, EyeIcon, BookOpen, User, FileText, Download, ExternalLink } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -317,6 +317,39 @@ export default function PlaceDetailPage() {
                     </CardContent>
                 </Card>
              )}
+             <Card>
+                <CardHeader>
+                    <CardTitle>İşletme Belgesi</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {place.businessDocument ? (
+                    <>
+                      <div className="flex items-center gap-2 text-sm">
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <span className="truncate">{place.businessDocument.filename}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button size="sm" variant="outline" asChild>
+                          <a href={place.businessDocument.url} target="_blank" rel="noreferrer">
+                            <ExternalLink className="mr-2 h-4 w-4" />
+                            Görüntüle
+                          </a>
+                        </Button>
+                        <Button size="sm" variant="outline" asChild>
+                          <a href={place.businessDocument.url} download>
+                            <Download className="mr-2 h-4 w-4" />
+                            İndir
+                          </a>
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      İşletme belgesi yüklenmemiş.
+                    </p>
+                  )}
+                </CardContent>
+             </Card>
         </div>
       </div>
     </div>

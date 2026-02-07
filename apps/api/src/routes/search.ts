@@ -1,7 +1,16 @@
 import { Hono } from "hono";
 import { db } from "../db/index.ts";
-import { place, collection, blogPost, user, review } from "../db/schemas/index.ts";
-import { eq, desc, ilike, sql, and, or } from "drizzle-orm";
+import {
+  place,
+  collection,
+  blogPost,
+  blogCategory,
+  file,
+  user,
+  review,
+} from "../db/schemas/index.ts";
+import { eq, desc, ilike, inArray, sql, and, or } from "drizzle-orm";
+import { resolvePublicFileUrl } from "../lib/place-relations.ts";
 
 const app = new Hono();
 
@@ -152,23 +161,26 @@ app.get("/", async (c) => {
           ilike(blogPost.seoTitle, searchTerm),
           ilike(blogPost.seoDescription, searchTerm),
           ilike(blogPost.tags, searchTerm),
+          ilike(blogCategory.name, searchTerm),
         ),
       ];
 
       const [blogCount] = await db
         .select({ count: sql`COUNT(*)::int` })
         .from(blogPost)
+        .leftJoin(blogCategory, eq(blogPost.categoryId, blogCategory.id))
         .where(and(...blogConditions));
 
-      const blogPosts = await db
+      const blogRows = await db
         .select({
           id: blogPost.id,
           slug: blogPost.slug,
           title: blogPost.title,
           excerpt: blogPost.excerpt,
-          heroImage: blogPost.heroImage,
-          featuredImage: blogPost.featuredImage,
-          category: blogPost.category,
+          heroImageId: blogPost.heroImageId,
+          featuredImageId: blogPost.featuredImageId,
+          category: blogCategory.slug,
+          categoryName: blogCategory.name,
           tags: blogPost.tags,
           featured: blogPost.featured,
           publishedAt: blogPost.publishedAt,
@@ -176,10 +188,47 @@ app.get("/", async (c) => {
           language: blogPost.language,
         })
         .from(blogPost)
+        .leftJoin(blogCategory, eq(blogPost.categoryId, blogCategory.id))
         .where(and(...blogConditions))
         .orderBy(sql`CASE WHEN ${blogPost.featured} = true THEN 1 ELSE 2 END`, desc(blogPost.publishedAt))
         .limit(limitInt)
         .offset(offset);
+
+      const fileIds = Array.from(
+        new Set(
+          blogRows
+            .flatMap((row) => [row.heroImageId, row.featuredImageId])
+            .filter((value): value is string => Boolean(value)),
+        ),
+      );
+      const fileRows =
+        fileIds.length > 0
+          ? await db
+              .select({ id: file.id, url: file.url })
+              .from(file)
+              .where(inArray(file.id, fileIds))
+          : [];
+      const fileMap = new Map(
+        fileRows.map((row) => [row.id, resolvePublicFileUrl(row.url)]),
+      );
+
+      const blogPosts = blogRows.map((row) => ({
+        id: row.id,
+        slug: row.slug,
+        title: row.title,
+        excerpt: row.excerpt,
+        heroImage: row.heroImageId ? (fileMap.get(row.heroImageId) ?? null) : null,
+        featuredImage: row.featuredImageId
+          ? (fileMap.get(row.featuredImageId) ?? null)
+          : null,
+        category: row.category,
+        categoryName: row.categoryName,
+        tags: row.tags,
+        featured: row.featured,
+        publishedAt: row.publishedAt,
+        readTime: row.readTime,
+        language: row.language,
+      }));
 
       results.blog = blogPosts;
       totalItems += Number(blogCount.count);

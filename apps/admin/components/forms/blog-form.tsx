@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import type { BlogPost } from "@/hooks/use-blogs";
+import { useBlogCategories } from "@/hooks/use-blogs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -43,29 +44,8 @@ import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { Eye, Heart, MessageCircle, Share2 } from "lucide-react";
 
-const CATEGORIES = [
-  "travel",
-  "food",
-  "culture",
-  "history",
-  "activity",
-  "lifestyle",
-  "business",
-] as const;
 const STATUSES = ["published", "draft", "pending_review", "archived"] as const;
 const LANGUAGES = ["tr", "en"] as const;
-const READING_LEVELS = ["easy", "medium", "hard"] as const;
-const AUDIENCES = ["travelers", "locals", "business_owners", "all"] as const;
-
-const CATEGORY_LABELS: Record<(typeof CATEGORIES)[number], string> = {
-  travel: "Seyahat",
-  food: "Yeme & İçme",
-  culture: "Kültür",
-  history: "Tarih",
-  activity: "Aktivite",
-  lifestyle: "Yaşam Tarzı",
-  business: "İş Dünyası",
-};
 
 const STATUS_LABELS: Record<(typeof STATUSES)[number], string> = {
   published: "Yayında",
@@ -95,26 +75,19 @@ const blogFormSchema = z.object({
   content: z.string().min(10, {
     message: "İçerik en az 10 karakter olmalıdır.",
   }),
-  category: z.enum(CATEGORIES),
+  categoryId: z.string().min(1, {
+    message: "Kategori seçimi zorunludur.",
+  }),
   status: z.enum(STATUSES),
   language: z.enum(LANGUAGES),
-  readingLevel: z.enum(READING_LEVELS),
-  targetAudience: z.enum(AUDIENCES),
   heroImage: z.string().optional().or(z.literal("")),
+  heroImageId: z.string().optional().or(z.literal("")),
   featuredImage: z.string().optional().or(z.literal("")),
+  featuredImageId: z.string().optional().or(z.literal("")),
   images: z.array(z.string()).default([]),
   tags: z.array(z.string()).default([]),
   featured: z.boolean().default(false),
   publishedAt: z.string().optional(),
-  readTime: z
-    .preprocess((value) => {
-      if (value === "" || value === null || typeof value === "undefined") {
-        return undefined;
-      }
-      const parsed = Number(value);
-      return Number.isNaN(parsed) ? undefined : parsed;
-    }, z.number().int().positive())
-    .optional(),
   seoTitle: z.string().optional(),
   seoDescription: z.string().optional(),
   seoKeywords: z.array(z.string()).default([]),
@@ -122,13 +95,8 @@ const blogFormSchema = z.object({
 
 export type BlogFormValues = z.infer<typeof blogFormSchema>;
 
-export type BlogFormSubmitValues = Omit<
-  BlogFormValues,
-  "tags" | "seoKeywords" | "images"
-> & {
-  tags: string;
-  seoKeywords: string;
-  images: string;
+export type BlogFormSubmitValues = Omit<BlogFormValues, "publishedAt"> & {
+  publishedAt?: string;
 };
 
 const defaultValues: BlogFormValues = {
@@ -136,18 +104,17 @@ const defaultValues: BlogFormValues = {
   slug: "",
   excerpt: "",
   content: "",
-  category: "travel",
+  categoryId: "",
   status: "draft",
   language: "tr",
-  readingLevel: "medium",
-  targetAudience: "travelers",
   heroImage: "",
+  heroImageId: "",
   featuredImage: "",
+  featuredImageId: "",
   images: [],
   tags: [],
   featured: false,
   publishedAt: "",
-  readTime: undefined,
   seoTitle: "",
   seoDescription: "",
   seoKeywords: [],
@@ -167,6 +134,7 @@ const normalizeArray = (value?: string | string[] | null) => {
   if (!value) return [];
   if (Array.isArray(value)) return value.filter(Boolean);
   if (typeof value !== "string") return [];
+
   try {
     const parsed = JSON.parse(value);
     return Array.isArray(parsed) ? parsed.filter(Boolean) : [value];
@@ -208,31 +176,64 @@ export function BlogForm({
   isSubmitting = false,
   onCancel,
 }: BlogFormProps) {
+  const { data: blogCategories = [] } = useBlogCategories({
+    includeInactive: true,
+  });
+
+  const categoryOptions = useMemo(
+    () =>
+      [...blogCategories].sort((a, b) => {
+        if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
+        return a.name.localeCompare(b.name, "tr");
+      }),
+    [blogCategories],
+  );
+
+  const categoryNameById = useMemo(
+    () => new Map(categoryOptions.map((item) => [item.id, item.name])),
+    [categoryOptions],
+  );
+
   const form = useForm<BlogFormValues>({
     resolver: zodResolver(blogFormSchema) as any,
     defaultValues,
   });
+  const [galleryFileIdByUrl, setGalleryFileIdByUrl] = useState<
+    Record<string, string>
+  >({});
 
   useEffect(() => {
     if (!initialData) return;
+    const normalizedImages = normalizeArray(initialData.images);
+    const normalizedImageFileIds = normalizeArray(
+      initialData.imageFileIds,
+    );
+
+    const mappedImageIds: Record<string, string> = {};
+    normalizedImages.forEach((url, index) => {
+      const fileId = normalizedImageFileIds[index];
+      if (fileId) {
+        mappedImageIds[url] = fileId;
+      }
+    });
+    setGalleryFileIdByUrl(mappedImageIds);
 
     form.reset({
       title: initialData.title || "",
       slug: initialData.slug || "",
       excerpt: initialData.excerpt || "",
       content: initialData.content || "",
-      category: initialData.category || "travel",
+      categoryId: initialData.categoryId || "",
       status: initialData.status || "draft",
       language: initialData.language || "tr",
-      readingLevel: initialData.readingLevel || "medium",
-      targetAudience: initialData.targetAudience || "travelers",
       heroImage: initialData.heroImage || "",
+      heroImageId: initialData.heroImageId || "",
       featuredImage: initialData.featuredImage || "",
-      images: normalizeArray(initialData.images),
+      featuredImageId: initialData.featuredImageId || "",
+      images: normalizedImages,
       tags: normalizeArray(initialData.tags),
       featured: Boolean(initialData.featured),
       publishedAt: toDateTimeLocal(initialData.publishedAt),
-      readTime: initialData.readTime ?? undefined,
       seoTitle: initialData.seoTitle || "",
       seoDescription: initialData.seoDescription || "",
       seoKeywords: normalizeArray(initialData.seoKeywords),
@@ -244,11 +245,10 @@ export function BlogForm({
   const excerptValue = form.watch("excerpt");
   const contentValue = form.watch("content");
   const statusValue = form.watch("status");
-  const categoryValue = form.watch("category");
+  const categoryIdValue = form.watch("categoryId");
   const languageValue = form.watch("language");
   const featuredValue = form.watch("featured");
   const heroImageValue = form.watch("heroImage");
-  const readTimeValue = form.watch("readTime");
   const seoTitleValue = form.watch("seoTitle");
   const seoDescriptionValue = form.watch("seoDescription");
 
@@ -260,49 +260,35 @@ export function BlogForm({
     form.setValue("slug", generateSlug(titleValue), { shouldValidate: true });
   }, [form, titleValue]);
 
-  const contentText = useMemo(
-    () => stripHtml(contentValue || ""),
-    [contentValue],
-  );
+  const contentText = useMemo(() => stripHtml(contentValue || ""), [contentValue]);
   const wordCount = contentText ? contentText.split(" ").length : 0;
   const characterCount = contentText.length;
-  const estimatedReadTime = wordCount
-    ? Math.max(1, Math.ceil(wordCount / 220))
-    : 0;
-
-  useEffect(() => {
-    if (!estimatedReadTime) return;
-    if (form.getFieldState("readTime").isDirty) return;
-    if (readTimeValue) return;
-
-    form.setValue("readTime", estimatedReadTime, { shouldValidate: true });
-  }, [estimatedReadTime, form, readTimeValue]);
+  const estimatedReadTime = wordCount ? Math.max(1, Math.ceil(wordCount / 220)) : 0;
 
   const handleSubmit = (values: BlogFormValues) => {
     const publishedAtValue = values.publishedAt?.trim();
-    const parsedDate = publishedAtValue
-      ? new Date(publishedAtValue)
-      : undefined;
+    const parsedDate = publishedAtValue ? new Date(publishedAtValue) : undefined;
     const resolvedPublishedAt =
       parsedDate && !Number.isNaN(parsedDate.getTime())
         ? parsedDate.toISOString()
         : undefined;
-
-    const serializeArray = (value?: string[]) => JSON.stringify(value || []);
+    const resolvedImages = (values.images || []).map(
+      (url) => galleryFileIdByUrl[url] ?? url,
+    );
 
     onSubmit({
       ...values,
+      heroImageId: values.heroImageId?.trim() || "",
+      featuredImageId: values.featuredImageId?.trim() || "",
       publishedAt: resolvedPublishedAt,
-      readTime: values.readTime || undefined,
-      tags: serializeArray(values.tags),
-      seoKeywords: serializeArray(values.seoKeywords),
-      images: serializeArray(values.images),
+      tags: values.tags || [],
+      images: resolvedImages,
+      seoKeywords: values.seoKeywords || [],
     });
   };
 
   const submitLabel = mode === "edit" ? "Güncelle" : "Oluştur";
-  const submittingLabel =
-    mode === "edit" ? "Güncelleniyor..." : "Oluşturuluyor...";
+  const submittingLabel = mode === "edit" ? "Güncelleniyor..." : "Oluşturuluyor...";
 
   return (
     <Form {...form}>
@@ -321,8 +307,7 @@ export function BlogForm({
                   <CardHeader>
                     <CardTitle>Başlık ve İçerik</CardTitle>
                     <CardDescription>
-                      Blog yazısının başlığını, özetini ve ana içeriğini
-                      düzenleyin.
+                      Blog yazısının başlığını, özetini ve ana içeriğini düzenleyin.
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
@@ -334,10 +319,7 @@ export function BlogForm({
                           <FormItem>
                             <FormLabel>Başlık</FormLabel>
                             <FormControl>
-                              <Input
-                                placeholder="Blog yazısı başlığı..."
-                                {...field}
-                              />
+                              <Input placeholder="Blog yazısı başlığı..." {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -350,14 +332,10 @@ export function BlogForm({
                           <FormItem>
                             <FormLabel>URL Yolu (Slug)</FormLabel>
                             <FormControl>
-                              <Input
-                                placeholder="ornek-blog-yazisi"
-                                {...field}
-                              />
+                              <Input placeholder="ornek-blog-yazisi" {...field} />
                             </FormControl>
                             <FormDescription className="text-xs">
-                              Otomatik oluşturulur. Önizleme:{" "}
-                              {`/blog/${slugValue || "ornek-baslik"}`}
+                              Otomatik oluşturulur. Önizleme: {`/blog/${slugValue || "ornek-baslik"}`}
                             </FormDescription>
                             <FormMessage />
                           </FormItem>
@@ -372,11 +350,7 @@ export function BlogForm({
                         <FormItem>
                           <FormLabel>Özet</FormLabel>
                           <FormControl>
-                            <Textarea
-                              className="min-h-[100px]"
-                              placeholder="Kısa özet..."
-                              {...field}
-                            />
+                            <Textarea className="min-h-[100px]" placeholder="Kısa özet..." {...field} />
                           </FormControl>
                           <FormDescription className="text-xs">
                             {`Arama ve liste görünümü için 140-180 karakter idealdir. (${(excerptValue || "").length} karakter)`}
@@ -396,12 +370,11 @@ export function BlogForm({
                             <TiptapEditor
                               value={field.value}
                               onChange={field.onChange}
-                              onImageUpload={(file) => api.upload.single(file)}
+                              onImageUpload={(file) => api.upload.single(file, "blog_content")}
                             />
                           </FormControl>
                           <FormDescription className="text-xs">
-                            İçeriği bloklara ayırın, başlıkları hiyerarşik
-                            kullanın.
+                            İçeriği bloklara ayırın, başlıkları hiyerarşik kullanın.
                           </FormDescription>
                           <FormMessage />
                         </FormItem>
@@ -420,6 +393,28 @@ export function BlogForm({
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
+                    <FormField
+                      control={form.control}
+                      name="heroImageId"
+                      render={({ field }) => (
+                        <FormItem className="hidden">
+                          <FormControl>
+                            <Input type="hidden" {...field} />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="featuredImageId"
+                      render={({ field }) => (
+                        <FormItem className="hidden">
+                          <FormControl>
+                            <Input type="hidden" {...field} />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
                     <div className="grid gap-4 lg:grid-cols-2">
                       <FormField
                         control={form.control}
@@ -430,10 +425,25 @@ export function BlogForm({
                             <FormControl>
                               <FileUpload
                                 value={field.value}
-                                onChange={field.onChange}
-                                onRemove={() => field.onChange("")}
+                                onChange={(url) => {
+                                  field.onChange(url);
+                                  if (!url) {
+                                    form.setValue("heroImageId", "", {
+                                      shouldDirty: true,
+                                      shouldValidate: true,
+                                    });
+                                  }
+                                }}
+                                onUploaded={(result) => {
+                                  if (!result.fileId) return;
+                                  form.setValue("heroImageId", result.fileId, {
+                                    shouldDirty: true,
+                                    shouldValidate: true,
+                                  });
+                                }}
                                 label="Kapak Görseli Yükle"
                                 aspectRatio="video"
+                                uploadFn={(file) => api.upload.single(file, "blog_hero")}
                               />
                             </FormControl>
                             <FormDescription className="text-xs">
@@ -452,10 +462,25 @@ export function BlogForm({
                             <FormControl>
                               <FileUpload
                                 value={field.value}
-                                onChange={field.onChange}
-                                onRemove={() => field.onChange("")}
+                                onChange={(url) => {
+                                  field.onChange(url);
+                                  if (!url) {
+                                    form.setValue("featuredImageId", "", {
+                                      shouldDirty: true,
+                                      shouldValidate: true,
+                                    });
+                                  }
+                                }}
+                                onUploaded={(result) => {
+                                  if (!result.fileId) return;
+                                  form.setValue("featuredImageId", result.fileId, {
+                                    shouldDirty: true,
+                                    shouldValidate: true,
+                                  });
+                                }}
                                 label="Öne Çıkan Görsel Yükle"
                                 aspectRatio="square"
+                                uploadFn={(file) => api.upload.single(file, "blog_featured")}
                               />
                             </FormControl>
                             <FormDescription className="text-xs">
@@ -476,13 +501,40 @@ export function BlogForm({
                           <FormControl>
                             <MultiFileUpload
                               values={field.value || []}
-                              onChange={field.onChange}
+                              onChange={(urls) => {
+                                const nextUrlSet = new Set(urls);
+                                setGalleryFileIdByUrl((prev) => {
+                                  const next: Record<string, string> = {};
+                                  Object.entries(prev).forEach(([url, fileId]) => {
+                                    if (nextUrlSet.has(url)) {
+                                      next[url] = fileId;
+                                    }
+                                  });
+                                  return next;
+                                });
+                                field.onChange(urls);
+                              }}
+                              onUploaded={(result) => {
+                                if (!result.fileIds?.length) return;
+                                setGalleryFileIdByUrl((prev) => {
+                                  const next = { ...prev };
+                                  result.urls.forEach((url, index) => {
+                                    const fileId = result.fileIds?.[index];
+                                    if (fileId) {
+                                      next[url] = fileId;
+                                    }
+                                  });
+                                  return next;
+                                });
+                              }}
                               maxFiles={12}
+                              uploadFn={(files) =>
+                                api.upload.multiple(files, "blog_content")
+                              }
                             />
                           </FormControl>
                           <FormDescription className="text-xs">
-                            Ek görselleri burada yükleyebilir ve maksimum 12
-                            görsel ekleyebilirsiniz.
+                            Ek görselleri burada yükleyebilir ve maksimum 12 görsel ekleyebilirsiniz.
                           </FormDescription>
                           <FormMessage />
                         </FormItem>
@@ -497,8 +549,7 @@ export function BlogForm({
                   <CardHeader>
                     <CardTitle>SEO Ayarları</CardTitle>
                     <CardDescription>
-                      Arama motorları ve sosyal paylaşım için başlık ve açıklama
-                      belirleyin.
+                      Arama motorları ve sosyal paylaşım için başlık ve açıklama belirleyin.
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
@@ -525,10 +576,7 @@ export function BlogForm({
                         <FormItem>
                           <FormLabel>SEO Açıklaması</FormLabel>
                           <FormControl>
-                            <Textarea
-                              placeholder="Meta description..."
-                              {...field}
-                            />
+                            <Textarea placeholder="Meta description..." {...field} />
                           </FormControl>
                           <FormDescription className="text-xs">
                             {`Önerilen: 140-160 karakter. (${(field.value || "").length} karakter)`}
@@ -597,10 +645,7 @@ export function BlogForm({
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Durum</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        value={field.value}
-                      >
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Durum seçiniz" />
@@ -609,9 +654,7 @@ export function BlogForm({
                         <SelectContent>
                           <SelectItem value="draft">Taslak</SelectItem>
                           <SelectItem value="published">Yayında</SelectItem>
-                          <SelectItem value="pending_review">
-                            İncelemede
-                          </SelectItem>
+                          <SelectItem value="pending_review">İncelemede</SelectItem>
                           <SelectItem value="archived">Arşivlendi</SelectItem>
                         </SelectContent>
                       </Select>
@@ -632,10 +675,7 @@ export function BlogForm({
                         </FormDescription>
                       </div>
                       <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
+                        <Switch checked={field.value} onCheckedChange={field.onChange} />
                       </FormControl>
                     </FormItem>
                   )}
@@ -662,30 +702,6 @@ export function BlogForm({
                   )}
                 />
 
-                <FormField
-                  control={form.control}
-                  name="readTime"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Okuma Süresi (dk)</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          min={1}
-                          value={field.value ?? ""}
-                          onChange={field.onChange}
-                        />
-                      </FormControl>
-                      <FormDescription className="text-xs">
-                        {estimatedReadTime
-                          ? `Önerilen okuma süresi: ${estimatedReadTime} dk`
-                          : "Okuma süresini dakika olarak belirleyin."}
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
                 <Separator />
 
                 <div className="grid grid-cols-3 gap-2 text-xs">
@@ -695,9 +711,7 @@ export function BlogForm({
                   </div>
                   <div className="rounded-lg border bg-muted/40 p-2">
                     <div className="text-muted-foreground">Karakter</div>
-                    <div className="text-base font-semibold">
-                      {characterCount}
-                    </div>
+                    <div className="text-base font-semibold">{characterCount}</div>
                   </div>
                   <div className="rounded-lg border bg-muted/40 p-2">
                     <div className="text-muted-foreground">Tahmini</div>
@@ -713,33 +727,28 @@ export function BlogForm({
               <CardHeader>
                 <CardTitle>Sınıflandırma</CardTitle>
                 <CardDescription>
-                  İçeriği doğru kategori ve hedef kitleyle eşleştirin.
+                  İçeriği doğru kategori ve etiketlerle eşleştirin.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <FormField
                   control={form.control}
-                  name="category"
+                  name="categoryId"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Kategori</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        value={field.value}
-                      >
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Kategori seçiniz" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="travel">Seyahat</SelectItem>
-                          <SelectItem value="food">Yeme & İçme</SelectItem>
-                          <SelectItem value="culture">Kültür</SelectItem>
-                          <SelectItem value="history">Tarih</SelectItem>
-                          <SelectItem value="activity">Aktivite</SelectItem>
-                          <SelectItem value="lifestyle">Yaşam Tarzı</SelectItem>
-                          <SelectItem value="business">İş Dünyası</SelectItem>
+                          {categoryOptions.map((category) => (
+                            <SelectItem key={category.id} value={category.id}>
+                              {category.name}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -761,8 +770,7 @@ export function BlogForm({
                         />
                       </FormControl>
                       <FormDescription className="text-xs">
-                        İçeriği filtrelemek ve keşfedilebilirliği artırmak için
-                        kullanılır.
+                        İçeriği filtrelemek ve keşfedilebilirliği artırmak için kullanılır.
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -775,10 +783,7 @@ export function BlogForm({
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Dil</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        value={field.value}
-                      >
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Dil seçiniz" />
@@ -793,70 +798,13 @@ export function BlogForm({
                     </FormItem>
                   )}
                 />
-
-                <FormField
-                  control={form.control}
-                  name="readingLevel"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Okuma Seviyesi</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        value={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Seviye seçiniz" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="easy">Kolay</SelectItem>
-                          <SelectItem value="medium">Orta</SelectItem>
-                          <SelectItem value="hard">Zor</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="targetAudience"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Hedef Kitle</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        value={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Kitle seçiniz" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="travelers">Gezginler</SelectItem>
-                          <SelectItem value="locals">Yerel Halk</SelectItem>
-                          <SelectItem value="business_owners">
-                            İşletme Sahipleri
-                          </SelectItem>
-                          <SelectItem value="all">Herkes</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
                 <CardTitle>Önizleme</CardTitle>
-                <CardDescription>
-                  Yayın görünümünün hızlı özeti.
-                </CardDescription>
+                <CardDescription>Yayın görünümünün hızlı özeti.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="overflow-hidden rounded-xl border bg-muted/40">
@@ -876,22 +824,20 @@ export function BlogForm({
 
                 <div className="space-y-2">
                   <div className="flex flex-wrap gap-2">
-                    <Badge variant="outline">
-                      {CATEGORY_LABELS[categoryValue]}
-                    </Badge>
+                    {categoryIdValue && (
+                      <Badge variant="outline">
+                        {categoryNameById.get(categoryIdValue) || "Kategori"}
+                      </Badge>
+                    )}
                     <Badge
                       variant="outline"
                       className={cn("border", STATUS_BADGE_STYLES[statusValue])}
                     >
                       {STATUS_LABELS[statusValue]}
                     </Badge>
-                    <Badge variant="secondary">
-                      {LANGUAGE_LABELS[languageValue]}
-                    </Badge>
+                    <Badge variant="secondary">{LANGUAGE_LABELS[languageValue]}</Badge>
                     {featuredValue && (
-                      <Badge className="bg-yellow-400 text-black">
-                        Öne Çıkan
-                      </Badge>
+                      <Badge className="bg-yellow-400 text-black">Öne Çıkan</Badge>
                     )}
                   </div>
 
@@ -907,9 +853,7 @@ export function BlogForm({
                   <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                     <span>{LANGUAGE_LABELS[languageValue]}</span>
                     <span>
-                      {readTimeValue || estimatedReadTime
-                        ? `${readTimeValue || estimatedReadTime} dk okuma`
-                        : "Okuma süresi"}
+                      {estimatedReadTime ? `${estimatedReadTime} dk okuma` : "Okuma süresi"}
                     </span>
                   </div>
                 </div>
@@ -920,42 +864,32 @@ export function BlogForm({
               <Card>
                 <CardHeader>
                   <CardTitle>İstatistikler</CardTitle>
-                  <CardDescription>
-                    Yayına girdikten sonra oluşan veriler.
-                  </CardDescription>
+                  <CardDescription>Yayına girdikten sonra oluşan veriler.</CardDescription>
                 </CardHeader>
                 <CardContent className="grid grid-cols-2 gap-3">
                   <div className="rounded-lg border bg-muted/40 p-3">
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <Eye className="h-4 w-4" /> Görüntülenme
                     </div>
-                    <div className="text-lg font-semibold">
-                      {initialData.views}
-                    </div>
+                    <div className="text-lg font-semibold">{initialData.views}</div>
                   </div>
                   <div className="rounded-lg border bg-muted/40 p-3">
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <Heart className="h-4 w-4" /> Beğeni
                     </div>
-                    <div className="text-lg font-semibold">
-                      {initialData.likeCount}
-                    </div>
+                    <div className="text-lg font-semibold">{initialData.likeCount}</div>
                   </div>
                   <div className="rounded-lg border bg-muted/40 p-3">
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <MessageCircle className="h-4 w-4" /> Yorum
                     </div>
-                    <div className="text-lg font-semibold">
-                      {initialData.commentCount}
-                    </div>
+                    <div className="text-lg font-semibold">{initialData.commentCount}</div>
                   </div>
                   <div className="rounded-lg border bg-muted/40 p-3">
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <Share2 className="h-4 w-4" /> Paylaşım
                     </div>
-                    <div className="text-lg font-semibold">
-                      {initialData.shareCount}
-                    </div>
+                    <div className="text-lg font-semibold">{initialData.shareCount}</div>
                   </div>
                 </CardContent>
               </Card>

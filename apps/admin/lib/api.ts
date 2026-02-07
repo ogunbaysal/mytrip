@@ -36,9 +36,19 @@ export async function apiFetch<T>(
 
 export const api = {
   upload: {
-    async single(file: File): Promise<{ url: string }> {
+    async single(
+      file: File,
+      usage:
+        | "place_image"
+        | "business_document"
+        | "blog_hero"
+        | "blog_featured"
+        | "blog_content"
+        | "other" = "other",
+    ): Promise<{ url: string; fileId: string }> {
       const formData = new FormData();
       formData.append("file", file);
+      formData.append("usage", usage);
       const response = await fetch(`${API_URL}/api/admin/upload`, {
         method: "POST",
         credentials: "include",
@@ -54,9 +64,17 @@ export const api = {
     },
     async multiple(
       files: File[],
-    ): Promise<{ urls: string[]; errors?: string[] }> {
+      usage:
+        | "place_image"
+        | "business_document"
+        | "blog_hero"
+        | "blog_featured"
+        | "blog_content"
+        | "other" = "other",
+    ): Promise<{ urls: string[]; fileIds: string[]; errors?: string[] }> {
       const formData = new FormData();
       files.forEach((file) => formData.append("files", file));
+      formData.append("usage", usage);
       const response = await fetch(`${API_URL}/api/admin/upload/multiple`, {
         method: "POST",
         credentials: "include",

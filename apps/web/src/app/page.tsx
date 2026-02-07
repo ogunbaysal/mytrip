@@ -1,8 +1,15 @@
+import type { Metadata } from "next";
+
+import { LatestBlogSection } from "@/components/blog/latest-blog-section";
 import { FeaturedCollectionsSection } from "@/components/collections/featured-collections-section";
 import { CategorySection } from "@/components/marketing/category-section";
 import { DestinationsSection } from "@/components/marketing/destinations-section";
 import { HeroSection } from "@/components/marketing/hero";
 import { FeaturedPlacesSection } from "@/components/places/featured-places-section";
+
+export const metadata: Metadata = {
+  title: "Muğla Konaklama, Deneyim ve Mekan Rehberi",
+};
 
 export default function HomePage() {
   return (
@@ -22,6 +29,9 @@ export default function HomePage() {
 
         {/* Featured Places */}
         <FeaturedPlacesSection />
+
+        {/* Latest Blogs */}
+        <LatestBlogSection />
 
         {/* Themed Collections */}
         <FeaturedCollectionsSection />

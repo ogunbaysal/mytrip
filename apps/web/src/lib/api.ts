@@ -4,6 +4,7 @@ import type {
   PlaceTypeSummary,
   PlaceDetail,
   PlaceAmenity,
+  BlogComment,
   BlogPost,
   BlogPostDetail,
   CollectionDetail,
@@ -14,6 +15,13 @@ const API_BASE_URL =
 const DEFAULT_LOCALE = "tr";
 
 type RequestOptions = RequestInit & { cache?: RequestCache };
+type OwnerUploadUsage =
+  | "place_image"
+  | "business_document"
+  | "blog_hero"
+  | "blog_featured"
+  | "blog_content"
+  | "other";
 
 async function request<T>(
   endpoint: string,
@@ -365,6 +373,22 @@ export const api = {
           { method: "POST" },
         );
       },
+      async categories() {
+        return await request<{
+          categories: { id: string; name: string; slug: string; icon?: string | null }[];
+        }>("/api/owner/places/categories");
+      },
+      async cities() {
+        return await request<{
+          cities: { id: string; name: string; slug: string }[];
+        }>("/api/owner/places/cities");
+      },
+      async districts(cityId: string) {
+        return await request<{
+          city: { id: string; name: string } | null;
+          districts: { id: string; name: string; slug: string }[];
+        }>(`/api/owner/places/districts/${cityId}`);
+      },
     },
     blogs: {
       async list(params?: { page?: number; limit?: number; status?: string }) {
@@ -405,11 +429,20 @@ export const api = {
           { method: "DELETE" },
         );
       },
+      async categories() {
+        return await request<{
+          categories: { id: string; slug: string; name: string; description?: string | null }[];
+        }>(`/api/owner/blogs/categories`);
+      },
     },
     upload: {
-      async single(file: File): Promise<{ url: string }> {
+      async single(
+        file: File,
+        usage: OwnerUploadUsage = "other",
+      ): Promise<{ url: string; fileId: string }> {
         const formData = new FormData();
         formData.append("file", file);
+        formData.append("usage", usage);
         const response = await fetch(`${API_BASE_URL}/api/owner/upload`, {
           method: "POST",
           credentials: "include",
@@ -423,9 +456,11 @@ export const api = {
       },
       async multiple(
         files: File[],
-      ): Promise<{ urls: string[]; errors?: string[] }> {
+        usage: OwnerUploadUsage = "other",
+      ): Promise<{ urls: string[]; fileIds: string[]; errors?: string[] }> {
         const formData = new FormData();
         files.forEach((file) => formData.append("files", file));
+        formData.append("usage", usage);
         const response = await fetch(
           `${API_BASE_URL}/api/owner/upload/multiple`,
           {
@@ -443,18 +478,10 @@ export const api = {
     },
   },
   places: {
-    async listFeatured(): Promise<PlaceSummary[]> {
-      try {
-        const response = await request<{ places: APIPlace[] }>(
-          `/api/places/featured?limit=9`,
-        );
-        return response.places.map(mapBackendPlaceToSummary);
-      } catch (error) {
-        console.error("Failed to fetch featured places from API:", error);
-        return [];
-      }
-    },
+    // Public places list API response used by listing page filters + pagination
+    // Keep this shape explicit to avoid "any" pagination regressions.
     async listAll(params?: {
+      page?: number;
       search?: string;
       city?: string;
       district?: string;
@@ -477,11 +504,21 @@ export const api = {
       };
       featured?: boolean;
       verified?: boolean;
-    }): Promise<PlaceSummary[]> {
+    }): Promise<{
+      places: PlaceSummary[];
+      pagination: {
+        page: number;
+        limit: number;
+        total: number;
+        totalPages: number;
+      };
+    }> {
       try {
+        const page = params?.page && params.page > 0 ? params.page : 1;
+        const limit = params?.limit && params.limit > 0 ? params.limit : 20;
         const queryParams = new URLSearchParams();
-        if (params?.limit) queryParams.set("limit", params.limit.toString());
-        else queryParams.set("limit", "20");
+        queryParams.set("page", page.toString());
+        queryParams.set("limit", limit.toString());
 
         if (params?.search) queryParams.set("search", params.search);
         if (params?.city) queryParams.set("city", params.city);
@@ -493,9 +530,9 @@ export const api = {
         if (params?.season) queryParams.set("season", params.season);
         if (params?.checkIn) queryParams.set("checkIn", params.checkIn);
         if (params?.checkOut) queryParams.set("checkOut", params.checkOut);
-        if (params?.priceMin)
+        if (params?.priceMin !== undefined)
           queryParams.set("priceMin", params.priceMin.toString());
-        if (params?.priceMax)
+        if (params?.priceMax !== undefined)
           queryParams.set("priceMax", params.priceMax.toString());
         if (params?.sort) queryParams.set("sort", params.sort);
         if (params?.amenities && params.amenities.length > 0) {
@@ -510,12 +547,51 @@ export const api = {
         if (params?.featured) queryParams.set("featured", "true");
         if (params?.verified) queryParams.set("verified", "true");
 
+        const response = await request<{
+          places: APIPlace[];
+          pagination?: {
+            page?: number;
+            limit?: number;
+            total?: number;
+            totalPages?: number;
+          };
+        }>(`/api/places?${queryParams.toString()}`);
+        const mappedPlaces = response.places.map(mapBackendPlaceToSummary);
+        const total = Number(response.pagination?.total ?? mappedPlaces.length);
+
+        return {
+          places: mappedPlaces,
+          pagination: {
+            page: Number(response.pagination?.page ?? page),
+            limit: Number(response.pagination?.limit ?? limit),
+            total,
+            totalPages: Number(
+              response.pagination?.totalPages ??
+                (total > 0 ? Math.ceil(total / limit) : 0),
+            ),
+          },
+        };
+      } catch (error) {
+        console.error("Failed to fetch places from API:", error);
+        return {
+          places: [],
+          pagination: {
+            page: params?.page && params.page > 0 ? params.page : 1,
+            limit: params?.limit && params.limit > 0 ? params.limit : 20,
+            total: 0,
+            totalPages: 0,
+          },
+        };
+      }
+    },
+    async listFeatured(): Promise<PlaceSummary[]> {
+      try {
         const response = await request<{ places: APIPlace[] }>(
-          `/api/places?${queryParams.toString()}`,
+          `/api/places/featured?limit=9`,
         );
         return response.places.map(mapBackendPlaceToSummary);
       } catch (error) {
-        console.error("Failed to fetch places from API:", error);
+        console.error("Failed to fetch featured places from API:", error);
         return [];
       }
     },
@@ -692,7 +768,10 @@ export const api = {
       search?: string;
       category?: string;
       featured?: boolean;
-    }): Promise<{ blogPosts: BlogPost[]; pagination: any }> {
+    }): Promise<{
+      blogPosts: BlogPost[];
+      pagination: { page: number; limit: number; total: number; totalPages: number };
+    }> {
       try {
         const queryParams = new URLSearchParams();
         if (params?.page) queryParams.set("page", params.page.toString());
@@ -701,11 +780,16 @@ export const api = {
         if (params?.category && params.category !== "tum")
           queryParams.set("category", params.category);
         if (params?.featured) queryParams.set("featured", "true");
+        queryParams.set("language", DEFAULT_LOCALE);
 
         const response = await request<{
           blogPosts: any[];
-          pagination: any;
-          filters: any;
+          pagination: {
+            page: number;
+            limit: number;
+            total: number;
+            totalPages: number;
+          };
         }>(`/api/blog?${queryParams.toString()}`);
 
         const mappedPosts: BlogPost[] = response.blogPosts.map((post: any) => ({
@@ -717,16 +801,22 @@ export const api = {
           featuredImage: post.featuredImage,
           publishedAt: post.publishedAt,
           readTime: post.readTime,
-          category: post.category,
+          categoryId: post.categoryId ?? null,
+          categorySlug: post.categorySlug ?? null,
+          categoryName: post.categoryName ?? null,
           authorName: post.authorName,
           authorAvatar: post.authorAvatar,
           views: post.views,
+          commentCount: post.commentCount ?? 0,
         }));
 
         return { blogPosts: mappedPosts, pagination: response.pagination };
       } catch (error) {
         console.error("Failed to fetch blog posts:", error);
-        return { blogPosts: [], pagination: {} };
+        return {
+          blogPosts: [],
+          pagination: { page: 1, limit: 12, total: 0, totalPages: 0 },
+        };
       }
     },
     async getBySlug(slug: string): Promise<{
@@ -750,14 +840,21 @@ export const api = {
           featuredImage: post.featuredImage,
           publishedAt: post.publishedAt,
           readTime: post.readTime,
-          category: post.category,
+          categoryId: post.categoryId ?? null,
+          categorySlug: post.categorySlug ?? null,
+          categoryName: post.categoryName ?? null,
           authorName: post.authorName,
           authorAvatar: post.authorAvatar,
           views: post.views,
           content: post.content,
-          tags: post.tags,
+          tags: safelyParseJSON<string[]>(post.tags, []),
           seoTitle: post.seoTitle,
           seoDescription: post.seoDescription,
+          seoKeywords: safelyParseJSON<string[]>(post.seoKeywords, []),
+          commentCount: post.commentCount ?? 0,
+          likeCount: post.likeCount ?? 0,
+          shareCount: post.shareCount ?? 0,
+          images: safelyParseJSON<string[]>(post.images, []),
         };
 
         const related = response.relatedPosts.map((p: any) => ({
@@ -769,10 +866,13 @@ export const api = {
           featuredImage: p.featuredImage,
           publishedAt: p.publishedAt,
           readTime: p.readTime,
-          category: p.category,
+          categoryId: p.categoryId ?? null,
+          categorySlug: p.categorySlug ?? null,
+          categoryName: p.categoryName ?? null,
           authorName: p.authorName,
           authorAvatar: p.authorAvatar,
           views: p.views,
+          commentCount: p.commentCount ?? 0,
         }));
 
         return { blogPost: details, relatedPosts: related };
@@ -793,6 +893,42 @@ export const api = {
         console.error("Failed to fetch blog categories:", error);
         return [];
       }
+    },
+    async listComments(
+      slug: string,
+      params?: { page?: number; limit?: number },
+    ): Promise<{
+      comments: BlogComment[];
+      pagination: { page: number; limit: number; total: number; totalPages: number };
+    }> {
+      try {
+        const query = new URLSearchParams();
+        if (params?.page) query.set("page", String(params.page));
+        if (params?.limit) query.set("limit", String(params.limit));
+        const endpoint = `/api/blog/${slug}/comments${query.toString() ? `?${query.toString()}` : ""}`;
+        return await request<{
+          comments: BlogComment[];
+          pagination: { page: number; limit: number; total: number; totalPages: number };
+        }>(endpoint);
+      } catch (error) {
+        console.error("Failed to fetch blog comments:", error);
+        return {
+          comments: [],
+          pagination: { page: 1, limit: 20, total: 0, totalPages: 0 },
+        };
+      }
+    },
+    async submitComment(
+      slug: string,
+      payload: { content: string; guestName?: string; guestEmail?: string },
+    ): Promise<{ success: boolean; message: string }> {
+      return await request<{ success: boolean; message: string }>(
+        `/api/blog/${slug}/comments`,
+        {
+          method: "POST",
+          body: JSON.stringify(payload),
+        },
+      );
     },
   },
   profile: {

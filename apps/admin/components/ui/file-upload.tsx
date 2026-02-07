@@ -8,6 +8,7 @@ import { api } from "@/lib/api";
 interface FileUploadProps {
   value?: string;
   onChange: (url: string) => void;
+  onUploaded?: (result: { url: string; fileId?: string }) => void;
   onRemove?: () => void;
   accept?: string;
   maxSize?: number;
@@ -16,12 +17,13 @@ interface FileUploadProps {
   description?: string;
   className?: string;
   aspectRatio?: "square" | "video" | "banner";
-  uploadFn?: (file: File) => Promise<{ url: string }>;
+  uploadFn?: (file: File) => Promise<{ url: string; fileId?: string }>;
 }
 
 export function FileUpload({
   value,
   onChange,
+  onUploaded,
   onRemove,
   accept = "image/*",
   maxSize = 5 * 1024 * 1024,
@@ -74,6 +76,7 @@ export function FileUpload({
       clearInterval(progressInterval);
       setProgress(100);
       onChange(result.url);
+      onUploaded?.(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Yükleme başarısız");
     } finally {

@@ -36,6 +36,17 @@ export type Place = {
   openingHours: any;
   checkInInfo: any;
   checkOutInfo: any;
+  businessDocumentFileId?: string | null;
+  businessDocument?: {
+    id: string;
+    filename: string;
+    mimeType: string;
+    size: number;
+    url: string;
+    usage: string;
+    uploadedById: string;
+    createdAt: string;
+  } | null;
 };
 
 type Params = {

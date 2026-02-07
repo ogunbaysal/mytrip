@@ -12,11 +12,12 @@ import {
 } from "@/components/ui/dialog";
 import { Slider } from "@/components/ui/slider";
 import { useAmenities } from "@/hooks/use-amenities";
+import { usePlaceTypes } from "@/hooks/use-place-types";
 import { cn } from "@/lib/utils";
 
 // Place type definitions with Turkish labels
 const PLACE_TYPES = [
-  { value: "hotel", label: "Otel" },
+  { value: "hotel", label: "Konaklama" },
   { value: "restaurant", label: "Restoran" },
   { value: "cafe", label: "Kafe" },
   { value: "activity", label: "Aktivite" },
@@ -132,6 +133,14 @@ export function FiltersModal({
   };
 
   const { data: apiAmenities = [] } = useAmenities();
+  const { data: placeTypeOptions = [] } = usePlaceTypes();
+  const resolvedPlaceTypes =
+    placeTypeOptions.length > 0
+      ? placeTypeOptions.map((item) => ({
+          value: item.type,
+          label: item.name,
+        }))
+      : PLACE_TYPES;
 
   // Build amenity map from API data
   const amenityMap = useMemo(() => {
@@ -276,7 +285,7 @@ export function FiltersModal({
           <section className="border-b border-gray-200 px-6 py-6">
             <h3 className="mb-4 text-lg font-semibold">Mekan Tipi</h3>
             <div className="flex flex-wrap gap-2">
-              {PLACE_TYPES.map((type) => (
+              {resolvedPlaceTypes.map((type) => (
                 <button
                   key={type.value}
                   onClick={() =>

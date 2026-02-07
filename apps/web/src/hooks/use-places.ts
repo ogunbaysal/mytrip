@@ -3,8 +3,11 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { api } from "@/lib/api";
+import type { PlaceSummary } from "@/types";
 
 export type PlaceFilters = {
+  page?: number;
+  limit?: number;
   search?: string;
   city?: string;
   district?: string;
@@ -23,8 +26,18 @@ export type PlaceFilters = {
   verified?: boolean;
 };
 
+export type PlaceListResult = {
+  places: PlaceSummary[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+};
+
 export function usePlaces(filters?: PlaceFilters) {
-  return useQuery({
+  return useQuery<PlaceListResult>({
     queryKey: ["places", "all", filters],
     queryFn: () => api.places.listAll(filters),
   });

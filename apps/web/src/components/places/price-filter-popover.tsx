@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/popover";
 import { Slider } from "@/components/ui/slider";
 import { useLocalizedFormatting } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 
 type PriceFilterPopoverProps = {
   minPrice?: number;
@@ -18,6 +19,7 @@ type PriceFilterPopoverProps = {
   onPriceChange: (min: number | undefined, max: number | undefined) => void;
   absoluteMin?: number;
   absoluteMax?: number;
+  triggerClassName?: string;
 };
 
 export function PriceFilterPopover({
@@ -26,6 +28,7 @@ export function PriceFilterPopover({
   onPriceChange,
   absoluteMin = 0,
   absoluteMax = 10000,
+  triggerClassName,
 }: PriceFilterPopoverProps) {
   const { formatPrice } = useLocalizedFormatting();
   const [open, setOpen] = useState(false);
@@ -65,9 +68,11 @@ export function PriceFilterPopover({
         <Button
           variant="outline"
           size="sm"
-          className={`h-9 gap-2 rounded-full border-gray-200 bg-white px-4 text-sm font-normal shadow-sm hover:border-gray-300 hover:bg-gray-50 ${
-            hasActiveFilter ? "border-gray-900 bg-gray-50 font-medium" : ""
-          }`}
+          className={cn(
+            "h-9 gap-2 rounded-full border-gray-200 bg-white px-4 text-sm font-normal shadow-sm hover:border-gray-300 hover:bg-gray-50",
+            hasActiveFilter && "border-gray-900 bg-gray-50 font-medium",
+            triggerClassName,
+          )}
         >
           {displayLabel}
           <ChevronDown className="size-4 text-gray-500" />

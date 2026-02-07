@@ -59,6 +59,12 @@ const placeTable = pgTable(
     }),
     location: text("location"), // JSON string for GPS coordinates {lat, lng}
     contactInfo: text("contact_info"), // JSON string for phone, email, website
+    businessDocumentFileId: text("business_document_file_id").references(
+      () => file.id,
+      {
+        onDelete: "set null",
+      },
+    ),
     rating: numeric("rating", { precision: 3, scale: 2 }).default("0.00"),
     reviewCount: integer("review_count").notNull().default(0),
     priceLevel: priceLevelEnum("price_level"),
@@ -83,6 +89,7 @@ const placeTable = pgTable(
     index("place_category_id_idx").on(table.categoryId),
     index("place_city_id_idx").on(table.cityId),
     index("place_district_id_idx").on(table.districtId),
+    index("place_business_document_file_id_idx").on(table.businessDocumentFileId),
     index("place_owner_id_idx").on(table.ownerId),
     index("place_status_idx").on(table.status),
     index("place_featured_idx").on(table.featured),

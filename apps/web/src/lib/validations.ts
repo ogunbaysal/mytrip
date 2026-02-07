@@ -4,7 +4,7 @@ import { STAY_TYPES } from "@/stores/app-store";
 
 export const searchFormSchema = z
   .object({
-    location: z.string().min(2, "Lütfen bir lokasyon girin"),
+    location: z.string().trim(),
     checkIn: z.string().nullable().optional(),
     checkOut: z.string().nullable().optional(),
     guests: z

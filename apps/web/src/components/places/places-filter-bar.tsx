@@ -77,88 +77,108 @@ export function PlacesFilterBar({
 
   // Show top 10 most common amenities
   const displayedAmenities = amenities.slice(0, 10);
+  const mobileAmenities = displayedAmenities.slice(0, 6);
 
   return (
-    <div className="flex w-full items-center gap-4 border-b border-gray-200 bg-white px-4 py-3 lg:px-6">
-      {/* Left section: Dropdown filters */}
-      <div className="flex shrink-0 items-center gap-2">
+    <div className="w-full border-b border-gray-200 bg-white px-4 py-3 lg:px-6">
+      {/* Mobile: single horizontal filter rail */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide md:hidden">
         <PriceFilterPopover
           minPrice={minPrice}
           maxPrice={maxPrice}
           onPriceChange={onPriceChange}
+          triggerClassName="shrink-0"
         />
         <TypeFilterPopover
           selectedType={selectedType}
           onTypeChange={onTypeChange}
+          triggerClassName="shrink-0"
         />
+        {mobileAmenities.map((amenity) => (
+          <AmenityToggle
+            key={amenity.key}
+            label={amenity.label}
+            isSelected={selectedAmenities.includes(amenity.key)}
+            onClick={() => toggleAmenity(amenity.key)}
+          />
+        ))}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onFiltersClick}
+          className="relative h-9 shrink-0 gap-2 rounded-full border-gray-200 bg-white px-4 text-sm shadow-sm hover:border-gray-300 hover:bg-gray-50"
+        >
+          <SlidersHorizontal className="size-4" />
+          Filtreler
+          {activeFiltersCount > 0 && (
+            <span className="flex size-5 items-center justify-center rounded-full bg-gray-900 text-xs font-medium text-white">
+              {activeFiltersCount}
+            </span>
+          )}
+        </Button>
       </div>
 
-      {/* Divider */}
-      <div className="hidden h-6 w-px shrink-0 bg-gray-200 md:block" />
+      {/* Desktop */}
+      <div className="hidden w-full items-center gap-4 md:flex">
+        <div className="flex shrink-0 items-center gap-2">
+          <PriceFilterPopover
+            minPrice={minPrice}
+            maxPrice={maxPrice}
+            onPriceChange={onPriceChange}
+          />
+          <TypeFilterPopover
+            selectedType={selectedType}
+            onTypeChange={onTypeChange}
+          />
+        </div>
 
-      {/* Right section: Amenity toggles (scrollable) */}
-      <div className="relative flex-1 overflow-hidden">
-        {/* Left shadow */}
-        <div
-          className={cn(
-            "pointer-events-none absolute left-0 top-0 z-10 h-full w-8 bg-gradient-to-r from-white to-transparent transition-opacity",
-            showLeftShadow ? "opacity-100" : "opacity-0",
+        <div className="h-6 w-px shrink-0 bg-gray-200" />
+
+        <div className="relative flex-1 overflow-hidden">
+          <div
+            className={cn(
+              "pointer-events-none absolute left-0 top-0 z-10 h-full w-8 bg-gradient-to-r from-white to-transparent transition-opacity",
+              showLeftShadow ? "opacity-100" : "opacity-0",
+            )}
+          />
+
+          <ScrollArea className="w-full" type="scroll">
+            <div ref={scrollRef} className="flex items-center gap-2 pb-2">
+              {displayedAmenities.map((amenity) => (
+                <AmenityToggle
+                  key={amenity.key}
+                  label={amenity.label}
+                  isSelected={selectedAmenities.includes(amenity.key)}
+                  onClick={() => toggleAmenity(amenity.key)}
+                />
+              ))}
+            </div>
+            <ScrollBar orientation="horizontal" className="h-1.5" />
+          </ScrollArea>
+
+          <div
+            className={cn(
+              "pointer-events-none absolute right-0 top-0 z-10 h-full w-8 bg-gradient-to-l from-white to-transparent transition-opacity",
+              showRightShadow ? "opacity-100" : "opacity-0",
+            )}
+          />
+        </div>
+
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onFiltersClick}
+          className="h-9 shrink-0 gap-2 rounded-full border-gray-200 bg-white px-4 text-sm font-normal shadow-sm hover:border-gray-300 hover:bg-gray-50"
+        >
+          <SlidersHorizontal className="size-4" />
+          Filtreler
+          {activeFiltersCount > 0 && (
+            <span className="flex size-5 items-center justify-center rounded-full bg-gray-900 text-xs font-medium text-white">
+              {activeFiltersCount}
+            </span>
           )}
-        />
-
-        <ScrollArea className="w-full" type="scroll">
-          <div ref={scrollRef} className="flex items-center gap-2 pb-2">
-            {displayedAmenities.map((amenity) => (
-              <AmenityToggle
-                key={amenity.key}
-                label={amenity.label}
-                isSelected={selectedAmenities.includes(amenity.key)}
-                onClick={() => toggleAmenity(amenity.key)}
-              />
-            ))}
-          </div>
-          <ScrollBar orientation="horizontal" className="h-1.5" />
-        </ScrollArea>
-
-        {/* Right shadow */}
-        <div
-          className={cn(
-            "pointer-events-none absolute right-0 top-0 z-10 h-full w-8 bg-gradient-to-l from-white to-transparent transition-opacity",
-            showRightShadow ? "opacity-100" : "opacity-0",
-          )}
-        />
+        </Button>
       </div>
-
-      {/* Filters button - Desktop */}
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={onFiltersClick}
-        className="hidden h-9 shrink-0 gap-2 rounded-full border-gray-200 bg-white px-4 text-sm font-normal shadow-sm hover:border-gray-300 hover:bg-gray-50 md:flex"
-      >
-        <SlidersHorizontal className="size-4" />
-        Filtreler
-        {activeFiltersCount > 0 && (
-          <span className="flex size-5 items-center justify-center rounded-full bg-gray-900 text-xs font-medium text-white">
-            {activeFiltersCount}
-          </span>
-        )}
-      </Button>
-
-      {/* Filters button - Mobile */}
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={onFiltersClick}
-        className="relative flex h-9 shrink-0 items-center justify-center rounded-full border-gray-200 bg-white px-3 shadow-sm hover:border-gray-300 hover:bg-gray-50 md:hidden"
-      >
-        <SlidersHorizontal className="size-4" />
-        {activeFiltersCount > 0 && (
-          <span className="absolute -right-1 -top-1 flex size-5 items-center justify-center rounded-full bg-gray-900 text-xs font-medium text-white">
-            {activeFiltersCount}
-          </span>
-        )}
-      </Button>
     </div>
   );
 }

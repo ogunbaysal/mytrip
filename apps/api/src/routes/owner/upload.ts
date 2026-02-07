@@ -16,7 +16,9 @@ const ALLOWED_IMAGE_TYPES = [
   "image/webp",
   "image/gif",
 ];
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const ALLOWED_DOCUMENT_TYPES = ["application/pdf"];
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_DOCUMENT_SIZE = 10 * 1024 * 1024; // 10MB
 
 // Ensure uploads directory exists
 const __filename = fileURLToPath(import.meta.url);
@@ -45,16 +47,26 @@ async function processUpload(
   userId: string,
   usage: string = "other",
 ): Promise<{ url: string; fileId: string } | { error: string }> {
-  // Validate file type
-  if (!ALLOWED_IMAGE_TYPES.includes(fileData.type)) {
+  const isBusinessDocument = usage === "business_document";
+  const allowedTypes = isBusinessDocument
+    ? ALLOWED_DOCUMENT_TYPES
+    : ALLOWED_IMAGE_TYPES;
+  const maxSize = isBusinessDocument ? MAX_DOCUMENT_SIZE : MAX_IMAGE_SIZE;
+
+  if (!allowedTypes.includes(fileData.type)) {
     return {
-      error: `Invalid file type: ${fileData.type}. Allowed: jpg, png, webp, gif`,
+      error: isBusinessDocument
+        ? `Invalid file type: ${fileData.type}. Allowed: pdf`
+        : `Invalid file type: ${fileData.type}. Allowed: jpg, png, webp, gif`,
     };
   }
 
-  // Validate file size
-  if (fileData.size > MAX_FILE_SIZE) {
-    return { error: `File too large. Maximum size is 5MB` };
+  if (fileData.size > maxSize) {
+    return {
+      error: `File too large. Maximum size is ${Math.round(
+        maxSize / 1024 / 1024,
+      )}MB`,
+    };
   }
 
   const extension = fileData.name?.split(".").pop()?.toLowerCase() || "jpg";

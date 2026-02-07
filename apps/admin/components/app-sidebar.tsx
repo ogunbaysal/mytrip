@@ -1,6 +1,6 @@
 "use client"
 
-import { Hotel, Users, MapPin, FileText, CreditCard, BarChart3, Settings, LogOut, ChevronDown, List, Package, Receipt, ShieldCheck, TicketPercent } from "lucide-react"
+import { Hotel, Users, MapPin, FileText, CreditCard, BarChart3, Settings, LogOut, ChevronDown, List, Package, Receipt, ShieldCheck, TicketPercent, MessageSquareText } from "lucide-react"
 import { useAuth } from "@/hooks/use-auth"
 import { useRouter } from "next/navigation"
 
@@ -70,6 +70,16 @@ const adminMenuItems: MenuItem[] = [
     url: "/blogs",
     icon: FileText,
     badge: "3",
+  },
+  {
+    title: "Blog Kategorileri",
+    url: "/blogs/categories",
+    icon: List,
+  },
+  {
+    title: "Blog Yorumları",
+    url: "/blogs/comments",
+    icon: MessageSquareText,
   },
   {
     title: "Abonelikler",

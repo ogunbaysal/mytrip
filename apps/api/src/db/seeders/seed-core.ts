@@ -30,6 +30,7 @@ import {
   subscriptionPlanFeature,
 } from "../schemas/subscriptions.ts";
 import { placeCategory } from "../schemas/categories.ts";
+import { blogCategory } from "../schemas/blog.ts";
 import { province, district } from "../schemas/locations.ts";
 
 // Turkey data
@@ -301,6 +302,51 @@ const PLACE_CATEGORIES = [
     slug: "spa-wellness",
     icon: "spa",
     description: "Spa merkezleri, hamamlar ve sağlık tesisleri",
+  },
+] as const;
+
+const BLOG_CATEGORIES = [
+  {
+    name: "Seyahat",
+    slug: "travel",
+    description: "Rota, gezi planı ve seyahat önerileri",
+    sortOrder: 0,
+  },
+  {
+    name: "Yeme & İçme",
+    slug: "food",
+    description: "Yerel lezzetler, restoran önerileri ve gurme içerikler",
+    sortOrder: 1,
+  },
+  {
+    name: "Kültür",
+    slug: "culture",
+    description: "Yerel yaşam, gelenekler ve kültürel keşif içerikleri",
+    sortOrder: 2,
+  },
+  {
+    name: "Tarih",
+    slug: "history",
+    description: "Bölgenin tarihi noktaları ve hikayeleri",
+    sortOrder: 3,
+  },
+  {
+    name: "Aktivite",
+    slug: "activity",
+    description: "Deneyim, macera ve aktivite önerileri",
+    sortOrder: 4,
+  },
+  {
+    name: "Yaşam Tarzı",
+    slug: "lifestyle",
+    description: "Yaşam, tasarım ve trend odaklı içerikler",
+    sortOrder: 5,
+  },
+  {
+    name: "İş Dünyası",
+    slug: "business",
+    description: "İşletme sahipleri ve sektör odaklı içerikler",
+    sortOrder: 6,
   },
 ] as const;
 
@@ -682,6 +728,41 @@ async function seedPlaceCategories(): Promise<void> {
   }
 }
 
+async function seedBlogCategories(): Promise<void> {
+  logSection("Seeding Blog Categories");
+
+  for (const item of BLOG_CATEGORIES) {
+    const existing = await db.query.blogCategory.findFirst({
+      where: eq(blogCategory.slug, item.slug),
+    });
+
+    if (existing) {
+      await db
+        .update(blogCategory)
+        .set({
+          name: item.name,
+          description: item.description,
+          sortOrder: item.sortOrder,
+          active: true,
+          updatedAt: new Date(),
+        })
+        .where(eq(blogCategory.id, existing.id));
+      logSkip(`Blog category "${item.name}" already exists, updated`);
+      continue;
+    }
+
+    await db.insert(blogCategory).values({
+      id: nanoid(),
+      slug: item.slug,
+      name: item.name,
+      description: item.description,
+      sortOrder: item.sortOrder,
+      active: true,
+    });
+    logSuccess(`Created blog category: ${item.name}`);
+  }
+}
+
 async function seedProvinces(): Promise<Map<string, string>> {
   logSection("Seeding Turkey Provinces (81 İl)");
 
@@ -808,10 +889,13 @@ async function main(): Promise<void> {
     // 6. Seed place categories
     await seedPlaceCategories();
 
-    // 7. Seed provinces
+    // 7. Seed blog categories
+    await seedBlogCategories();
+
+    // 8. Seed provinces
     const provinceMap = await seedProvinces();
 
-    // 8. Seed districts
+    // 9. Seed districts
     await seedDistricts(provinceMap);
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
@@ -825,6 +909,7 @@ async function main(): Promise<void> {
     console.log(`    • ${SUBSCRIPTION_PLANS.length} subscription plans`);
     console.log(`    • ${COUPONS.length} coupons`);
     console.log(`    • ${PLACE_CATEGORIES.length} place categories`);
+    console.log(`    • ${BLOG_CATEGORIES.length} blog categories`);
     console.log(`    • 81 provinces`);
     console.log(`    • ~970 districts`);
     console.log("");

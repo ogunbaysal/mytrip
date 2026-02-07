@@ -38,6 +38,34 @@ const priceFormatter = new Intl.NumberFormat("tr-TR", {
   minimumFractionDigits: 0,
 });
 
+const escapeHtml = (value: string) =>
+  value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+
+const sanitizeHtml = (value: string) =>
+  value
+    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, "")
+    .replace(/\son\w+="[^"]*"/gi, "")
+    .replace(/\son\w+='[^']*'/gi, "")
+    .replace(/javascript:/gi, "");
+
+const renderDescriptionHtml = (value: string | null | undefined) => {
+  if (!value) return "";
+  const hasHtmlTag = /<\/?[a-z][\s\S]*>/i.test(value);
+  if (hasHtmlTag) {
+    return sanitizeHtml(value);
+  }
+  return value
+    .split("\n")
+    .map((line) => escapeHtml(line))
+    .join("<br />");
+};
+
 export async function generateMetadata({
   params,
 }: {
@@ -131,6 +159,7 @@ export default async function PlaceDetailPage({
   const bathrooms = detail.bathrooms ?? 1;
   const cancellationPolicy =
     detail.cancellationPolicy ?? "Ücretsiz iptal: 14 gün öncesine kadar";
+  const descriptionHtml = renderDescriptionHtml(detail.description);
 
   // Get first 5 images for the gallery grid
   const galleryImages = [detail.heroImage, ...detail.gallery].slice(0, 5);
@@ -310,9 +339,10 @@ export default async function PlaceDetailPage({
 
             {/* Description */}
             <div className="space-y-4">
-              <p className="whitespace-pre-line text-muted-foreground">
-                {detail.description}
-              </p>
+              <div
+                className="prose prose-sm max-w-none text-muted-foreground [&_*]:text-inherit"
+                dangerouslySetInnerHTML={{ __html: descriptionHtml }}
+              />
               <button className="flex items-center gap-1 font-medium underline">
                 Daha fazla göster
                 <ChevronRight className="h-4 w-4" />

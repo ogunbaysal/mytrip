@@ -10,6 +10,22 @@ import {
   province,
 } from "../db/schemas/index.ts";
 
+const API_BASE_URL = process.env.API_URL || "http://localhost:3002";
+
+export const resolvePublicFileUrl = (value: string | null | undefined): string => {
+  if (!value) return "";
+  if (value.startsWith("http://") || value.startsWith("https://")) {
+    return value;
+  }
+  if (value.startsWith("/uploads/")) {
+    return `${API_BASE_URL}${value}`;
+  }
+  if (value.startsWith("/")) {
+    return `${API_BASE_URL}/uploads${value}`;
+  }
+  return `${API_BASE_URL}/uploads/${value}`;
+};
+
 const PLACE_TYPE_TO_CATEGORY_SLUGS: Record<string, readonly string[]> = {
   hotel: ["hotels", "villas", "guesthouses", "apart-hotels"],
   restaurant: ["restaurants"],
@@ -156,7 +172,7 @@ export async function getPlaceImagesMap(
 
   for (const row of rows) {
     const current = map.get(row.placeId) ?? [];
-    current.push(row.url);
+    current.push(resolvePublicFileUrl(row.url));
     map.set(row.placeId, current);
   }
 

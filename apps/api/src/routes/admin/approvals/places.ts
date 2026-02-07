@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { db } from "../../../db/index.ts";
-import { district, place, placeCategory, province, user } from "../../../db/schemas/index.ts";
+import { district, file, place, placeCategory, province, user } from "../../../db/schemas/index.ts";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { getSessionFromRequest } from "../../../lib/session.ts";
 import {
@@ -170,7 +170,11 @@ app.put("/places/:id/approve", async (c) => {
     const id = c.req.param("id");
 
     const [existingPlace] = await db
-      .select({ status: place.status, ownerId: place.ownerId })
+      .select({
+        status: place.status,
+        ownerId: place.ownerId,
+        businessDocumentFileId: place.businessDocumentFileId,
+      })
       .from(place)
       .where(eq(place.id, id))
       .limit(1);
@@ -184,6 +188,38 @@ app.put("/places/:id/approve", async (c) => {
         {
           error: "Cannot approve",
           message: "Sadece beklemede olan mekanlar onaylanabilir",
+        },
+        400,
+      );
+    }
+
+    if (!existingPlace.businessDocumentFileId) {
+      return c.json(
+        {
+          error: "Business document required",
+          message:
+            "Bu mekanı onaylamak için işletme belgesi yüklenmiş olmalıdır",
+        },
+        400,
+      );
+    }
+
+    const [businessDocument] = await db
+      .select({ id: file.id, usage: file.usage, mimeType: file.mimeType })
+      .from(file)
+      .where(eq(file.id, existingPlace.businessDocumentFileId))
+      .limit(1);
+
+    if (
+      !businessDocument ||
+      businessDocument.usage !== "business_document" ||
+      businessDocument.mimeType !== "application/pdf"
+    ) {
+      return c.json(
+        {
+          error: "Invalid business document",
+          message:
+            "Mekanı onaylamak için geçerli bir işletme belgesi PDF dosyası gerekir",
         },
         400,
       );
