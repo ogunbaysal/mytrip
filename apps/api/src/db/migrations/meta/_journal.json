@@ -5,50 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1769109895365,
-      "tag": "0000_gorgeous_living_lightning",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1770403543289,
-      "tag": "0001_legal_weapon_omega",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1770405635498,
-      "tag": "0002_lying_black_widow",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1770410498808,
-      "tag": "0003_daily_the_enforcers",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1770417379428,
-      "tag": "0004_gorgeous_sentry",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1770423634879,
-      "tag": "0005_blog_normalization",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "7",
-      "when": 1770424003564,
-      "tag": "0006_blog_slug_constraint",
+      "when": 1770425250109,
+      "tag": "0000_lowly_the_renegades",
       "breakpoints": true
     }
   ]
