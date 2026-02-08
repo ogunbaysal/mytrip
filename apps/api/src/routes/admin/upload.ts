@@ -8,6 +8,7 @@ import { getSessionFromRequest } from "../../lib/session.ts";
 import { db } from "../../db/index.ts";
 import { file, user } from "../../db/schemas/index.ts";
 import { eq } from "drizzle-orm";
+import { toPublicUploadUrl } from "../../lib/public-url.ts";
 
 const app = new Hono();
 
@@ -45,6 +46,7 @@ function getFileType(
 async function processUpload(
   fileData: globalThis.File,
   userId: string,
+  request: Request,
   usage: string = "other",
 ): Promise<{ url: string; fileId: string } | { error: string }> {
   const isBusinessDocument = usage === "business_document";
@@ -99,7 +101,7 @@ async function processUpload(
     });
   }
 
-  const fullUrl = `${process.env.API_URL || "http://localhost:3002"}/uploads/${storedFilename}`;
+  const fullUrl = toPublicUploadUrl(storedFilename, request);
   return { url: fullUrl, fileId };
 }
 
@@ -120,7 +122,7 @@ app.post("/", async (c) => {
       return c.json({ error: "No file uploaded" }, 400);
     }
 
-    const result = await processUpload(fileData, session.user.id, usage);
+    const result = await processUpload(fileData, session.user.id, c.req.raw, usage);
 
     if ("error" in result) {
       return c.json({ error: result.error }, 400);
@@ -166,7 +168,7 @@ app.post("/multiple", async (c) => {
     for (const fileData of fileArray) {
       if (typeof fileData === "string") continue;
 
-      const result = await processUpload(fileData, session.user.id, usage);
+      const result = await processUpload(fileData, session.user.id, c.req.raw, usage);
       if ("error" in result) {
         errors.push(`${fileData.name}: ${result.error}`);
       } else {

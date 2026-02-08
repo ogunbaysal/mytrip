@@ -9,21 +9,11 @@ import {
   placeImage,
   province,
 } from "../db/schemas/index.ts";
-
-const API_BASE_URL = process.env.API_URL || "http://localhost:3002";
+import { toPublicUploadUrl } from "./public-url.ts";
 
 export const resolvePublicFileUrl = (value: string | null | undefined): string => {
   if (!value) return "";
-  if (value.startsWith("http://") || value.startsWith("https://")) {
-    return value;
-  }
-  if (value.startsWith("/uploads/")) {
-    return `${API_BASE_URL}${value}`;
-  }
-  if (value.startsWith("/")) {
-    return `${API_BASE_URL}/uploads${value}`;
-  }
-  return `${API_BASE_URL}/uploads/${value}`;
+  return toPublicUploadUrl(value);
 };
 
 const PLACE_TYPE_TO_CATEGORY_SLUGS: Record<string, readonly string[]> = {

@@ -220,16 +220,18 @@ export function BlogsTable({
       cell: ({ row }) => {
         const blog = row.original;
         return (
-          <div className="space-y-1">
+          <div className="min-w-0 max-w-[720px] space-y-1">
             <div className="flex items-center space-x-2">
-              <span className="font-medium">{blog.title}</span>
+              <span className="truncate font-medium">{blog.title}</span>
               {blog.featured && (
                 <Badge variant="default" className="bg-yellow-500 text-xs text-black">
                   ⭐ Öne Çıkan
                 </Badge>
               )}
             </div>
-            <div className="line-clamp-1 text-sm text-muted-foreground">{blog.excerpt}</div>
+            <div className="truncate text-sm text-muted-foreground">
+              {blog.excerpt || "-"}
+            </div>
           </div>
         );
       },
