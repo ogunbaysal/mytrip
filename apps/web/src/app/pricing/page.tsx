@@ -1,11 +1,13 @@
 "use client";
 
-import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
+import type { Route } from "next";
+import { useRouter } from "next/navigation";
 import { Check, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { api } from "@/lib/api";
+import { authClient } from "@/lib/auth-client";
 
 interface Plan {
   id: string;
@@ -26,15 +28,34 @@ interface Plan {
 }
 
 export default function PricingPage() {
+  const router = useRouter();
   const { data: plansData, isLoading } = useQuery({
     queryKey: ["plans"],
     queryFn: () => api.subscriptions.getPlans(),
     staleTime: 1000 * 60 * 5,
   });
+  const { data: session, isLoading: isSessionLoading } = useQuery({
+    queryKey: ["session"],
+    queryFn: () => authClient.getSession(),
+    staleTime: 1000 * 60,
+  });
 
   const plans = (plansData?.plans as Plan[] | undefined)?.filter(
     (plan) => plan.billingCycle === "yearly",
   ) || [];
+  const user = session?.data?.user;
+
+  const handlePlanSelect = (planId: string) => {
+    const checkoutPath = `/subscribe/checkout?plan=${planId}` as Route;
+    if (!user) {
+      router.push(
+        `/register?redirect=${encodeURIComponent(checkoutPath)}` as Route,
+      );
+      return;
+    }
+
+    router.push(checkoutPath);
+  };
 
   const getDisplayPrice = (price: string | number) => {
     const priceNum = typeof price === "string" ? parseFloat(price) : price;
@@ -129,21 +150,23 @@ export default function PricingPage() {
                       ))}
                     </ul>
 
-                    <Link
-                      href={`/subscribe/checkout?plan=${plan.id}` as any}
-                      className="w-full"
+                    <Button
+                      type="button"
+                      onClick={() => handlePlanSelect(plan.id)}
+                      disabled={isSessionLoading}
+                      className={`w-full ${
+                        isPopular
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted-foreground text-background"
+                      }`}
                     >
-                      <Button
-                        className={`w-full ${
-                          isPopular
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-muted-foreground text-background"
-                        }`}
-                      >
-                        {plan.maxPlaces === 0 ? "İletişime Geç" : "Planı Seç"}
-                        <ArrowRight className="ml-2 size-4" />
-                      </Button>
-                    </Link>
+                      {isSessionLoading
+                        ? "Kontrol ediliyor..."
+                        : plan.maxPlaces === 0
+                          ? "İletişime Geç"
+                          : "Planı Seç"}
+                      <ArrowRight className="ml-2 size-4" />
+                    </Button>
                   </div>
                 </Card>
               );

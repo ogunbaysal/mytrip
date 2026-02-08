@@ -33,6 +33,10 @@ function CheckoutForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const planId = searchParams.get("plan");
+  const checkoutRedirectPath = useMemo(() => {
+    const query = searchParams.toString();
+    return `/subscribe/checkout${query ? `?${query}` : ""}` as Route;
+  }, [searchParams]);
   const queryClient = useQueryClient();
 
   const [paymentData, setPaymentData] = useState({
@@ -54,9 +58,10 @@ function CheckoutForm() {
     currency: string;
   } | null>(null);
 
-  const { data: session } = useQuery({
+  const { data: session, isLoading: isSessionLoading } = useQuery({
     queryKey: ["session"],
     queryFn: () => authClient.getSession(),
+    retry: false,
   });
 
   const { data: plansData } = useQuery({
@@ -64,6 +69,22 @@ function CheckoutForm() {
     queryFn: () => api.subscriptions.getPlans(),
     enabled: !!planId,
   });
+
+  const user = session?.data?.user as
+    | { id?: string; role?: string; subscriptionStatus?: string }
+    | undefined;
+
+  const { data: currentSubscriptionData, isLoading: isSubscriptionLoading } =
+    useQuery({
+      queryKey: ["subscription-current"],
+      queryFn: () => api.subscriptions.getCurrent(),
+      enabled: Boolean(user?.id),
+      retry: false,
+    });
+
+  const hasActiveSubscription = ["active", "trial"].includes(
+    currentSubscriptionData?.subscription?.status || "",
+  );
 
   const selectedPlan = (plansData?.plans as Plan[] | undefined)?.find(
     (plan) => plan.id === planId,
@@ -138,16 +159,57 @@ function CheckoutForm() {
 
   useEffect(() => {
     if (!planId) {
-      router.push("/pricing" as Route);
+      router.replace("/pricing" as Route);
+      return;
     }
-  }, [planId, router]);
 
-  const user = session?.data?.user as
-    | { role?: string; subscriptionStatus?: string }
-    | undefined;
-  if (user?.role === "owner" && user?.subscriptionStatus === "active") {
-    router.push("/dashboard" as Route);
-    return null;
+    if (isSessionLoading) {
+      return;
+    }
+
+    if (!user?.id) {
+      router.replace(
+        `/register?redirect=${encodeURIComponent(checkoutRedirectPath)}` as Route,
+      );
+      return;
+    }
+
+    if (isSubscriptionLoading) {
+      return;
+    }
+
+    if (hasActiveSubscription) {
+      router.replace("/dashboard/subscription" as Route);
+    }
+  }, [
+    checkoutRedirectPath,
+    hasActiveSubscription,
+    isSessionLoading,
+    isSubscriptionLoading,
+    planId,
+    router,
+    user?.id,
+  ]);
+
+  const isGuardLoading =
+    !planId ||
+    isSessionLoading ||
+    !user?.id ||
+    isSubscriptionLoading ||
+    hasActiveSubscription;
+
+  if (isGuardLoading) {
+    return (
+      <div className="container mx-auto flex min-h-[calc(100vh-8rem)] items-center justify-center px-4 py-12">
+        <Card className="mx-auto max-w-md p-8 text-center">
+          <AlertTriangle className="mx-auto mb-4 size-16 text-yellow-500" />
+          <h2 className="mb-2 text-2xl font-bold">Yönlendiriliyor</h2>
+          <p className="text-muted-foreground">
+            Abonelik erişim kontrolü yapılıyor.
+          </p>
+        </Card>
+      </div>
+    );
   }
 
   const validateForm = () => {

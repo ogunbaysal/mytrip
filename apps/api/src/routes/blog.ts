@@ -202,7 +202,7 @@ app.get("/", async (c) => {
     const rows = await db
       .select(basePublicSelect)
       .from(blog)
-      .innerJoin(user, eq(blog.authorId, user.id))
+      .leftJoin(user, eq(blog.authorId, user.id))
       .leftJoin(blogCategory, eq(blog.categoryId, blogCategory.id))
       .where(whereClause)
       .orderBy(sortOrder === "asc" ? asc(orderByColumn) : desc(orderByColumn))
@@ -246,7 +246,7 @@ app.get("/featured", async (c) => {
     const rows = await db
       .select(basePublicSelect)
       .from(blog)
-      .innerJoin(user, eq(blog.authorId, user.id))
+      .leftJoin(user, eq(blog.authorId, user.id))
       .leftJoin(blogCategory, eq(blog.categoryId, blogCategory.id))
       .where(
         and(
@@ -287,7 +287,7 @@ app.get("/popular", async (c) => {
     const rows = await db
       .select(basePublicSelect)
       .from(blog)
-      .innerJoin(user, eq(blog.authorId, user.id))
+      .leftJoin(user, eq(blog.authorId, user.id))
       .leftJoin(blogCategory, eq(blog.categoryId, blogCategory.id))
       .where(
         and(
@@ -437,7 +437,7 @@ app.get("/latest", async (c) => {
     const rows = await db
       .select(basePublicSelect)
       .from(blog)
-      .innerJoin(user, eq(blog.authorId, user.id))
+      .leftJoin(user, eq(blog.authorId, user.id))
       .leftJoin(blogCategory, eq(blog.categoryId, blogCategory.id))
       .where(and(eq(blog.status, "published"), eq(blog.language, language as any)))
       .orderBy(desc(blog.publishedAt), desc(blog.createdAt))
@@ -598,7 +598,7 @@ app.get("/:slug", async (c) => {
     const [row] = await db
       .select(basePublicSelect)
       .from(blog)
-      .innerJoin(user, eq(blog.authorId, user.id))
+      .leftJoin(user, eq(blog.authorId, user.id))
       .leftJoin(blogCategory, eq(blog.categoryId, blogCategory.id))
       .where(and(eq(blog.slug, slug), eq(blog.status, "published")))
       .limit(1);
@@ -623,7 +623,7 @@ app.get("/:slug", async (c) => {
     const relatedRows = await db
       .select(basePublicSelect)
       .from(blog)
-      .innerJoin(user, eq(blog.authorId, user.id))
+      .leftJoin(user, eq(blog.authorId, user.id))
       .leftJoin(blogCategory, eq(blog.categoryId, blogCategory.id))
       .where(
         and(

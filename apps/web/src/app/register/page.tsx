@@ -3,20 +3,27 @@
 import { useState } from "react";
 import type { Route } from "next";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { authClient } from "@/lib/auth-client";
+import { resolveSafeRedirect } from "@/lib/redirect";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 
 export default function RegisterPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const redirectTo = resolveSafeRedirect(searchParams.get("redirect"), "/" as Route);
+  const loginHref =
+    redirectTo === "/"
+      ? ("/login" as Route)
+      : (`/login?redirect=${encodeURIComponent(redirectTo)}` as Route);
 
   const register = useMutation({
     mutationFn: async () => {
@@ -44,7 +51,7 @@ export default function RegisterPage() {
         queryKey: ["session"],
         refetchType: "all",
       });
-      router.push("/");
+      router.push(redirectTo);
       router.refresh();
     },
     onError: (error: Error) => {
@@ -143,7 +150,7 @@ export default function RegisterPage() {
             Zaten hesabınız var mı?{" "}
           </span>
           <Link
-            href={"/login" as Route}
+            href={loginHref}
             className="font-medium text-primary hover:underline"
           >
             Giriş yap

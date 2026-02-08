@@ -1,6 +1,7 @@
 "use client"
 
 import { zodResolver } from "@hookform/resolvers/zod"
+import { useEffect, useMemo, useState } from "react"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
 import { Button } from "@/components/ui/button"
@@ -26,9 +27,10 @@ import { toast } from "sonner"
 import { useCreatePlace } from "@/hooks/use-places"
 import { useCategories } from "@/hooks/use-categories"
 import { useCities, useDistricts } from "@/hooks/use-locations"
+import { useUsers } from "@/hooks/use-users"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, Loader2 } from "lucide-react"
 import Link from "next/link"
 import { GalleryUpload } from "@/components/ui/gallery-upload"
 import { CoordinateMapPicker } from "@/components/ui/coordinate-map-picker"
@@ -44,6 +46,7 @@ const formSchema = z.object({
   address: z.string().min(5, "Adres zorunludur"),
   city: z.string().min(2, "Şehir zorunludur"),
   district: z.string().min(2, "İlçe zorunludur"),
+  ownerId: z.string().min(1, "Mekan sahibi seçimi zorunludur"),
   latitude: z.string().optional(), // In production convert to number
   longitude: z.string().optional(),
   priceLevel: z.string().optional(), // 1-4 scale usually
@@ -57,6 +60,47 @@ export default function CreatePlacePage() {
   const { mutate: createPlace, isPending } = useCreatePlace()
   const { data: categories } = useCategories()
   const { data: cities } = useCities()
+  const [ownerSearchInput, setOwnerSearchInput] = useState("")
+  const [ownerSearch, setOwnerSearch] = useState("")
+  const [ownerPage, setOwnerPage] = useState(1)
+  const [selectedOwnerSnapshot, setSelectedOwnerSnapshot] = useState<{
+    id: string
+    name: string
+    email: string
+  } | null>(null)
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      setOwnerSearch(ownerSearchInput.trim())
+      setOwnerPage(1)
+    }, 300)
+
+    return () => clearTimeout(timeoutId)
+  }, [ownerSearchInput])
+
+  const ownerParams = useMemo(
+    () => ({
+      page: String(ownerPage),
+      limit: "20",
+      search: ownerSearch || undefined,
+      role: "owner",
+      status: "active",
+      sortBy: "name",
+      sortOrder: "asc" as const,
+    }),
+    [ownerPage, ownerSearch],
+  )
+
+  const { data: ownersData, isLoading: isOwnersLoading } = useUsers(ownerParams)
+  const owners = useMemo(() => ownersData?.users ?? [], [ownersData?.users])
+  const ownerPagination = ownersData?.pagination
+
+  useEffect(() => {
+    const totalPages = Math.max(ownerPagination?.totalPages ?? 1, 1)
+    if (ownerPage > totalPages) {
+      setOwnerPage(totalPages)
+    }
+  }, [ownerPage, ownerPagination?.totalPages])
   
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -71,12 +115,29 @@ export default function CreatePlacePage() {
       address: "",
       city: "",
       district: "",
+      ownerId: "",
       priceLevel: "moderate",
       latitude: "",
       longitude: "",
       nightlyPrice: "",
     },
   })
+  const selectedOwnerId = form.watch("ownerId")
+
+  useEffect(() => {
+    if (!selectedOwnerId) {
+      return
+    }
+
+    const matchedOwner = owners.find((owner) => owner.id === selectedOwnerId)
+    if (matchedOwner) {
+      setSelectedOwnerSnapshot({
+        id: matchedOwner.id,
+        name: matchedOwner.name,
+        email: matchedOwner.email,
+      })
+    }
+  }, [owners, selectedOwnerId])
 
   const watchedCity = form.watch("city")
   const { data: districts } = useDistricts(watchedCity)
@@ -95,15 +156,6 @@ export default function CreatePlacePage() {
           ? { lat: parsedLat, lng: parsedLng }
           : undefined,
         priceLevel: values.priceLevel || undefined,
-        // In a real app we would pick an owner. For this MVP we might need to handle owner assignment differently or set current admin as owner?
-        // The API actually allows nullable ownerId for places (if the schema permits), or we might need to select a user first.
-        // Assuming admin can create "system" places or we will update the API to handle nullable ownerId or assign to admin.
-        // Let's assume we can pass a dummy or specific ownerId if required, or the backend handles it.
-        // Checking the API: `ownerId: placeData.ownerId` is used. If we don't send it, it might be undefined.
-        // Let's assume for now we don't set ownerId and see if DB schema allows it (usually requires it).
-        // If it requires, we'd need a user picker. For simplicity, let's omit and see if it fails (or backend should infer from auth context if creating as self).
-        // Based on API: `ownerId: placeData.ownerId` is just passed through.
-        // Let's rely on basic data first.
     }
 
     createPlace(apiData, {
@@ -248,6 +300,104 @@ export default function CreatePlacePage() {
                                     <FormMessage />
                                 </FormItem>
                             )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="ownerId"
+                            render={({ field }) => {
+                              const hasSelectedOwnerInCurrentPage = owners.some(
+                                (owner) => owner.id === field.value,
+                              )
+                              const totalPages = Math.max(ownerPagination?.totalPages ?? 1, 1)
+                              const canGoPrev = ownerPage > 1
+                              const canGoNext = ownerPage < totalPages
+
+                              return (
+                                <FormItem>
+                                  <FormLabel>Mekan Sahibi</FormLabel>
+                                  <div className="space-y-3">
+                                    <Input
+                                      value={ownerSearchInput}
+                                      onChange={(event) =>
+                                        setOwnerSearchInput(event.target.value)
+                                      }
+                                      placeholder="İsim veya e-posta ile ara"
+                                    />
+                                    <Select
+                                      onValueChange={field.onChange}
+                                      value={field.value}
+                                    >
+                                      <FormControl>
+                                        <SelectTrigger>
+                                          <SelectValue
+                                            placeholder={
+                                              isOwnersLoading
+                                                ? "Mekan sahipleri yükleniyor..."
+                                                : "Mekan sahibi seçin"
+                                            }
+                                          />
+                                        </SelectTrigger>
+                                      </FormControl>
+                                      <SelectContent>
+                                        {selectedOwnerSnapshot &&
+                                          !hasSelectedOwnerInCurrentPage && (
+                                            <SelectItem value={selectedOwnerSnapshot.id}>
+                                              {selectedOwnerSnapshot.name} ({selectedOwnerSnapshot.email})
+                                            </SelectItem>
+                                          )}
+                                        {owners.length === 0 ? (
+                                          <SelectItem value="__no_results__" disabled>
+                                            Sonuç bulunamadı
+                                          </SelectItem>
+                                        ) : (
+                                          owners.map((owner) => (
+                                            <SelectItem key={owner.id} value={owner.id}>
+                                              {owner.name} ({owner.email})
+                                            </SelectItem>
+                                          ))
+                                        )}
+                                      </SelectContent>
+                                    </Select>
+                                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+                                      <div className="inline-flex items-center gap-1">
+                                        {isOwnersLoading && (
+                                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                        )}
+                                        <span>
+                                          Toplam {ownerPagination?.total ?? 0} mekan sahibi
+                                        </span>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <Button
+                                          type="button"
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => setOwnerPage((prev) => Math.max(1, prev - 1))}
+                                          disabled={isOwnersLoading || !canGoPrev}
+                                        >
+                                          Önceki
+                                        </Button>
+                                        <span>
+                                          Sayfa {ownerPagination?.page ?? ownerPage}/{totalPages}
+                                        </span>
+                                        <Button
+                                          type="button"
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() =>
+                                            setOwnerPage((prev) => Math.min(totalPages, prev + 1))
+                                          }
+                                          disabled={isOwnersLoading || !canGoNext}
+                                        >
+                                          Sonraki
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <FormMessage />
+                                </FormItem>
+                              )
+                            }}
                         />
                     </CardContent>
                 </Card>

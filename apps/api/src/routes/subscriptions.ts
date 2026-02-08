@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { db } from "../db/index.ts";
 import {
@@ -385,6 +385,32 @@ app.post("/create", zValidator("json", createSubscriptionSchema), async (c) => {
       return c.json({ error: "Plan not found or inactive" }, 404);
     }
 
+    const [existingActiveSubscription] = await db
+      .select({
+        id: subscription.id,
+        status: subscription.status,
+      })
+      .from(subscription)
+      .where(
+        and(
+          eq(subscription.userId, userId),
+          or(eq(subscription.status, "active"), eq(subscription.status, "trial")),
+        ),
+      )
+      .orderBy(desc(subscription.createdAt))
+      .limit(1);
+
+    if (existingActiveSubscription) {
+      return c.json(
+        {
+          error: "Active subscription exists",
+          message:
+            "Zaten aktif bir aboneliğiniz var. Checkout sayfasına tekrar erişemezsiniz.",
+        },
+        409,
+      );
+    }
+
     const startDate = new Date();
     const endDate = new Date(startDate);
     endDate.setFullYear(endDate.getFullYear() + 1);
@@ -600,6 +626,14 @@ app.post("/cancel", async (c) => {
         updatedAt: new Date(),
       })
       .where(eq(subscription.id, activeSub.id));
+
+    await db
+      .update(user)
+      .set({
+        subscriptionStatus: "cancelled",
+        updatedAt: new Date(),
+      })
+      .where(eq(user.id, userId));
 
     return c.json({
       success: true,

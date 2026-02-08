@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { db } from "../../db/index.ts";
 import { auth } from "../../lib/auth.ts";
 import { user } from "../../db/schemas/index.ts";
-import { eq, desc, ilike, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
 const app = new Hono();
 
@@ -42,7 +42,7 @@ app.get("/", async (c) => {
       conditions.push(eq(user.status, status as any));
     }
 
-    const whereClause = conditions.length > 0 ? sql`${conditions.join(" AND ")}` : sql`1=1`;
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
     // Build order by clause
     const orderByColumn = {

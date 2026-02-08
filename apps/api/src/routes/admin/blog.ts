@@ -24,6 +24,7 @@ import {
   withDefaultPublishedAt,
 } from "../../lib/blog-relations.ts";
 import { resolvePublicFileUrl } from "../../lib/place-relations.ts";
+import { getSessionFromRequest } from "../../lib/session.ts";
 
 const app = new Hono();
 
@@ -873,6 +874,8 @@ app.post("/", async (c) => {
   try {
     const payload = await c.req.json();
     const title = String(payload.title || "").trim();
+    const session = await getSessionFromRequest(c);
+    const fallbackAuthorId = session?.user?.id ?? null;
 
     if (title.length < 2) {
       return c.json({ error: "Invalid title", message: "Title is required" }, 400);
@@ -912,7 +915,7 @@ app.post("/", async (c) => {
         tags: serializeJsonStringArray(payload.tags),
         status,
         featured: Boolean(payload.featured),
-        authorId: payload.authorId || null,
+        authorId: payload.authorId || fallbackAuthorId,
         publishedAt: withDefaultPublishedAt({
           status,
           publishedAt: parsedPublishedAt,

@@ -3,18 +3,25 @@
 import { useState } from "react";
 import type { Route } from "next";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { authClient } from "@/lib/auth-client";
+import { resolveSafeRedirect } from "@/lib/redirect";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const redirectTo = resolveSafeRedirect(searchParams.get("redirect"), "/" as Route);
+  const registerHref =
+    redirectTo === "/"
+      ? ("/register" as Route)
+      : (`/register?redirect=${encodeURIComponent(redirectTo)}` as Route);
 
   const login = useMutation({
     mutationFn: async () => {
@@ -35,7 +42,7 @@ export default function LoginPage() {
         queryKey: ["session"],
         refetchType: "all",
       });
-      router.push("/");
+      router.push(redirectTo);
       router.refresh();
     },
     onError: (error: Error) => {
@@ -99,7 +106,7 @@ export default function LoginPage() {
         <div className="mt-6 text-center text-sm">
           <span className="text-muted-foreground">Hesabınız yok mu? </span>
           <Link
-            href={"/register" as Route}
+            href={registerHref}
             className="font-medium text-primary hover:underline"
           >
             Kayıt ol
