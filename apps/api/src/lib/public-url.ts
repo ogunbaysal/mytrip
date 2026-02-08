@@ -1,58 +1,22 @@
-const LOCAL_API_ORIGIN = "http://localhost:3002";
+import { buildPublicObjectUrl } from "./object-storage.ts";
 
-const trimTrailingSlash = (value: string) => value.replace(/\/+$/, "");
-
-export function getApiBaseUrl(req?: Request): string {
-  const configured =
-    process.env.API_PUBLIC_URL ||
-    process.env.BETTER_AUTH_URL ||
-    process.env.API_URL;
-
-  if (configured && configured.trim()) {
-    return trimTrailingSlash(configured.trim());
-  }
-
-  if (req) {
-    const forwardedProto = req.headers.get("x-forwarded-proto");
-    const forwardedHost = req.headers.get("x-forwarded-host");
-    const host = forwardedHost || req.headers.get("host");
-    if (host) {
-      let requestProtocol: string | null = null;
-      try {
-        requestProtocol = new URL(req.url).protocol.replace(":", "");
-      } catch {
-        requestProtocol = null;
-      }
-      const protocol = forwardedProto || requestProtocol || "https";
-      return `${protocol}://${host}`;
-    }
-
-    try {
-      return new URL(req.url).origin;
-    } catch {
-      // ignore and use fallback
-    }
-  }
-
-  return LOCAL_API_ORIGIN;
+function normalizeLegacyUploadPath(value: string): string {
+  if (value.startsWith("/uploads/")) return value.slice("/uploads/".length);
+  if (value.startsWith("/")) return value.slice(1);
+  return value;
 }
 
-export function toPublicUploadUrl(
-  filenameOrPath: string,
-  req?: Request,
-): string {
-  const base = getApiBaseUrl(req);
-  if (
-    filenameOrPath.startsWith("http://") ||
-    filenameOrPath.startsWith("https://")
-  ) {
-    return filenameOrPath;
+export function toPublicUploadUrl(value: string): string {
+  if (value.startsWith("http://") || value.startsWith("https://")) {
+    return value;
   }
-  if (filenameOrPath.startsWith("/uploads/")) {
-    return `${base}${filenameOrPath}`;
+
+  const normalized = normalizeLegacyUploadPath(value);
+  if (!normalized) return value;
+
+  try {
+    return buildPublicObjectUrl(normalized);
+  } catch {
+    return value;
   }
-  if (filenameOrPath.startsWith("/")) {
-    return `${base}/uploads${filenameOrPath}`;
-  }
-  return `${base}/uploads/${filenameOrPath}`;
 }

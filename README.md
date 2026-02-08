@@ -47,6 +47,13 @@ This is a Turborepo monorepo with three main applications:
    BETTER_AUTH_SECRET=your-secret-key
    BETTER_AUTH_URL=http://localhost:3002
    ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001
+   MINIO_ENDPOINT=http://localhost:9000
+   MINIO_PUBLIC_BASE_URL=http://localhost:9000/mytrip
+   MINIO_BUCKET=mytrip
+   MINIO_ACCESS_KEY=minioadmin
+   MINIO_SECRET_KEY=minioadmin
+   MINIO_REGION=us-east-1
+   MINIO_FORCE_PATH_STYLE=true
    ```
 
    **Web (`apps/web/.env.local`)**:

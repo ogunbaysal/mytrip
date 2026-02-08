@@ -32,8 +32,8 @@ export const fileUsageEnum = pgEnum("file_usage", [
 export const file = pgTable("file", {
   id: text("id").primaryKey(),
   filename: text("filename").notNull(), // Original filename
-  storedFilename: text("stored_filename").notNull(), // UUID-based filename on disk
-  url: text("url").notNull(), // Full URL to access the file
+  storedFilename: text("stored_filename").notNull(), // Object storage key
+  url: text("url").notNull(), // Public URL to access the file
   mimeType: text("mime_type").notNull(),
   size: integer("size").notNull(), // File size in bytes
   type: fileTypeEnum("type").notNull().default("image"),
