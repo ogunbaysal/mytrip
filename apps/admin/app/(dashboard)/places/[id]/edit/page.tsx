@@ -1,6 +1,7 @@
 "use client"
 
 import { zodResolver } from "@hookform/resolvers/zod"
+import { useQueryClient } from "@tanstack/react-query"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
 import { Button } from "@/components/ui/button"
@@ -25,7 +26,13 @@ import {
 import { toast } from "sonner"
 import { usePlace, useUpdatePlace } from "@/hooks/use-places"
 import { useCategories } from "@/hooks/use-categories"
-import { useCities, useDistricts } from "@/hooks/use-locations"
+import {
+  fetchDistrictCenter,
+  getDistrictCenterQueryKey,
+  useCities,
+  useDistrictData,
+  useDistricts,
+} from "@/hooks/use-locations"
 import { useParams, useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ArrowLeft, FileText, Loader2, Upload } from "lucide-react"
@@ -118,7 +125,42 @@ function parseLocationInput(input: unknown): { lat: string; lng: string } {
   return { lat: "", lng: "" };
 }
 
+function parseCoordinates(
+  location?:
+    | {
+        latitude: number | string | null
+        longitude: number | string | null
+      }
+    | null,
+): { lat: number; lng: number } | null {
+  if (!location) return null
+
+  if (location.latitude === null || location.latitude === undefined) return null
+  if (location.longitude === null || location.longitude === undefined) return null
+  if (
+    typeof location.latitude === "string" &&
+    location.latitude.trim() === ""
+  ) {
+    return null
+  }
+  if (
+    typeof location.longitude === "string" &&
+    location.longitude.trim() === ""
+  ) {
+    return null
+  }
+
+  const lat = Number(location.latitude)
+  const lng = Number(location.longitude)
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return null
+  }
+
+  return { lat, lng }
+}
+
 export default function EditPlacePage() {
+  const queryClient = useQueryClient()
   const router = useRouter()
   const params = useParams()
   const placeId = params.id as string
@@ -165,6 +207,7 @@ export default function EditPlacePage() {
   const watchedCity = form.watch("city")
   const { data: cities } = useCities()
   const { data: districts } = useDistricts(watchedCity)
+  const { data: districtData } = useDistrictData(watchedCity)
 
   useEffect(() => {
     if (place) {
@@ -323,6 +366,16 @@ export default function EditPlacePage() {
     normalizedDistrictValue &&
       districts?.some((districtName) => districtName === normalizedDistrictValue),
   );
+  const setCoordinateFields = (coords: { lat: number; lng: number }) => {
+    form.setValue("latitude", String(coords.lat), {
+      shouldDirty: true,
+      shouldValidate: true,
+    })
+    form.setValue("longitude", String(coords.lng), {
+      shouldDirty: true,
+      shouldValidate: true,
+    })
+  }
 
   return (
     <div className="flex-1 space-y-4 p-8 pt-6">
@@ -645,7 +698,26 @@ export default function EditPlacePage() {
                                                 name={field.name}
                                                 onValueChange={(val) => {
                                                     field.onChange(val)
-                                                    form.setValue("district", "") // Reset district when city changes
+                                                    form.setValue("district", "", {
+                                                      shouldDirty: true,
+                                                      shouldValidate: true,
+                                                    })
+
+                                                    const selectedCity = cities?.find(
+                                                      (city) => city.name === val,
+                                                    )
+                                                    const cityCoordinates = parseCoordinates(
+                                                      selectedCity
+                                                        ? {
+                                                            latitude: selectedCity.latitude,
+                                                            longitude: selectedCity.longitude,
+                                                          }
+                                                        : null,
+                                                    )
+
+                                                    if (cityCoordinates) {
+                                                      setCoordinateFields(cityCoordinates)
+                                                    }
                                                 }}
                                                 value={field.value || ""}
                                             >
@@ -654,7 +726,7 @@ export default function EditPlacePage() {
                                                         <SelectValue placeholder="Şehir seçin" />
                                                     </SelectTrigger>
                                                 </FormControl>
-                                                <SelectContent>
+                                                <SelectContent className="z-[1200]">
                                                     {field.value && !hasCurrentCityInOptions && (
                                                         <SelectItem value={field.value}>
                                                             {field.value}
@@ -680,7 +752,60 @@ export default function EditPlacePage() {
                                             <Select
                                                 key={`district-${field.value ?? "empty"}-${normalizedCityValue}-${districts?.length ?? 0}`}
                                                 name={field.name}
-                                                onValueChange={field.onChange}
+                                                onValueChange={(val) => {
+                                                  field.onChange(val)
+
+                                                  const selectedDistrict = districtData?.districtItems.find(
+                                                    (district) => district.name === val,
+                                                  )
+                                                  const districtCoordinates = parseCoordinates(
+                                                    selectedDistrict
+                                                      ? {
+                                                          latitude: selectedDistrict.latitude,
+                                                          longitude: selectedDistrict.longitude,
+                                                        }
+                                                      : null,
+                                                  )
+
+                                                  if (districtCoordinates) {
+                                                    setCoordinateFields(districtCoordinates)
+                                                    return
+                                                  }
+
+                                                  const requestCity = normalizedCityValue
+                                                  const requestDistrict = val
+                                                  if (!requestCity || !requestDistrict) return
+
+                                                  void queryClient
+                                                    .fetchQuery({
+                                                      queryKey: getDistrictCenterQueryKey(
+                                                        requestCity,
+                                                        requestDistrict,
+                                                      ),
+                                                      queryFn: () =>
+                                                        fetchDistrictCenter(
+                                                          requestCity,
+                                                          requestDistrict,
+                                                        ),
+                                                      staleTime: 1000 * 60 * 60 * 24,
+                                                    })
+                                                    .then((center) => {
+                                                      if (!center) return
+
+                                                      const currentCity = form.getValues("city")
+                                                      const currentDistrict =
+                                                        form.getValues("district")
+
+                                                      if (
+                                                        currentCity !== requestCity ||
+                                                        currentDistrict !== requestDistrict
+                                                      ) {
+                                                        return
+                                                      }
+
+                                                      setCoordinateFields(center)
+                                                    })
+                                                }}
                                                 value={field.value || ""}
                                                 disabled={!normalizedCityValue}
                                             >
@@ -689,7 +814,7 @@ export default function EditPlacePage() {
                                                         <SelectValue placeholder={normalizedCityValue ? "İlçe seçin" : "Önce şehir seçin"} />
                                                     </SelectTrigger>
                                                 </FormControl>
-                                                <SelectContent>
+                                                <SelectContent className="z-[1200]">
                                                     {field.value && !hasCurrentDistrictInOptions && (
                                                         <SelectItem value={field.value}>
                                                             {field.value}
@@ -715,14 +840,7 @@ export default function EditPlacePage() {
                                   latitude={mapLatitude}
                                   longitude={mapLongitude}
                                   onChange={({ lat, lng }) => {
-                                    form.setValue("latitude", String(lat), {
-                                      shouldDirty: true,
-                                      shouldValidate: true,
-                                    })
-                                    form.setValue("longitude", String(lng), {
-                                      shouldDirty: true,
-                                      shouldValidate: true,
-                                    })
+                                    setCoordinateFields({ lat, lng })
                                   }}
                                 />
                            </div>

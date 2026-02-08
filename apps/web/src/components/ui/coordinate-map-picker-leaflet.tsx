@@ -47,16 +47,15 @@ function ClickHandler({
 
 function RecenterOnPinChange({
   center,
-  zoom,
 }: {
   center: [number, number];
-  zoom: number;
 }) {
   const map = useMap();
 
   useEffect(() => {
-    map.setView(center, zoom, { animate: false });
-  }, [map, center, zoom]);
+    // Keep the active zoom level while syncing the marker position.
+    map.setView(center, map.getZoom(), { animate: false });
+  }, [map, center]);
 
   return null;
 }
@@ -96,7 +95,7 @@ export function CoordinateMapPickerLeaflet({
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
-      <RecenterOnPinChange center={center} zoom={zoom} />
+      <RecenterOnPinChange center={center} />
       <ClickHandler onChange={onChange} />
       <Marker
         draggable

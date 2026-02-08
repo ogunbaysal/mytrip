@@ -105,13 +105,13 @@ export default function CreatePlacePage() {
   });
 
   const { data: citiesData, isLoading: isCitiesLoading } = useQuery({
-    queryKey: ["owner-place-cities"],
-    queryFn: () => api.owner.places.cities(),
+    queryKey: ["place-location-cities"],
+    queryFn: () => api.locations.cities(),
   });
 
   const { data: districtsData, isLoading: isDistrictsLoading } = useQuery({
-    queryKey: ["owner-place-districts", formData.cityId],
-    queryFn: () => api.owner.places.districts(formData.cityId),
+    queryKey: ["place-location-districts", formData.cityId],
+    queryFn: () => api.locations.districts(formData.cityId),
     enabled: Boolean(formData.cityId),
   });
 
@@ -131,7 +131,7 @@ export default function CreatePlacePage() {
 
   const categories = categoriesData?.categories ?? [];
   const cities = citiesData?.cities ?? [];
-  const districts = districtsData?.districts ?? [];
+  const districts = districtsData?.districtItems ?? [];
 
   const usage = usageData?.usage;
   const placesUsed = usage?.places.current || 0;
@@ -150,6 +150,22 @@ export default function CreatePlacePage() {
       "",
     [districts, formData.districtId],
   );
+
+  const resolveCoordinates = (
+    latitude: number | null | undefined,
+    longitude: number | null | undefined,
+  ): { lat: number; lng: number } | null => {
+    if (
+      typeof latitude !== "number" ||
+      typeof longitude !== "number" ||
+      !Number.isFinite(latitude) ||
+      !Number.isFinite(longitude)
+    ) {
+      return null;
+    }
+
+    return { lat: latitude, lng: longitude };
+  };
 
   const toggleFeature = (featureId: string) => {
     setFormData((prev) => ({
@@ -454,13 +470,20 @@ export default function CreatePlacePage() {
               <Label>Şehir *</Label>
               <Select
                 value={formData.cityId || undefined}
-                onValueChange={(value) =>
+                onValueChange={(value) => {
+                  const selectedCity = cities.find((city) => city.id === value);
+                  const cityCoordinates = resolveCoordinates(
+                    selectedCity?.latitude,
+                    selectedCity?.longitude,
+                  );
+
                   setFormData((prev) => ({
                     ...prev,
                     cityId: value,
                     districtId: "",
-                  }))
-                }
+                    location: cityCoordinates ?? prev.location,
+                  }));
+                }}
                 disabled={isCitiesLoading}
               >
                 <SelectTrigger>
@@ -480,9 +503,59 @@ export default function CreatePlacePage() {
               <Label>İlçe *</Label>
               <Select
                 value={formData.districtId || undefined}
-                onValueChange={(value) =>
-                  setFormData((prev) => ({ ...prev, districtId: value }))
-                }
+                onValueChange={(value) => {
+                  const requestCityId = formData.cityId;
+                  const selectedDistrict = districts.find(
+                    (district) => district.id === value,
+                  );
+                  const districtCoordinates = resolveCoordinates(
+                    selectedDistrict?.latitude,
+                    selectedDistrict?.longitude,
+                  );
+
+                  setFormData((prev) => ({
+                    ...prev,
+                    districtId: value,
+                    location: districtCoordinates ?? prev.location,
+                  }));
+
+                  if (
+                    districtCoordinates ||
+                    !requestCityId ||
+                    !selectedDistrict?.name
+                  ) {
+                    return;
+                  }
+
+                  void queryClient
+                    .fetchQuery({
+                      queryKey: [
+                        "place-location-district-center",
+                        requestCityId,
+                        selectedDistrict.name,
+                      ],
+                      queryFn: () =>
+                        api.locations.districtCenter(
+                          requestCityId,
+                          selectedDistrict.name,
+                        ),
+                      staleTime: 1000 * 60 * 60 * 24,
+                    })
+                    .then((center) => {
+                      if (!center) return;
+
+                      setFormData((prev) => {
+                        if (
+                          prev.cityId !== requestCityId ||
+                          prev.districtId !== value
+                        ) {
+                          return prev;
+                        }
+
+                        return { ...prev, location: center };
+                      });
+                    });
+                }}
                 disabled={!formData.cityId || isDistrictsLoading}
               >
                 <SelectTrigger>

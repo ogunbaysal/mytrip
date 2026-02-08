@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -30,6 +30,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { CoordinateMapPicker } from "@/components/ui/coordinate-map-picker";
 import {
   PageHeader,
   DashboardCard,
@@ -65,6 +73,8 @@ const FEATURES = [
   { id: "spa", label: "SPA", icon: Sparkles },
   { id: "24h", label: "24 Saat Resepsiyon", icon: Clock },
 ];
+
+const DEFAULT_COORDS = { lat: 39.0, lng: 35.0 };
 
 export default function EditPlacePage() {
   const router = useRouter();
@@ -104,6 +114,42 @@ export default function EditPlacePage() {
   });
 
   const place = placeData?.place;
+
+  const { data: citiesData, isLoading: isCitiesLoading } = useQuery({
+    queryKey: ["place-location-cities"],
+    queryFn: () => api.locations.cities(),
+  });
+
+  const cities = citiesData?.cities ?? [];
+  const selectedCity = useMemo(
+    () => cities.find((city) => city.name === formData.city) ?? null,
+    [cities, formData.city],
+  );
+  const selectedCityId = selectedCity?.id ?? "";
+
+  const { data: districtsData, isLoading: isDistrictsLoading } = useQuery({
+    queryKey: ["place-location-districts", selectedCityId],
+    queryFn: () => api.locations.districts(selectedCityId),
+    enabled: Boolean(selectedCityId),
+  });
+
+  const districts = districtsData?.districtItems ?? [];
+
+  const resolveCoordinates = (
+    latitude: number | null | undefined,
+    longitude: number | null | undefined,
+  ): { lat: number; lng: number } | null => {
+    if (
+      typeof latitude !== "number" ||
+      typeof longitude !== "number" ||
+      !Number.isFinite(latitude) ||
+      !Number.isFinite(longitude)
+    ) {
+      return null;
+    }
+
+    return { lat: latitude, lng: longitude };
+  };
 
   useEffect(() => {
     if (place) {
@@ -473,23 +519,143 @@ export default function EditPlacePage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="city">Şehir *</Label>
-              <Input
-                id="city"
-                value={formData.city}
-                onChange={(e) => handleChange("city", e.target.value)}
-                placeholder="Örn: Muğla"
-                required
-              />
+              <Label>Şehir *</Label>
+              <Select
+                value={formData.city || undefined}
+                onValueChange={(value) => {
+                  const nextCity = cities.find((city) => city.name === value);
+                  const cityCoordinates = resolveCoordinates(
+                    nextCity?.latitude,
+                    nextCity?.longitude,
+                  );
+
+                  setFormData((prev) => ({
+                    ...prev,
+                    city: value,
+                    district: "",
+                    location: cityCoordinates ?? prev.location,
+                  }));
+                  setHasChanges(true);
+                }}
+                disabled={isCitiesLoading}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Şehir seçin" />
+                </SelectTrigger>
+                <SelectContent className="z-[1200]">
+                  {formData.city &&
+                    !cities.some((city) => city.name === formData.city) && (
+                      <SelectItem value={formData.city}>{formData.city}</SelectItem>
+                    )}
+                  {cities.map((city) => (
+                    <SelectItem key={city.id} value={city.name}>
+                      {city.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="district">İlçe</Label>
-              <Input
-                id="district"
-                value={formData.district}
-                onChange={(e) => handleChange("district", e.target.value)}
-                placeholder="Örn: Bodrum"
+              <Label>İlçe</Label>
+              <Select
+                value={formData.district || undefined}
+                onValueChange={(value) => {
+                  const requestCityId = selectedCityId;
+                  const requestCityName = formData.city;
+                  const selectedDistrict = districts.find(
+                    (district) => district.name === value,
+                  );
+                  const districtCoordinates = resolveCoordinates(
+                    selectedDistrict?.latitude,
+                    selectedDistrict?.longitude,
+                  );
+
+                  setFormData((prev) => ({
+                    ...prev,
+                    district: value,
+                    location: districtCoordinates ?? prev.location,
+                  }));
+                  setHasChanges(true);
+
+                  if (
+                    districtCoordinates ||
+                    !requestCityId ||
+                    !selectedDistrict?.name
+                  ) {
+                    return;
+                  }
+
+                  void queryClient
+                    .fetchQuery({
+                      queryKey: [
+                        "place-location-district-center",
+                        requestCityId,
+                        selectedDistrict.name,
+                      ],
+                      queryFn: () =>
+                        api.locations.districtCenter(
+                          requestCityId,
+                          selectedDistrict.name,
+                        ),
+                      staleTime: 1000 * 60 * 60 * 24,
+                    })
+                    .then((center) => {
+                      if (!center) return;
+
+                      setFormData((prev) => {
+                        if (
+                          prev.city !== requestCityName ||
+                          prev.district !== value
+                        ) {
+                          return prev;
+                        }
+
+                        return { ...prev, location: center };
+                      });
+                    });
+                }}
+                disabled={!selectedCityId || isDistrictsLoading}
+              >
+                <SelectTrigger>
+                  <SelectValue
+                    placeholder={selectedCityId ? "İlçe seçin" : "Önce şehir seçin"}
+                  />
+                </SelectTrigger>
+                <SelectContent className="z-[1200]">
+                  {formData.district &&
+                    !districts.some(
+                      (district) => district.name === formData.district,
+                    ) && (
+                      <SelectItem value={formData.district}>
+                        {formData.district}
+                      </SelectItem>
+                    )}
+                  {districts.map((district) => (
+                    <SelectItem key={district.id} value={district.name}>
+                      {district.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="md:col-span-2 space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Haritada konuma tıklayın veya pini sürükleyin.
+              </p>
+              <CoordinateMapPicker
+                latitude={
+                  Number.isFinite(formData.location.lat)
+                    ? formData.location.lat
+                    : DEFAULT_COORDS.lat
+                }
+                longitude={
+                  Number.isFinite(formData.location.lng)
+                    ? formData.location.lng
+                    : DEFAULT_COORDS.lng
+                }
+                onChange={(coords) => handleChange("location", coords)}
               />
             </div>
 

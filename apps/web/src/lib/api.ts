@@ -150,6 +150,14 @@ function parseCoordinates(location: string | object | null | undefined): {
   return { lat, lng };
 }
 
+function toNullableNumber(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value === "string" && value.trim() === "") return null;
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 function mapBackendPlaceToSummary(place: APIPlace): PlaceSummary {
   const images = safelyParseJSON<string[]>(place.images, []);
   const location = parseCoordinates(place.location);
@@ -331,6 +339,102 @@ export const api = {
       return await request<{ usage: any; subscription: any }>(
         "/api/subscriptions/usage",
       );
+    },
+  },
+  locations: {
+    async cities() {
+      const data = await request<{
+        cities: {
+          id: string;
+          name: string;
+          slug: string;
+          latitude: number | string | null;
+          longitude: number | string | null;
+        }[];
+      }>("/api/locations/cities");
+
+      return {
+        cities: data.cities.map((city) => ({
+          ...city,
+          latitude: toNullableNumber(city.latitude),
+          longitude: toNullableNumber(city.longitude),
+        })),
+      };
+    },
+    async districts(city: string) {
+      if (!city) {
+        return {
+          city: null as {
+            id: string;
+            name: string;
+            latitude: number | null;
+            longitude: number | null;
+          } | null,
+          districts: [] as string[],
+          districtItems: [] as {
+            id: string;
+            name: string;
+            slug: string;
+            latitude: number | null;
+            longitude: number | null;
+          }[],
+        };
+      }
+
+      const data = await request<{
+        city?: {
+          id: string;
+          name: string;
+          latitude: number | string | null;
+          longitude: number | string | null;
+        } | null;
+        districts?: string[];
+        districtItems?: {
+          id: string;
+          name: string;
+          slug: string;
+          latitude: number | string | null;
+          longitude: number | string | null;
+        }[];
+      }>(`/api/locations/districts/${encodeURIComponent(city)}`);
+
+      return {
+        city: data.city
+          ? {
+              ...data.city,
+              latitude: toNullableNumber(data.city.latitude),
+              longitude: toNullableNumber(data.city.longitude),
+            }
+          : null,
+        districts: data.districts ?? [],
+        districtItems: (data.districtItems ?? []).map((item) => ({
+          ...item,
+          latitude: toNullableNumber(item.latitude),
+          longitude: toNullableNumber(item.longitude),
+        })),
+      };
+    },
+    async districtCenter(city: string, district: string) {
+      const normalizedCity = city.trim();
+      const normalizedDistrict = district.trim();
+      if (!normalizedCity || !normalizedDistrict) return null;
+
+      const params = new URLSearchParams({
+        city: normalizedCity,
+        district: normalizedDistrict,
+      });
+
+      const data = await request<{
+        center?: { lat: number | string; lng: number | string } | null;
+      }>(`/api/locations/district-center?${params.toString()}`);
+
+      if (!data.center) return null;
+
+      const lat = Number(data.center.lat);
+      const lng = Number(data.center.lng);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+
+      return { lat, lng };
     },
   },
   owner: {
