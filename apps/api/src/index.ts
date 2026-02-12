@@ -23,7 +23,6 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",")
 
 console.log({
   minio: process.env,
-  bun: Bun.env,
 });
 
 app.use(
