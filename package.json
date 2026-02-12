@@ -1,7 +1,7 @@
 {
   "name": "mytrip",
   "private": true,
-  "packageManager": "bun@1.2.22",
+  "packageManager": "npm@10.2.4",
   "scripts": {
     "dev": "turbo dev",
     "build": "turbo build",
