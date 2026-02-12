@@ -1,3 +1,10 @@
+console.log("[BOOT] pid", process.pid);
+console.log("[BOOT] MINIO_ENDPOINT =", process.env.MINIO_ENDPOINT);
+console.log(
+  "[BOOT] MINIO keys =",
+  Object.keys(process.env).filter((k) => k.startsWith("MINIO_"))
+);
+
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { auth } from "./lib/auth.ts";
