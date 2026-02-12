@@ -17,7 +17,7 @@ export function BlogPostCard({ post }: { post: BlogPost }) {
     >
       <div className="relative aspect-[4/3] overflow-hidden rounded-2xl">
         <Image
-          src={post.heroImage || post.featuredImage || "/images/placeholders/blog-placeholder.jpg"}
+          src={post.heroImage || post.featuredImage || "/images/placeholders/blog-placeholder.png"}
           alt={post.title}
           fill
           className="object-cover transition duration-500 group-hover:scale-105"

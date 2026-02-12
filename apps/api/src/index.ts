@@ -22,6 +22,10 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",")
   "http://localhost:3002",
 ];
 
+console.log({
+  minio: process.env.MINIO_ENDPOINT,
+});
+
 app.use(
   "*",
   cors({

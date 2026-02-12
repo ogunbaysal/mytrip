@@ -59,7 +59,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
     <article className="space-y-16 pb-24">
       <section className="relative overflow-hidden h-[60vh] min-h-[400px]">
         <Image
-          src={detail.heroImage || detail.featuredImage || "/images/placeholders/blog-placeholder.jpg"}
+          src={detail.heroImage || detail.featuredImage || "/images/placeholders/blog-placeholder.png"}
           alt={detail.title}
           fill
           className="object-cover"
