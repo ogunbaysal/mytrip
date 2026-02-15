@@ -1,6 +1,20 @@
 import { Context, Next } from "hono";
 import { auth } from "../lib/auth.ts";
 
+type HeadersWithSetCookie = Headers & {
+  getSetCookie?: () => string[];
+};
+
+function forwardSetCookieHeaders(c: Context, headers: Headers) {
+  const cookies =
+    (headers as HeadersWithSetCookie).getSetCookie?.() ??
+    (headers.get("set-cookie") ? [headers.get("set-cookie") as string] : []);
+
+  for (const cookie of cookies) {
+    c.header("Set-Cookie", cookie, { append: true });
+  }
+}
+
 /**
  * Middleware to protect admin routes
  * Ensures user is authenticated and is an admin (exists in admin table)
@@ -8,9 +22,14 @@ import { auth } from "../lib/auth.ts";
 export const adminAuth = async (c: Context, next: Next) => {
   try {
     // Get session from Better Auth
-    const session = await auth.api.getSession({
+    const { headers, response: session } = await auth.api.getSession({
       headers: c.req.raw.headers,
+      returnHeaders: true,
     });
+
+    if (headers) {
+      forwardSetCookieHeaders(c, headers);
+    }
 
     // Check if user is authenticated
     if (!session || !session.user) {
@@ -58,9 +77,14 @@ export const adminAuth = async (c: Context, next: Next) => {
  */
 export const adminOrOwnerAuth = async (c: Context, next: Next) => {
   try {
-    const session = await auth.api.getSession({
+    const { headers, response: session } = await auth.api.getSession({
       headers: c.req.raw.headers,
+      returnHeaders: true,
     });
+
+    if (headers) {
+      forwardSetCookieHeaders(c, headers);
+    }
 
     if (!session || !session.user) {
       // TODO: Try to check Web User session here if needed

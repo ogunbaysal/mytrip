@@ -1,13 +1,13 @@
 import { Hono } from "hono";
-import { getSessionFromRequest } from "../../lib/session.ts";
 import { processFileUpload } from "../../lib/upload-service.ts";
+import { getAdminUserFromContext } from "../../lib/admin-context.ts";
 
 const app = new Hono();
 
 app.post("/", async (c) => {
   try {
-    const session = await getSessionFromRequest(c);
-    if (!session?.user?.id) {
+    const adminUser = getAdminUserFromContext(c);
+    if (!adminUser?.id) {
       return c.json({ error: "Unauthorized" }, 401);
     }
 
@@ -21,10 +21,10 @@ app.post("/", async (c) => {
 
     const result = await processFileUpload(
       fileData,
-      session.user.id,
+      adminUser.id,
       {
-        email: session.user.email ?? null,
-        name: session.user.name ?? null,
+        email: adminUser.email ?? null,
+        name: adminUser.name ?? null,
       },
       usage,
     );
@@ -42,8 +42,8 @@ app.post("/", async (c) => {
 
 app.post("/multiple", async (c) => {
   try {
-    const session = await getSessionFromRequest(c);
-    if (!session?.user?.id) {
+    const adminUser = getAdminUserFromContext(c);
+    if (!adminUser?.id) {
       return c.json({ error: "Unauthorized" }, 401);
     }
 
@@ -73,10 +73,10 @@ app.post("/multiple", async (c) => {
 
       const result = await processFileUpload(
         fileData,
-        session.user.id,
+        adminUser.id,
         {
-          email: session.user.email ?? null,
-          name: session.user.name ?? null,
+          email: adminUser.email ?? null,
+          name: adminUser.name ?? null,
         },
         usage,
       );

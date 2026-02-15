@@ -4,7 +4,7 @@ import { settings, user } from "../../db/schemas/index.ts";
 import { eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
-import { auth } from "../../lib/auth.ts";
+import { getAdminUserFromContext } from "../../lib/admin-context.ts";
 
 const router = new Hono();
 
@@ -76,13 +76,12 @@ router.put(
     })
   ) as any,
   async (c) => {
-    const session = await auth.api.getSession({ headers: c.req.raw.headers });
-    if (!session) {
+    const adminUser = getAdminUserFromContext(c);
+    if (!adminUser?.id) {
       return c.json({ error: "Unauthorized" }, 401);
     }
     
-    // In Better Auth, user id comes from session.user.id
-    const userId = session.user.id;
+    const userId = adminUser.id;
     const body = await c.req.json();
 
     const updated = await db

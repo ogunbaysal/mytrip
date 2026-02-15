@@ -8,8 +8,8 @@ import {
   user,
 } from "../../../db/schemas/index.ts";
 import { eq, desc, sql } from "drizzle-orm";
-import { getSessionFromRequest } from "../../../lib/session.ts";
 import { nanoid } from "nanoid";
+import { getAdminUserFromContext } from "../../../lib/admin-context.ts";
 
 const app = new Hono();
 
@@ -19,8 +19,8 @@ const approveRejectSchema = z.object({
 
 app.get("/registrations", async (c) => {
   try {
-    const session = await getSessionFromRequest(c);
-    if (!session?.user?.id || (session.user as any).role !== "admin") {
+    const adminUser = getAdminUserFromContext(c);
+    if (!adminUser?.id) {
       return c.json({ error: "Unauthorized" }, 401);
     }
 
@@ -71,12 +71,12 @@ app.get("/registrations", async (c) => {
 
 app.put("/registrations/:id/approve", async (c) => {
   try {
-    const session = await getSessionFromRequest(c);
-    if (!session?.user?.id || (session.user as any).role !== "admin") {
+    const adminUser = getAdminUserFromContext(c);
+    if (!adminUser?.id) {
       return c.json({ error: "Unauthorized" }, 401);
     }
 
-    const adminId = session.user.id;
+    const adminId = adminUser.id;
     const id = c.req.param("id");
 
     const [existingRegistration] = await db
@@ -150,12 +150,12 @@ app.put(
   zValidator("json", approveRejectSchema),
   async (c) => {
     try {
-      const session = await getSessionFromRequest(c);
-      if (!session?.user?.id || (session.user as any).role !== "admin") {
+      const adminUser = getAdminUserFromContext(c);
+      if (!adminUser?.id) {
         return c.json({ error: "Unauthorized" }, 401);
       }
 
-      const adminId = session.user.id;
+      const adminId = adminUser.id;
       const id = c.req.param("id");
       const data = c.req.valid("json");
 

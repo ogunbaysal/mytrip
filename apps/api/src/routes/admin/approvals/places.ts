@@ -4,7 +4,7 @@ import { z } from "zod";
 import { db } from "../../../db/index.ts";
 import { district, file, place, placeCategory, province, user } from "../../../db/schemas/index.ts";
 import { and, desc, eq, sql } from "drizzle-orm";
-import { getSessionFromRequest } from "../../../lib/session.ts";
+import { getAdminUserFromContext } from "../../../lib/admin-context.ts";
 import {
   derivePlaceTypeFromCategorySlug,
   hydratePlaceMediaAndAmenities,
@@ -18,8 +18,8 @@ const approveRejectSchema = z.object({
 
 app.get("/places", async (c) => {
   try {
-    const session = await getSessionFromRequest(c);
-    if (!session?.user?.id || (session.user as any).role !== "admin") {
+    const adminUser = getAdminUserFromContext(c);
+    if (!adminUser?.id) {
       return c.json({ error: "Unauthorized" }, 401);
     }
 
@@ -91,8 +91,8 @@ app.get("/places", async (c) => {
 
 app.get("/places/:id", async (c) => {
   try {
-    const session = await getSessionFromRequest(c);
-    if (!session?.user?.id || (session.user as any).role !== "admin") {
+    const adminUser = getAdminUserFromContext(c);
+    if (!adminUser?.id) {
       return c.json({ error: "Unauthorized" }, 401);
     }
 
@@ -162,8 +162,8 @@ app.get("/places/:id", async (c) => {
 
 app.put("/places/:id/approve", async (c) => {
   try {
-    const session = await getSessionFromRequest(c);
-    if (!session?.user?.id || (session.user as any).role !== "admin") {
+    const adminUser = getAdminUserFromContext(c);
+    if (!adminUser?.id) {
       return c.json({ error: "Unauthorized" }, 401);
     }
 
@@ -251,8 +251,8 @@ app.put(
   zValidator("json", approveRejectSchema),
   async (c) => {
     try {
-      const session = await getSessionFromRequest(c);
-      if (!session?.user?.id || (session.user as any).role !== "admin") {
+      const adminUser = getAdminUserFromContext(c);
+      if (!adminUser?.id) {
         return c.json({ error: "Unauthorized" }, 401);
       }
 
