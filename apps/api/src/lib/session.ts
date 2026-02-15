@@ -1,38 +1,58 @@
 import { Context } from "hono";
+import { webAuth } from "./web-auth.ts";
 
-export async function getSessionFromRequest(c: Context) {
-  const cookies = c.req.raw.headers.get("cookie") || "";
+type HeadersWithSetCookie = Headers & {
+  getSetCookie?: () => string[];
+};
 
-  const sessionTokenMatch = cookies.match(/better-auth\.session_token=([^;]+)/);
-  const sessionDataMatch = cookies.match(/better-auth\.session_data=([^;]+)/);
+function getSetCookieValues(headers: Headers): string[] {
+  const cookieHeaders = (headers as HeadersWithSetCookie).getSetCookie?.();
 
-  if (!sessionTokenMatch || !sessionDataMatch) {
-    return null;
+  if (cookieHeaders && cookieHeaders.length > 0) {
+    return cookieHeaders;
   }
 
-  const token = sessionTokenMatch[1].split(";")[0];
-  const dataStr = sessionDataMatch[1].split(";")[0];
+  const setCookie = headers.get("set-cookie");
+  return setCookie ? [setCookie] : [];
+}
 
+function forwardSetCookieHeaders(c: Context, headers: Headers) {
+  const cookies = getSetCookieValues(headers);
+
+  for (const cookie of cookies) {
+    c.header("Set-Cookie", cookie, { append: true });
+  }
+}
+
+export async function getSessionFromRequest(c: Context) {
   try {
-    const data = JSON.parse(atob(dataStr));
+    const { headers, response } = await webAuth.api.getSession({
+      headers: c.req.raw.headers,
+      returnHeaders: true,
+    });
 
-    const expiresAt = new Date(data.session.expiresAt);
-    const now = new Date();
+    if (headers) {
+      forwardSetCookieHeaders(c, headers);
+    }
 
-    if (expiresAt < now) {
+    if (!response?.session || !response.user) {
       return null;
     }
 
-    const userId = data.session?.session?.userId || data.session?.userId;
+    const userId = response.session.userId || response.user.id;
+    if (!userId) {
+      return null;
+    }
 
     return {
-      session: data.session,
+      ...response,
       user: {
+        ...response.user,
         id: userId,
-        ...data.user,
       },
     };
   } catch (error) {
+    console.error("Session resolution error:", error);
     return null;
   }
 }
