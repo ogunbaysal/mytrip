@@ -46,6 +46,29 @@ function parsePositiveInt(value: string | undefined, fallback: number): number {
   return parsed;
 }
 
+function normalizeDisplayName(value: string | null | undefined): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const lower = trimmed.toLowerCase();
+  if (lower === "anonim" || lower === "anonymous") return null;
+  return trimmed;
+}
+
+function resolveCommentAuthorName(input: {
+  guestName: string | null | undefined;
+  userName: string | null | undefined;
+}): string {
+  const reviewName = normalizeDisplayName(input.guestName);
+  if (reviewName) return reviewName;
+
+  const userName = normalizeDisplayName(input.userName);
+  if (userName) return userName;
+
+  return "Anonymous";
+}
+
 type BlogRow = {
   id: string;
   slug: string;
@@ -503,7 +526,10 @@ app.get("/comments", async (c) => {
     return c.json({
       comments: rows.map((row) => ({
         ...row,
-        authorName: row.userName || row.guestName || "Anonim",
+        authorName: resolveCommentAuthorName({
+          guestName: row.guestName,
+          userName: row.userName,
+        }),
         authorEmail: row.userEmail || row.guestEmail || null,
       })),
       pagination: {
@@ -556,7 +582,10 @@ app.get("/comments/:commentId", async (c) => {
     return c.json({
       comment: {
         ...row,
-        authorName: row.userName || row.guestName || "Anonim",
+        authorName: resolveCommentAuthorName({
+          guestName: row.guestName,
+          userName: row.userName,
+        }),
         authorEmail: row.userEmail || row.guestEmail || null,
       },
     });

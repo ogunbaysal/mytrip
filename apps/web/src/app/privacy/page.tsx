@@ -45,7 +45,7 @@ const SECTIONS = [
     title: "6. Haklarınız",
     paragraphs: [
       "Kişisel verilerinizin silinmesini, düzeltilmesini veya taşınmasını talep edebilirsiniz.",
-      "Destek talepleri için kvkk@tatildesen.com adresine e-posta gönderebilirsiniz.",
+      "Destek talepleri için info@tatildesen.com adresine e-posta gönderebilirsiniz.",
     ],
   },
 ];
@@ -79,7 +79,7 @@ export default function PrivacyPolicyPage() {
       </section>
 
       <footer className="rounded-3xl border border-primary/30 bg-primary/5 p-6 text-sm text-primary/90">
-        Gizlilik politikamızla ilgili sorularınız için kvkk@tatildesen.com adresine e-posta gönderebilirsiniz.
+        Gizlilik politikamızla ilgili sorularınız için info@tatildesen.com adresine e-posta gönderebilirsiniz.
       </footer>
     </article>
   );

@@ -95,7 +95,9 @@ function formatZodIssues(issues: ZodIssueLike[]): string | null {
     return "Gönderilen bilgiler doğrulanamadı. Lütfen alanları kontrol edin.";
   }
 
-  const readableFields = uniqueFields.map((field) => FIELD_LABELS[field] || field);
+  const readableFields = uniqueFields.map(
+    (field) => FIELD_LABELS[field] || field,
+  );
   return `Geçersiz alanlar: ${readableFields.join(", ")}.`;
 }
 
@@ -331,7 +333,7 @@ function mapBackendPlaceToSummary(place: APIPlace): PlaceSummary {
     nightlyPrice: place.nightlyPrice ? Number(place.nightlyPrice) : 0,
     rating: place.rating ? Number(place.rating) : 0,
     reviewCount: place.reviewCount,
-    imageUrl: images[0] || "/images/placeholders/place-placeholder.jpg",
+    imageUrl: images[0] || "/images/placeholders/place-placeholder.png",
     city: place.city || "",
     district: place.district || "",
     type,
@@ -356,7 +358,7 @@ function mapBackendPlaceToDetail(
 
   return {
     ...summary,
-    heroImage: images[0] || "/images/placeholders/place-placeholder.jpg",
+    heroImage: images[0] || "/images/placeholders/place-placeholder.png",
     gallery: images,
     shortHighlights,
     description: place.description || "",
@@ -398,7 +400,7 @@ function mapBackendCollectionToSummary(
     description: collection.description || "",
     coverImage:
       collection.coverImage ||
-      "/images/placeholders/collection-placeholder.jpg",
+      "/images/placeholders/collection-placeholder.png",
     itemCount: collection.itemCount,
   };
 }
@@ -645,7 +647,12 @@ export const api = {
       },
       async categories() {
         return await request<{
-          categories: { id: string; name: string; slug: string; icon?: string | null }[];
+          categories: {
+            id: string;
+            name: string;
+            slug: string;
+            icon?: string | null;
+          }[];
         }>("/api/owner/places/categories");
       },
       async cities() {
@@ -701,7 +708,12 @@ export const api = {
       },
       async categories() {
         return await request<{
-          categories: { id: string; slug: string; name: string; description?: string | null }[];
+          categories: {
+            id: string;
+            slug: string;
+            name: string;
+            description?: string | null;
+          }[];
         }>(`/api/owner/blogs/categories`);
       },
     },
@@ -1001,12 +1013,12 @@ export const api = {
           name: col.name,
           description: col.description || "",
           coverImage:
-            col.coverImage || "/images/placeholders/collection-placeholder.jpg",
+            col.coverImage || "/images/placeholders/collection-placeholder.png",
           itemCount: col.itemCount,
           heroImage:
             col.heroImage ||
             col.coverImage ||
-            "/images/placeholders/collection-placeholder.jpg",
+            "/images/placeholders/collection-placeholder.png",
           intro: col.intro || "",
           duration: col.duration || "",
           season: col.season || "",
@@ -1040,7 +1052,12 @@ export const api = {
       featured?: boolean;
     }): Promise<{
       blogPosts: BlogPost[];
-      pagination: { page: number; limit: number; total: number; totalPages: number };
+      pagination: {
+        page: number;
+        limit: number;
+        total: number;
+        totalPages: number;
+      };
     }> {
       try {
         const queryParams = new URLSearchParams();
@@ -1169,7 +1186,12 @@ export const api = {
       params?: { page?: number; limit?: number },
     ): Promise<{
       comments: BlogComment[];
-      pagination: { page: number; limit: number; total: number; totalPages: number };
+      pagination: {
+        page: number;
+        limit: number;
+        total: number;
+        totalPages: number;
+      };
     }> {
       try {
         const query = new URLSearchParams();
@@ -1178,7 +1200,12 @@ export const api = {
         const endpoint = `/api/blog/${slug}/comments${query.toString() ? `?${query.toString()}` : ""}`;
         return await request<{
           comments: BlogComment[];
-          pagination: { page: number; limit: number; total: number; totalPages: number };
+          pagination: {
+            page: number;
+            limit: number;
+            total: number;
+            totalPages: number;
+          };
         }>(endpoint);
       } catch (error) {
         console.error("Failed to fetch blog comments:", error);

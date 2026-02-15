@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function BookingsPage() {
   return (
     <div className="container mx-auto px-4 py-12">
@@ -10,12 +12,12 @@ export default function BookingsPage() {
           <p className="mb-4 text-lg">
             İlk seyahatinizi planlamaya hazır mısınız?
           </p>
-          <a
+          <Link
             href="/places"
             className="inline-block rounded-full bg-primary px-6 py-3 text-white transition hover:bg-primary/90"
           >
             Yerleri Keşfet
-          </a>
+          </Link>
         </div>
       </div>
     </div>

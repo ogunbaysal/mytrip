@@ -25,7 +25,7 @@ const SECTIONS = [
     title: "3. Çerez tercihleri",
     paragraphs: [
       "Tarayıcınızdaki ayarlar üzerinden çerezleri dilediğiniz zaman silebilir veya engelleyebilirsiniz.",
-      "Pazarlama çerezleri için sayfanın alt kısmındaki &quot;Çerez tercihlerini güncelle&quot; bağlantısını kullanabilirsiniz.",
+      "Pazarlama çerezleri dahil tüm çerez tercihlerinizi tarayıcı ayarlarınız üzerinden yönetebilirsiniz.",
     ],
   },
   {
@@ -38,7 +38,7 @@ const SECTIONS = [
   {
     title: "5. İletişim",
     paragraphs: [
-      "Çerez politikamızla ilgili sorularınız için privacy@tatildesen.com adresine e-posta gönderebilirsiniz.",
+      "Çerez politikamızla ilgili sorularınız için info@tatildesen.com adresine e-posta gönderebilirsiniz.",
     ],
   },
 ];
@@ -86,7 +86,7 @@ export default function CookiesPage() {
       </section>
 
       <footer className="rounded-3xl border border-primary/30 bg-primary/5 p-6 text-sm text-primary/90">
-        Çerez tercihlerinizi güncellemek için tarayıcı ayarlarınızı kullanabilir veya privacy@tatildesen.com adresiyle iletişime geçebilirsiniz.
+        Çerez tercihlerinizi yönetmek için tarayıcı ayarlarınızı kullanabilir veya info@tatildesen.com adresiyle iletişime geçebilirsiniz.
       </footer>
     </article>
   );

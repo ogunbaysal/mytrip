@@ -24,6 +24,33 @@ function parsePositiveInt(value: string | undefined, fallback: number): number {
   return parsed;
 }
 
+function normalizeDisplayName(value: string | null | undefined): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const lower = trimmed.toLowerCase();
+  if (lower === "anonim" || lower === "anonymous") return null;
+  return trimmed;
+}
+
+function resolveBlogPostAuthorName(authorName: string | null | undefined): string {
+  return normalizeDisplayName(authorName) || "TatilDesen Editörleri";
+}
+
+function resolveCommentAuthorName(input: {
+  guestName: string | null | undefined;
+  userName: string | null | undefined;
+}): string {
+  const reviewName = normalizeDisplayName(input.guestName);
+  if (reviewName) return reviewName;
+
+  const userName = normalizeDisplayName(input.userName);
+  if (userName) return userName;
+
+  return "Anonymous";
+}
+
 type PublicBlogRow = {
   id: string;
   slug: string;
@@ -98,6 +125,7 @@ async function hydratePublicBlogs(rows: PublicBlogRow[]): Promise<PublicBlogPayl
 
   return rows.map((row) => ({
     ...row,
+    authorName: resolveBlogPostAuthorName(row.authorName),
     heroImage: row.heroImageId ? (fileUrlMap.get(row.heroImageId) ?? null) : null,
     featuredImage: row.featuredImageId
       ? (fileUrlMap.get(row.featuredImageId) ?? null)
@@ -509,7 +537,10 @@ app.get("/:slug/comments", async (c) => {
       comments: rows.map((row) => ({
         id: row.id,
         userId: row.userId,
-        authorName: row.userName || row.guestName || "Anonim",
+        authorName: resolveCommentAuthorName({
+          guestName: row.guestName,
+          userName: row.userName,
+        }),
         content: row.content,
         createdAt: row.createdAt,
       })),
@@ -568,7 +599,7 @@ app.post("/:slug/comments", async (c) => {
       id: crypto.randomUUID(),
       blogId: post.id,
       userId,
-      guestName: userId ? null : guestName || "Anonim",
+      guestName: userId ? null : guestName || null,
       guestEmail: userId ? null : guestEmail,
       content,
       status: "pending",

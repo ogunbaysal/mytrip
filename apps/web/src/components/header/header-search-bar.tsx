@@ -30,11 +30,13 @@ export function HeaderSearchBar({ className, onSearch }: HeaderSearchBarProps) {
 
   // Form state
   const [location, setLocation] = useState<string>("");
+  const [category, setCategory] = useState<string>("");
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [guests, setGuests] = useState(1);
 
   // Popover states
   const [locationOpen, setLocationOpen] = useState(false);
+  const [categoryOpen, setCategoryOpen] = useState(false);
   const [dateOpen, setDateOpen] = useState(false);
 
   useEffect(() => {
@@ -48,6 +50,12 @@ export function HeaderSearchBar({ className, onSearch }: HeaderSearchBarProps) {
     enabled: mounted,
   });
 
+  const { data: placeCategories } = useQuery({
+    queryKey: ["place-categories"],
+    queryFn: api.places.listTypes,
+    enabled: mounted,
+  });
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -55,6 +63,9 @@ export function HeaderSearchBar({ className, onSearch }: HeaderSearchBarProps) {
 
     if (location) {
       params.set("city", location);
+    }
+    if (category) {
+      params.set("category", category);
     }
     if (dateRange?.from) {
       params.set("checkIn", format(dateRange.from, "yyyy-MM-dd"));
@@ -79,6 +90,11 @@ export function HeaderSearchBar({ className, onSearch }: HeaderSearchBarProps) {
     setTimeout(() => setDateOpen(true), 150);
   };
 
+  const handleCategorySelect = (categoryId: string) => {
+    setCategory(categoryId);
+    setCategoryOpen(false);
+  };
+
   // Format date range for display
   const formatDateDisplay = () => {
     if (!dateRange?.from) return "Tarih ekle";
@@ -94,6 +110,8 @@ export function HeaderSearchBar({ className, onSearch }: HeaderSearchBarProps) {
   };
 
   const locationDisplay = location || "Nereye?";
+  const selectedCategory = placeCategories?.find((item) => item.id === category);
+  const categoryDisplay = selectedCategory?.title || "Kategori";
   const guestsDisplay = guests === 1 ? "1 misafir" : `${guests} misafir`;
 
   if (!mounted) {
@@ -157,6 +175,51 @@ export function HeaderSearchBar({ className, onSearch }: HeaderSearchBarProps) {
                 onClick={() => handleLocationSelect(city.name)}
               >
                 {city.name}
+              </button>
+            ))}
+          </div>
+        </PopoverContent>
+      </Popover>
+
+      {/* Divider */}
+      <div className="h-6 w-px bg-gray-200" aria-hidden />
+
+      {/* Category Section */}
+      <Popover open={categoryOpen} onOpenChange={setCategoryOpen}>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            className={cn(
+              "flex items-center rounded-full px-6 py-2 text-sm font-medium transition-colors hover:bg-gray-50",
+              category ? "text-foreground" : "text-muted-foreground",
+            )}
+          >
+            {categoryDisplay}
+          </button>
+        </PopoverTrigger>
+        <PopoverContent align="start" className="w-64 p-2">
+          <div className="space-y-1">
+            <button
+              type="button"
+              className={cn(
+                "w-full rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-gray-100",
+                !category && "bg-gray-100 font-medium",
+              )}
+              onClick={() => handleCategorySelect("")}
+            >
+              Tüm kategoriler
+            </button>
+            {placeCategories?.map((item) => (
+              <button
+                type="button"
+                key={item.id}
+                className={cn(
+                  "w-full rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-gray-100",
+                  category === item.id && "bg-gray-100 font-medium",
+                )}
+                onClick={() => handleCategorySelect(item.id)}
+              >
+                {item.title}
               </button>
             ))}
           </div>

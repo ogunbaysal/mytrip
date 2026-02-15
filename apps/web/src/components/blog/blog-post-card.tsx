@@ -9,6 +9,8 @@ import type { BlogPost } from "@/types";
 export function BlogPostCard({ post }: { post: BlogPost }) {
   const { formatDate } = useLocalizedFormatting();
   const categoryLabel = post.categoryName || post.categorySlug || "";
+  const authorName = post.authorName?.trim() || "TatilDesen Editörleri";
+  const authorInitial = authorName.charAt(0).toUpperCase();
 
   return (
     <Link
@@ -40,7 +42,17 @@ export function BlogPostCard({ post }: { post: BlogPost }) {
           {post.title}
         </h3>
         <p className="text-sm text-muted-foreground line-clamp-2">{post.excerpt || ""}</p>
-        <span className="text-sm font-semibold text-primary group-hover:underline">Yazıyı oku →</span>
+        <div className="mt-auto flex items-center justify-between gap-3 pt-1">
+          <div className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+              {authorInitial}
+            </span>
+            <span className="line-clamp-1">{authorName}</span>
+          </div>
+          <span className="text-sm font-semibold text-primary group-hover:underline">
+            Yazıyı oku →
+          </span>
+        </div>
       </div>
     </Link>
   );

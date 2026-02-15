@@ -51,6 +51,7 @@ function PlacesContent() {
       city: searchParams.get("city") || undefined,
       district: searchParams.get("district") || undefined,
       type: searchParams.get("type") || undefined,
+      category: searchParams.get("category") || undefined,
       season: searchParams.get("season") || undefined,
       guests: searchParams.get("guests")
         ? parseInt(searchParams.get("guests") || "0")

@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import {
   CalendarDays,
   ChevronDown,
+  Layers,
   MapPin,
   Minus,
   Plus,
@@ -36,6 +37,7 @@ type PlaceSearchFormProps = {
 
 const LABELS = {
   location: "Yer",
+  category: "Kategori",
   date: "Tarih",
   guests: "Kişiler",
   stayType: "Konaklama Türü",
@@ -60,8 +62,14 @@ export function PlaceSearchForm({
     queryFn: api.places.listPlaceTypes,
   });
 
+  const { data: placeCategories } = useQuery({
+    queryKey: ["place-categories"],
+    queryFn: api.places.listTypes,
+  });
+
   const defaultValues: SearchFormValues = {
     location: searchParams.get("city") || searchParams.get("search") || "",
+    category: searchParams.get("category") || "",
     checkIn: searchParams.get("checkIn") || "",
     checkOut: searchParams.get("checkOut") || "",
     guests: parseInt(searchParams.get("guests") || "1"),
@@ -77,6 +85,7 @@ export function PlaceSearchForm({
   useEffect(() => {
     const newValues: SearchFormValues = {
       location: searchParams.get("city") || searchParams.get("search") || "",
+      category: searchParams.get("category") || "",
       checkIn: searchParams.get("checkIn") || "",
       checkOut: searchParams.get("checkOut") || "",
       guests: parseInt(searchParams.get("guests") || "1"),
@@ -90,6 +99,7 @@ export function PlaceSearchForm({
   const checkOutValue = form.watch("checkOut");
   const guestsValue = form.watch("guests") ?? 1;
   const locationValue = form.watch("location");
+  const categoryValue = form.watch("category");
   const stayTypeValue = form.watch("stayType");
 
   useEffect(() => {
@@ -103,6 +113,7 @@ export function PlaceSearchForm({
   const handleClear = () => {
     form.reset({
       location: "",
+      category: "",
       checkIn: "",
       checkOut: "",
       guests: 1,
@@ -118,6 +129,7 @@ export function PlaceSearchForm({
     if (values.checkIn) params.set("checkIn", values.checkIn);
     if (values.checkOut) params.set("checkOut", values.checkOut);
     if (values.guests) params.set("guests", values.guests.toString());
+    if (values.category) params.set("category", values.category);
     if (values.stayType && values.stayType !== "all")
       params.set("type", values.stayType);
 
@@ -127,6 +139,7 @@ export function PlaceSearchForm({
 
   const hasActiveFilters =
     Boolean(locationValue) ||
+    Boolean(categoryValue) ||
     Boolean(checkInValue) ||
     Boolean(checkOutValue) ||
     guestsValue > 1 ||
@@ -156,6 +169,24 @@ export function PlaceSearchForm({
               {cities?.map((city) => (
                 <option key={city.slug} value={city.name}>
                   {city.name}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-0 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          </div>
+        </FieldCard>
+
+        <FieldCard label={LABELS.category} icon={Layers}>
+          <div className="relative">
+            <select
+              id="category"
+              className="w-full appearance-none border-none bg-transparent pr-6 text-base font-medium text-foreground outline-none focus-visible:ring-0"
+              {...form.register("category")}
+            >
+              <option value="">Tümü</option>
+              {placeCategories?.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.title}
                 </option>
               ))}
             </select>
