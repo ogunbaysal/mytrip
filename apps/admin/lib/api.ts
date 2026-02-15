@@ -103,8 +103,10 @@ export const api = {
         return apiFetch<{ success: boolean; message: string }>(
           `/api/admin/approvals/places/${id}/approve`,
           {
-            method: "POST",
-            body: JSON.stringify({ reason }),
+            method: "PUT",
+            ...(reason
+              ? { body: JSON.stringify({ reason }) }
+              : {}),
           },
         );
       },
@@ -112,8 +114,8 @@ export const api = {
         return apiFetch<{ success: boolean; message: string }>(
           `/api/admin/approvals/places/${id}/reject`,
           {
-            method: "POST",
-            body: JSON.stringify({ reason }),
+            method: "PUT",
+            body: JSON.stringify({ rejectionReason: reason }),
           },
         );
       },
@@ -131,8 +133,10 @@ export const api = {
         return apiFetch<{ success: boolean; message: string }>(
           `/api/admin/approvals/business/${id}/approve`,
           {
-            method: "POST",
-            body: JSON.stringify({ reason }),
+            method: "PUT",
+            ...(reason
+              ? { body: JSON.stringify({ reason }) }
+              : {}),
           },
         );
       },
@@ -140,8 +144,8 @@ export const api = {
         return apiFetch<{ success: boolean; message: string }>(
           `/api/admin/approvals/business/${id}/reject`,
           {
-            method: "POST",
-            body: JSON.stringify({ reason }),
+            method: "PUT",
+            body: JSON.stringify({ rejectionReason: reason }),
           },
         );
       },

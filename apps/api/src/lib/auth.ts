@@ -15,6 +15,8 @@ const trustedOrigins = process.env.ALLOWED_ORIGINS?.split(",")
 // Check if we're in production (cross-origin scenario)
 const cookieDomain = resolveCookieDomain();
 const enableCrossSubDomain = !!cookieDomain;
+const adminCookiePrefix =
+  process.env.BETTER_AUTH_ADMIN_COOKIE_PREFIX?.trim() || "mytrip-admin-auth";
 
 export const auth = betterAuth({
   appName: "Admin Panel",
@@ -47,6 +49,7 @@ export const auth = betterAuth({
   },
   socialProviders: {},
   advanced: {
+    cookiePrefix: adminCookiePrefix,
     crossSubDomainCookies: {
       enabled: enableCrossSubDomain,
       domain: cookieDomain,

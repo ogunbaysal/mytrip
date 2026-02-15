@@ -14,6 +14,8 @@ const trustedOrigins = process.env.ALLOWED_ORIGINS?.split(",")
 
 const cookieDomain = resolveCookieDomain();
 const enableCrossSubDomain = !!cookieDomain;
+const webCookiePrefix =
+  process.env.BETTER_AUTH_WEB_COOKIE_PREFIX?.trim() || "mytrip-web-auth";
 
 export const webAuth = betterAuth({
   appName: "TatilDesen",
@@ -50,6 +52,7 @@ export const webAuth = betterAuth({
   },
   socialProviders: {},
   advanced: {
+    cookiePrefix: webCookiePrefix,
     crossSubDomainCookies: {
       enabled: enableCrossSubDomain,
       domain: cookieDomain,

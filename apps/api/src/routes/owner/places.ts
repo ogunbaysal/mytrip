@@ -103,6 +103,46 @@ const normalizeOptionalId = (value?: string | null): string | null => {
   return trimmed.length > 0 ? trimmed : null;
 };
 
+const normalizeSlugBase = (value: string): string =>
+  value
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "")
+    .replace(/-+/g, "-");
+
+const escapeLikePattern = (value: string): string =>
+  value.replace(/[\\%_]/g, "\\$&");
+
+const resolveUniquePlaceSlug = async (name: string): Promise<string> => {
+  const baseSlug = normalizeSlugBase(name) || "mekan";
+  const likePattern = `${escapeLikePattern(baseSlug)}%`;
+
+  const existingRows = await db
+    .select({ slug: place.slug })
+    .from(place)
+    .where(sql`${place.slug} LIKE ${likePattern} ESCAPE '\\'`);
+
+  const existingSlugs = new Set(existingRows.map((row) => row.slug));
+  if (!existingSlugs.has(baseSlug)) {
+    return baseSlug;
+  }
+
+  let suffix = 2;
+  while (existingSlugs.has(`${baseSlug}-${suffix}`)) {
+    suffix += 1;
+  }
+
+  return `${baseSlug}-${suffix}`;
+};
+
+const isUniqueViolationError = (error: unknown): boolean => {
+  const err = error as { code?: string; cause?: { code?: string } } | null;
+  return err?.code === "23505" || err?.cause?.code === "23505";
+};
+
 const DEFAULT_PRICE_LEVEL_THRESHOLDS = {
   budget: 1000,
   moderate: 2500,
@@ -625,10 +665,7 @@ app.post("/", zValidator("json", createPlaceSchema), async (c) => {
       );
     }
 
-    const slug = data.name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/(^-|-$)/g, "");
+    const slug = await resolveUniquePlaceSlug(data.name);
 
     const resolvedCategory = await resolveCategoryId({
       categoryId: data.categoryId,
@@ -758,6 +795,16 @@ app.post("/", zValidator("json", createPlaceSchema), async (c) => {
         error.message.includes("belgesi"))
     ) {
       return c.json({ error: "Validation failed", message: error.message }, 400);
+    }
+    if (isUniqueViolationError(error)) {
+      return c.json(
+        {
+          error: "Conflict",
+          message:
+            "Bu mekan adı için benzersiz bir URL oluşturulamadı. Lütfen tekrar deneyin.",
+        },
+        409,
+      );
     }
     return c.json({ error: "Internal server error" }, 500);
   }
