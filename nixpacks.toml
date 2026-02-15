@@ -1,0 +1,7 @@
+[variables]
+NODE_ENV = "production"
+
+[phases.install]
+cmds = [
+  "bun install --frozen-lockfile"
+]
