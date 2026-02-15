@@ -27,6 +27,10 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "media.tatildesen.com",
       },
+      {
+        protocol: "https",
+        hostname: "tatildesen.com",
+      },
     ],
   },
   async rewrites() {
