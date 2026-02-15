@@ -6,32 +6,53 @@
 FROM oven/bun:1.2.18 AS prune
 WORKDIR /repo
 
+# Optional build args injected by Coolify
+ARG NEXT_PUBLIC_API_URL
+ARG COOLIFY_URL
+ARG COOLIFY_FQDN
+ARG COOLIFY_BRANCH
+ARG COOLIFY_RESOURCE_UUID
+
 # Copy entire repo (prune step needs it)
 COPY . .
 
 # Create a pruned workspace suitable for Docker builds
-# Outputs: /repo/out/json and /repo/out/full (and lockfile)
+# Outputs: /repo/out/json and /repo/out/full (and lockfile inside out/json when present)
 RUN bunx turbo prune --scope=web --docker
 
 #########################################
-# 2) Install deps in pruned workspace    #
+# 2) Install deps in pruned workspace   #
 #########################################
 FROM oven/bun:1.2.18 AS deps
 WORKDIR /app
 
-# Copy package metadata first for better caching
-COPY --from=prune /repo/out/json/ ./
-COPY --from=prune /repo/out/bun.lockb ./bun.lockb
+# Optional build args injected by Coolify
+ARG NEXT_PUBLIC_API_URL
+ARG COOLIFY_URL
+ARG COOLIFY_FQDN
+ARG COOLIFY_BRANCH
+ARG COOLIFY_RESOURCE_UUID
 
-# Deterministic install
+# Copy package metadata (includes lockfile when turbo emits it there)
+COPY --from=prune /repo/out/json/ ./
+
+# Deterministic install (will use lockfile from out/json if present)
 RUN --mount=type=cache,target=/root/.bun \
     bun install --frozen-lockfile
 
 #########################################
-# 3) Build                               #
+# 3) Build                              #
 #########################################
 FROM oven/bun:1.2.18 AS build
 WORKDIR /app
+
+# Optional build args injected by Coolify
+ARG NEXT_PUBLIC_API_URL
+ARG COOLIFY_URL
+ARG COOLIFY_FQDN
+ARG COOLIFY_BRANCH
+ARG COOLIFY_RESOURCE_UUID
+
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV TURBO_TELEMETRY_DISABLED=1
@@ -45,7 +66,7 @@ RUN --mount=type=cache,target=/app/.turbo \
     bunx turbo run build --filter=web
 
 #########################################
-# 4) Runtime (small)                     #
+# 4) Runtime                            #
 #########################################
 FROM node:22-alpine AS runner
 WORKDIR /app
@@ -56,7 +77,6 @@ ENV PORT=3000
 ENV HOST=0.0.0.0
 
 # Copy only what runtime needs
-# (Next start requires .next + public + package.json + node_modules)
 COPY --from=build /app/apps/web/.next ./apps/web/.next
 COPY --from=build /app/apps/web/public ./apps/web/public
 COPY --from=build /app/apps/web/package.json ./apps/web/package.json

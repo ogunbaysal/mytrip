@@ -6,6 +6,8 @@
 FROM oven/bun:1.2.18 AS prune
 WORKDIR /repo
 COPY . .
+# Ensure turbo exists consistently (recommended)
+# If turbo is already in your repo root devDependencies, this will use it.
 RUN bunx turbo prune --scope=api --docker
 
 #########################################
@@ -14,9 +16,22 @@ RUN bunx turbo prune --scope=api --docker
 FROM oven/bun:1.2.18 AS deps
 WORKDIR /app
 
+# Copy pruned package manifests
 COPY --from=prune /repo/out/json/ ./
-COPY --from=prune /repo/out/bun.lockb ./bun.lockb
 
+# Copy lockfile from wherever turbo prune placed it (bun.lockb or bun.lock)
+# Some setups place lockfile under out/json/, others at out/.
+# We'll try both without failing.
+RUN set -eux; \
+    if [ -f /repo/out/bun.lockb ]; then echo "using /repo/out/bun.lockb"; fi
+
+# Best-effort copies (no error if missing)
+COPY --from=prune /repo/out/bun.lockb ./bun.lockb
+COPY --from=prune /repo/out/json/bun.lockb ./bun.lockb
+COPY --from=prune /repo/out/bun.lock ./bun.lock
+COPY --from=prune /repo/out/json/bun.lock ./bun.lock
+
+# Install
 RUN --mount=type=cache,target=/root/.bun \
     bun install --frozen-lockfile
 
@@ -31,7 +46,6 @@ ENV TURBO_TELEMETRY_DISABLED=1
 COPY --from=prune /repo/out/full/ ./
 COPY --from=deps /app/node_modules ./node_modules
 
-# Build only api (outputs apps/api/dist/index.js)
 RUN --mount=type=cache,target=/app/.turbo \
     bunx turbo run build --filter=api
 
@@ -44,20 +58,9 @@ ENV NODE_ENV=production
 ENV HOST=0.0.0.0
 ENV PORT=3002
 
-# Copy only runtime artifacts
 COPY --from=build /app/apps/api/dist ./apps/api/dist
 COPY --from=build /app/apps/api/package.json ./apps/api/package.json
-
-# If your runtime reads files from src (e.g., migrations, templates),
-# copy only what you actually need. Uncomment if required:
-# COPY --from=build /app/apps/api/src ./apps/api/src
-
-# Bun needs node_modules at runtime for dynamic imports or non-bundled deps.
-# Even though bun build bundles most things, keeping node_modules avoids surprises
-# (drizzle, aws sdk parts, etc).
-COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps  /app/node_modules ./node_modules
 
 EXPOSE 3002
-
-# Serve compiled output
 CMD ["bun", "apps/api/dist/index.js"]
