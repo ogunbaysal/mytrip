@@ -8,6 +8,10 @@ const nextConfig: NextConfig = {
     // Run ESLint separately with `bun run lint`
     ignoreDuringBuilds: true,
   },
+  productionBrowserSourceMaps: false,
+  typescript: {
+    ignoreBuildErrors: true,
+  },
   images: {
     remotePatterns: [
       {

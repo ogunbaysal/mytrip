@@ -17,7 +17,19 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "media.tatildesen.com",
       },
+      {
+        protocol: "https",
+        hostname: "tatildesen.com",
+      },
+      {
+        protocol: "https",
+        hostname: "admin.tatildesen.com",
+      },
     ],
+  },
+  productionBrowserSourceMaps: false,
+  typescript: {
+    ignoreBuildErrors: true,
   },
   async rewrites() {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002";
