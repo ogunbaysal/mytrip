@@ -6,28 +6,16 @@
 FROM oven/bun:1.2.22 AS prune
 WORKDIR /repo
 
-# Optional build args injected by Coolify
-ARG NEXT_PUBLIC_API_URL
-ARG COOLIFY_URL
-ARG COOLIFY_FQDN
-ARG COOLIFY_BRANCH
-ARG COOLIFY_RESOURCE_UUID
-
 COPY . .
 
 # Create pruned repo for apps/web
-# Turbo will generate /repo/out/full, /repo/out/json and usually /repo/out/bun.lock
 RUN bunx turbo prune --scope=web --docker
 
-# Ensure the pruned lockfile is available in /repo/out/json as well
-# (DO NOT overwrite /repo/out/bun.lock with /repo/bun.lock)
-RUN if [ -f /repo/out/bun.lock ]; then \
-    cp -f /repo/out/bun.lock /repo/out/json/bun.lock; \
-    elif [ -f /repo/bun.lock ]; then \
-    cp -f /repo/bun.lock /repo/out/bun.lock && cp -f /repo/bun.lock /repo/out/json/bun.lock; \
-    else \
-    echo "ERROR: No bun.lock found in repo root or turbo prune output." && exit 1; \
-    fi
+# Make sure the pruned lockfile exists (fail fast if not)
+RUN test -f /repo/out/bun.lock || (echo "ERROR: turbo prune did not produce /repo/out/bun.lock" && exit 1)
+
+# Also place it in out/json so bun install can use it reliably
+RUN cp -f /repo/out/bun.lock /repo/out/json/bun.lock
 
 
 #########################################
@@ -36,7 +24,7 @@ RUN if [ -f /repo/out/bun.lock ]; then \
 FROM oven/bun:1.2.22 AS deps
 WORKDIR /app
 
-# Toolchain (safe; covers native deps if they appear)
+# Toolchain (safe for native deps if any appear)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     python3 \
@@ -46,7 +34,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy pruned package manifests/workspace + lockfile
+# Copy pruned manifests + lockfile
 COPY --from=prune /repo/out/json/ ./
 
 # Deterministic install
@@ -60,19 +48,20 @@ RUN --mount=type=cache,target=/root/.bun \
 FROM oven/bun:1.2.22 AS build
 WORKDIR /app
 
-ARG NEXT_PUBLIC_API_URL
-ARG COOLIFY_URL
-ARG COOLIFY_FQDN
-ARG COOLIFY_BRANCH
-ARG COOLIFY_RESOURCE_UUID
-
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV TURBO_TELEMETRY_DISABLED=1
 
+# Copy full pruned source
 COPY --from=prune /repo/out/full/ ./
+
+# IMPORTANT: put lockfile where turbo expects it
+COPY --from=prune /repo/out/bun.lock /app/bun.lock
+
+# Bring node_modules from deps stage
 COPY --from=deps /app/node_modules ./node_modules
 
+# Build web
 RUN --mount=type=cache,target=/app/.turbo \
     bunx turbo run build --filter=web
 
