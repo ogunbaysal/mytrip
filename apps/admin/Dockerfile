@@ -1,59 +1,81 @@
 # syntax=docker/dockerfile:1.6
 
-#############################
-# 1) Prune monorepo -> admin
-#############################
-FROM oven/bun:1.2.18 AS prune
+##############################
+# 1) Prune monorepo -> admin #
+##############################
+FROM oven/bun:1.2.22 AS prune
 WORKDIR /repo
+
 COPY . .
+
+# Create pruned repo for apps/admin
 RUN bunx turbo prune --scope=admin --docker
 
+# Make sure the pruned lockfile exists (fail fast if not)
+RUN test -f /repo/out/bun.lock || (echo "ERROR: turbo prune did not produce /repo/out/bun.lock" && exit 1)
+
+# Also place it in out/json so bun install can use it reliably
+RUN cp -f /repo/out/bun.lock /repo/out/json/bun.lock
+
+
 #########################################
-# 2) Install deps in pruned workspace
+# 2) Install deps in pruned workspace   #
 #########################################
-FROM oven/bun:1.2.18 AS deps
+FROM oven/bun:1.2.22 AS deps
 WORKDIR /app
 
-# pruned manifests
+# Toolchain (safe for native deps if any appear)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    python3 \
+    make \
+    g++ \
+    pkg-config \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy pruned manifests + lockfile
 COPY --from=prune /repo/out/json/ ./
 
-# lockfile can be in out/json (common) or out (sometimes), and may be bun.lockb or bun.lock
-# We try both locations + both names.
-COPY --from=prune /repo/out/bun.lockb ./bun.lockb
-COPY --from=prune /repo/out/json/bun.lockb ./bun.lockb
-COPY --from=prune /repo/out/bun.lock ./bun.lock
-COPY --from=prune /repo/out/json/bun.lock ./bun.lock
-
+# Deterministic install
 RUN --mount=type=cache,target=/root/.bun \
     bun install --frozen-lockfile
 
+
 #########################################
-# 3) Build
+# 3) Build                              #
 #########################################
-FROM oven/bun:1.2.18 AS build
+FROM oven/bun:1.2.22 AS build
 WORKDIR /app
+
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV TURBO_TELEMETRY_DISABLED=1
 
+# Copy full pruned source
 COPY --from=prune /repo/out/full/ ./
+
+# IMPORTANT: put lockfile where turbo expects it
+COPY --from=prune /repo/out/bun.lock /app/bun.lock
+
+# Bring node_modules from deps stage
 COPY --from=deps /app/node_modules ./node_modules
 
+# Build admin
 RUN --mount=type=cache,target=/app/.turbo \
     bunx turbo run build --filter=admin
 
+
 #########################################
-# 4) Runtime
+# 4) Runtime                            #
 #########################################
 FROM node:22-alpine AS runner
 WORKDIR /app
+
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3001
 ENV HOST=0.0.0.0
-
-# Recommended for Next standalone if you enable it (optional):
-# ENV NEXT_SHARP_PATH=/app/node_modules/sharp
 
 COPY --from=build /app/apps/admin/.next ./apps/admin/.next
 COPY --from=build /app/apps/admin/public ./apps/admin/public
