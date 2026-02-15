@@ -49,6 +49,9 @@ type PlaceRow = {
   categorySlug: string | null;
   cityName: string | null;
   districtName: string | null;
+  ownerName?: string | null;
+  ownerAvatar?: string | null;
+  ownerCreatedAt?: Date | null;
 };
 
 function toLegacyPlace(row: PlaceRow) {
@@ -692,11 +695,15 @@ app.get("/:slug", async (c) => {
         categorySlug: placeCategory.slug,
         cityName: province.name,
         districtName: district.name,
+        ownerName: user.name,
+        ownerAvatar: sql<string | null>`COALESCE(${user.avatar}, ${user.image})`,
+        ownerCreatedAt: user.createdAt,
       })
       .from(place)
       .leftJoin(placeCategory, eq(place.categoryId, placeCategory.id))
       .leftJoin(province, eq(place.cityId, province.id))
       .leftJoin(district, eq(place.districtId, district.id))
+      .leftJoin(user, eq(place.ownerId, user.id))
       .where(and(eq(place.slug, slug), eq(place.status, "active")))
       .limit(1);
 
@@ -768,11 +775,15 @@ app.get("/:slug", async (c) => {
           categorySlug: placeCategory.slug,
           cityName: province.name,
           districtName: district.name,
+          ownerName: user.name,
+          ownerAvatar: sql<string | null>`COALESCE(${user.avatar}, ${user.image})`,
+          ownerCreatedAt: user.createdAt,
         })
         .from(place)
         .leftJoin(placeCategory, eq(place.categoryId, placeCategory.id))
         .leftJoin(province, eq(place.cityId, province.id))
         .leftJoin(district, eq(place.districtId, district.id))
+        .leftJoin(user, eq(place.ownerId, user.id))
         .where(
           and(
             eq(place.cityId, placeRow.cityId),

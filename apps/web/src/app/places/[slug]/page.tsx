@@ -98,16 +98,13 @@ export default async function PlaceDetailPage({
 
   // Mock data for fields not yet in API
   const host = detail.host ?? {
-    id: "host-1",
-    name: "Ahmet",
-    avatar: "/images/avatars/host-1.jpg",
-    isSuperhost: true,
-    joinedDate: "Mayıs 2021",
-    reviewCount: 12,
-    isVerified: true,
-    responseRate: 100,
-    responseTime: "bir saat içinde",
-    description: "Misafirlerime en iyi deneyimi sunmak için buradayım.",
+    id: detail.id,
+    name: "Ev Sahibi",
+    avatar: "/images/placeholders/image-error.svg",
+    isSuperhost: false,
+    joinedDate: "Yakın zamanda katıldı",
+    reviewCount: detail.reviewCount ?? 0,
+    isVerified: false,
   };
 
   const ratings = detail.ratings ?? {

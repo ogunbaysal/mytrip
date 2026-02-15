@@ -209,6 +209,10 @@ type APIPlace = {
   featured: boolean;
   views: number;
   bookingCount: number;
+  ownerId?: string | null;
+  ownerName?: string | null;
+  ownerAvatar?: string | null;
+  ownerCreatedAt?: string | Date | null;
 };
 
 function safelyParseJSON<T>(
@@ -294,6 +298,18 @@ function toNullableNumber(value: unknown): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function formatHostJoinedDate(value: APIPlace["ownerCreatedAt"]): string {
+  if (!value) return "Yakın zamanda katıldı";
+
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "Yakın zamanda katıldı";
+
+  return new Intl.DateTimeFormat("tr-TR", {
+    month: "long",
+    year: "numeric",
+  }).format(date);
+}
+
 function mapBackendPlaceToSummary(place: APIPlace): PlaceSummary {
   const images = safelyParseJSON<string[]>(place.images, []);
   const location = parseCoordinates(place.location);
@@ -334,6 +350,9 @@ function mapBackendPlaceToDetail(
   const features = safelyParseJSON<string[]>(place.features, []);
 
   const shortHighlights = features.slice(0, 3).map((f) => f.replace(/_/g, " "));
+  const hostName = place.ownerName?.trim();
+  const hostAvatar =
+    place.ownerAvatar?.trim() || "/images/placeholders/image-error.svg";
 
   return {
     ...summary,
@@ -344,6 +363,17 @@ function mapBackendPlaceToDetail(
     amenities: mapFeaturesToAmenities(features),
     checkInInfo: safelyParseJSON<any>(place.checkInInfo, null)?.checkIn,
     checkOutInfo: safelyParseJSON<any>(place.checkOutInfo, null)?.checkOut,
+    host: hostName
+      ? {
+          id: place.ownerId || place.id,
+          name: hostName,
+          avatar: hostAvatar,
+          joinedDate: formatHostJoinedDate(place.ownerCreatedAt),
+          reviewCount: place.reviewCount ?? 0,
+          isVerified: place.verified,
+          isSuperhost: false,
+        }
+      : undefined,
     featuredCollections: [],
     nearbyPlaces: nearbyPlaces.map(mapBackendPlaceToSummary),
   };

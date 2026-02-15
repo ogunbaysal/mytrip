@@ -1,77 +1,160 @@
-# Product Requirements Document (PRD) — TatilDesen
+# Product Requirements Document (PRD) - TatilDesen
 
-## 1) Executive Summary
-- TatilDesen is a curated travel discovery platform for Muğla, Türkiye, highlighting premium stays, dining, and experiences through a visually rich, map-enabled web app (Next.js 15).
-- Current build delivers static, editor-curated content (places, collections, blog stories) with location-aware filtering and detailed itineraries; API layer exists primarily for authentication and is not yet wired to dynamic listings.
-- Goal: validate traveler demand and concierge/lead capture in Muğla, then scale with real inventory, owner onboarding, and admin operations.
+## 1) Document Scope
+This PRD reflects the **currently implemented product** in the monorepo as of **February 15, 2026**, plus near-term product direction.
 
-## 2) Product Vision
-Deliver a trusted, local-first discovery and planning companion for Muğla that surfaces a small, high-quality set of vetted stays and experiences, pairs them with ready-to-use itineraries, and offers human or digital concierge handoff.
+## 2) Executive Summary
+TatilDesen is a travel discovery and business onboarding platform for Türkiye (with a Muğla-first content focus), composed of:
+- a public traveler web app (`apps/web`),
+- an owner-facing dashboard inside the same web app,
+- an admin panel (`apps/admin`),
+- a Bun + Hono API (`apps/api`) backed by PostgreSQL (Drizzle ORM), Better Auth, and object storage uploads.
 
-## 3) Target Users / Personas
-- **Premium Leisure Traveler (P0)**: 28–45, urban professional/couple, mid-high spend, wants tasteful, low-effort curation; values trust, design, and local tips.
-- **Boutique Host / Experience Operator (P1)**: Villa/hotel/restaurant/experience owner seeking qualified demand and higher ADR via better storytelling; needs easy onboarding and guidance.
-- **TatilDesen Operations (P0)**: Small internal team curating listings, managing content, and handling concierge inquiries; needs simple tooling and approvals.
+The product is no longer static-only. Core content and operational flows are API-driven: places, collections, blog posts/comments, search, reviews, subscriptions, business registration/approval, owner CRUD, and admin moderation/operations.
 
-## 4) Problem Statement
-Travelers struggle to find trustworthy, design-forward stays and authentic experiences in Muğla without sifting through noisy marketplaces. Local hosts lack a premium channel to reach the right guests. TatilDesen must provide a high-signal catalog, clear itineraries, and low-friction contact paths while keeping operational overhead low.
+## 3) Product Vision
+Provide a trusted discovery and conversion platform where:
+- travelers can discover curated places/content quickly,
+- businesses can onboard, subscribe, and manage listings/content,
+- operations can approve, moderate, and manage platform health from a dedicated admin surface.
 
-## 5) Solution Overview
-- **Traveler Web (apps/web, Next.js 15)**: Home discovery (hero, categories), featured places, map-enabled search, filtered results, rich place detail pages, curated collections with itineraries, and an editorial blog. Contact/support pages exist for lead capture (currently static).
-- **API (apps/api, Hono + Better Auth)**: Authentication scaffold (email + verification) with Postgres/Drizzle schema for users/sessions/accounts; no live listings endpoints yet.
-- **Admin / Dashboard (apps/admin & apps/dashboard)**: Placeholder Next.js apps; not implemented.
-- **Data model (web)**: Place summaries and details, collections with itineraries, and blog posts seeded as static content; API URL env var enables swapping to live data when ready.
-- **Maps & Localization**: Leaflet + OSM tiles for geospatial context; UI/content primarily Turkish, with English planned.
+## 4) User Personas
+- **Traveler (P0):** Browses places, collections, and blog content; uses filters, maps, and search.
+- **Business Owner (P0):** Registers business, subscribes, manages places/blog posts, submits content for approval.
+- **Admin / Operations (P0):** Manages users, admins/roles, places, reviews, blog, subscriptions, coupons/plans, approvals, analytics, and settings.
 
-## 6) Success Metrics (MVP validation, 90 days)
-- 1.5k+ monthly unique visitors; 30%+ click-through from home to place detail.
-- 20%+ of place-detail visitors engage with contact/CTA (scroll to price/CTA, click-out, or form start).
-- <3s LCP on core pages; <1% client error rate across API calls.
-- Content trust: avg. rating proxy ≥4.7 on featured set (until real reviews exist, use qualitative feedback/NPS ≥45).
+## 5) Current Functional Scope
 
-## 7) Feature Requirements
-| Feature | Description | User Benefit | Acceptance Criteria | Priority |
-| --- | --- | --- | --- | --- |
-| Home discovery | Hero, category pills, featured places/collections with Muğla focus | Fast path to inspiration without searching | Page loads with curated sections; links deep-link to listings/collections; responsive layout | P0 |
-| Search & filters | Location text, stay type selector, optional dates/guests; updates list | Quickly narrows to relevant stays/experiences | Filters persist in store; results reflect type/location; empty-state shown when none match | P0 |
-| Map browse | Leaflet/OSM map with pins for current result set | Geospatial confidence and context | Map fits bounds of results; clicking pin shows name/location; works on mobile/desktop | P0 |
-| Place listing page | Card grid with price, rating, location tag | Scannable comparison of options | Cards render data and link to `/places/[slug]`; loading/empty states present; responsive grid | P0 |
-| Place detail page | Hero, highlights, gallery, amenities, map, nearby suggestions, price card, reservation calendar UI | Rich confidence to inquire/book | Static detail renders for all seeded slugs; map centers on coordinates; CTA visible; nearby/collections sections show when data exists | P0 |
-| Collections | Listing page + detail pages with highlights, itinerary, tips, and featured places | Ready-made plans to reduce planning time | All seeded collection slugs resolve; itinerary/tips display; related places link correctly | P0 |
-| Blog | Category filter (rehber/deneyim/gurme/mikrotrend), hero story, list of posts | Brand credibility and SEO surface | Category filter works; posts sorted by date; cards link (static for now) | P1 |
-| Contact & Support | Static contact cards and FAQ; form UI | Lead capture and reassurance | Pages render; mailto/WhatsApp links work; form UI present (submission not yet wired) | P1 |
-| Authentication (API) | Better Auth email/password with verification; Drizzle schema for auth tables | Foundation for gated owner/admin flows | Auth routes mount under `AUTH_BASE_PATH`; secrets required; db adapter configured; email sending stubbed in non-prod | P1 |
-| Internationalization (planned) | Turkish primary; English fallback planned | Serve domestic + intl users | Turkish content default; ability to extend to English without breaking routes | P2 |
+### 5.1 Public Web (`apps/web`)
+- Home with hero, category, destinations, featured places, featured collections, and latest blogs.
+- Place discovery:
+  - list page with URL-driven filters and pagination,
+  - map/list view,
+  - type, city/district, amenities, price, featured/verified filters,
+  - bounds-based map search support.
+- Place detail pages with gallery/media, amenities, map context, and metadata.
+- Collections:
+  - listing and detail pages,
+  - featured collections,
+  - itinerary/tips/highlights and related place hydration.
+- Blog:
+  - listing with category/filters,
+  - detail pages,
+  - comments list + submit.
+- Search and content support pages:
+  - login/register/profile,
+  - about/contact/support/privacy/terms/cookies/careers,
+  - pricing and subscription checkout.
 
-## 8) Non-Functional Requirements
-- **Performance**: Core pages LCP <3s on 4G; map loading non-blocking; image optimization via Next Image.
-- **Reliability**: Graceful fallback to static data when API URL missing; handle empty/error states in queries.
-- **Security & Privacy**: TLS in production; auth secrets required; no PII persisted in client state; forms should avoid collecting sensitive data until backend is ready.
-- **Compliance**: Prepare for KVKK/GDPR (consent for tracking, data deletion flow) before enabling analytics or persistence.
-- **Accessibility**: Keyboard navigable; semantic headings; alt text for images; sufficient color contrast.
+### 5.2 Web Auth + Profile
+- Dedicated Better Auth namespace for web users at `/api/web/auth/*`.
+- Session refresh endpoint at `/api/refresh-session`.
+- User profile read/update (`/api/profile`, `/api/profile/update`).
+- Role-aware UX for owner-protected dashboard screens.
 
-## 9) Constraints & Dependencies
-- Listings/collections/blog data are static seed files; no CMS or database-backed content yet.
-- Contact/support forms are UI-only; no submission handler or CRM integration.
-- Payments/booking, reviews, and owner dashboards are out of current scope.
-- Admin and dashboard apps are placeholders; ops must be handled manually/offline.
-- Maps rely on OpenStreetMap tiles; ensure usage complies with rate limits for production.
-- API currently only exposes auth; any listing data must be added before removing static fallbacks.
+### 5.3 Business Registration + Owner Flows (`apps/web` + `apps/api`)
+- Business registration wizard (`/business/register`).
+- Registration lifecycle:
+  - pending / approved / rejected handling,
+  - business profile update endpoint for approved owners.
+- Owner dashboard modules (`/dashboard/*`):
+  - overview (subscription + usage),
+  - place management (list/create/edit/delete/submit),
+  - blog management (list/create/edit/delete/publish),
+  - subscription management.
+- Uploads for owner content and business documents via `/api/owner/upload`.
 
-## 10) Release Plan (high level)
-- **Phase 1 – Beta Discovery (Now → +2 weeks)**: Stabilize web UX, ensure all seeded content renders, harden error states, instrument analytics, wire contact form to email/CRM, finalize env configuration.
-- **Phase 2 – Live Data & Lead Ops (Next 4–6 weeks)**: Stand up listings/collections/blog endpoints backed by Postgres; replace static data with API; add basic admin content curation tools; enable simple lead capture pipeline (email/webhook).
-- **Phase 3 – Host Onboarding & Payments (Post-MVP)**: Build owner dashboard basics, role-based access, listing submission/approval, and scoped payment/concierge workflows; introduce English content and SEO hardening.
+### 5.4 Subscription & Billing Domain
+- Public subscription APIs:
+  - plans,
+  - current subscription,
+  - coupon validation,
+  - create/cancel subscription,
+  - usage reporting.
+- Coupon scope and redemption accounting implemented in schema/routes.
+- Payment provider interface exists; current implementation uses a mocked Iyzico provider flow.
 
-## 11) Open Questions
-- What is the primary conversion action for MVP (concierge contact, WhatsApp click, email lead, or provisional booking request)?
-- Which operational tool will manage inbound leads (CRM, shared inbox, ticketing), and how should the contact form post data?
-- What data source and governance will replace static seeds (CMS vs. bespoke backend), and who owns curation?
-- Are payments and bookings planned for near-term, or is the strategy to remain lead-gen/concierge initially?
-- What is the minimum acceptable coverage of listings/collections to launch (count and category mix)?
-- English rollout: which pages must be bilingual for launch vs. later?
+### 5.5 Admin Panel (`apps/admin`)
+- Admin login + protected dashboard.
+- CRUD/management surfaces implemented for:
+  - admins and roles,
+  - users,
+  - places,
+  - categories,
+  - blog posts/categories/comments,
+  - subscriptions/plans/coupons/payments,
+  - approvals (business registrations and owner place submissions),
+  - analytics,
+  - settings.
+- File upload support via `/api/admin/upload`.
 
-## 12) Appendices
-- **Architecture**: Turborepo; apps/web (Next.js 15, React 19, Tailwind v4, React Query, Zustand, Leaflet), apps/api (Hono, Better Auth, Drizzle, Postgres, Bun), apps/admin & apps/dashboard (placeholders).
-- **Key Data Structures (web)**: `PlaceSummary` (id, slug, name, price, rating, coords, type/category), `PlaceDetail` (hero image, gallery, highlights, amenities, collections, nearby), `CollectionDetail` (itinerary, tips, featured places), `BlogPost` (category, excerpt, cover, publish date).
-- **Environment**: `NEXT_PUBLIC_API_URL` optional for data; API requires `BETTER_AUTH_SECRET`/`AUTH_SECRET`, `BETTER_AUTH_URL`, and DB URL for Drizzle/Better Auth; map uses OSM tiles without an API key.
+### 5.6 API Surface (`apps/api`)
+- Public APIs: `places`, `collections`, `blog`, `reviews`, `search`.
+- Operational APIs: `business`, `subscriptions`, `profile`, `locations`, `refresh-session`.
+- Owner APIs: `owner/places`, `owner/blogs`, `owner/upload`.
+- Admin APIs: `admin/*` domains for auth, operations, moderation, approvals, analytics, content, subscription stack.
+- Auth split:
+  - admin auth: `/api/auth/*`,
+  - web auth: `/api/web/auth/*`.
+
+## 6) Data & Platform Architecture
+- **Monorepo:** Turborepo with `apps/web`, `apps/admin`, `apps/api`.
+- **Database:** PostgreSQL + Drizzle schema modules:
+  - auth (admin + web users + sessions/accounts),
+  - places + amenities + media,
+  - collections,
+  - blog + categories + images + comments,
+  - reviews,
+  - bookings,
+  - subscriptions + plans/features + coupons + payments + redemptions,
+  - business registration/profile,
+  - locations,
+  - settings,
+  - analytics events,
+  - files.
+- **Uploads/Object Storage:** S3-compatible storage (MinIO envs currently used).
+- **Frontend Data Layer:** TanStack Query in both web and admin apps.
+
+## 7) Non-Functional Requirements
+- **Performance:** list endpoints paginated; frontend query caching via TanStack Query; image/media hydration optimized by mapping file IDs.
+- **Security:** Better Auth session cookies, CORS allowlist, admin route middleware, role/status checks on protected operations.
+- **Reliability:** graceful API error messaging in web/admin API clients; fallback parsing for JSON payload inconsistencies.
+- **Localization:** Turkish-first UX/content with language fields in blog domain (`tr`, `en`).
+
+## 8) Known Gaps / Risks
+- Automated tests are currently minimal/absent for critical API and UI domains.
+- Payment integration is mocked (no live gateway completion yet).
+- Some routes retain backward-compat alias fields during schema migration (technical debt).
+- Admin frontend uses mixed API calling styles (absolute base URL client + some relative fetches), which can produce environment-specific behavior.
+- Analytics “quick actions” UI elements include placeholders and are not all wired to explicit actions.
+
+## 9) Success Metrics (Next Iteration)
+- Traveler conversion:
+  - place detail CTR from listing/home,
+  - checkout starts from pricing,
+  - business registration completion rate.
+- Owner activation:
+  - approved registration rate,
+  - first place published,
+  - first blog submitted.
+- Ops efficiency:
+  - median approval time (business/place),
+  - moderation backlog size,
+  - failed admin action rate.
+- Platform quality:
+  - API error rate,
+  - P95 list endpoint latency,
+  - upload success rate.
+
+## 10) Near-Term Roadmap
+- Harden and test owner/admin critical flows (subscriptions, approvals, upload, moderation).
+- Complete live payment gateway implementation and reconciliation.
+- Standardize API access patterns across admin and web frontends.
+- Expand analytics/reporting from event ingestion to decision-ready dashboards.
+- Add deeper QA coverage (API integration tests + frontend smoke tests).
+
+## 11) Open Product Questions
+- Which conversion event is the primary north-star in the next quarter: subscription purchase, approved business onboarding, or traveler lead actions?
+- Should travelers have authenticated booking creation in the immediate roadmap, or remain discovery-first?
+- What SLA should be enforced for business/place approval workflows?
+- Which admin actions require stricter RBAC granularity beyond current role checks?
