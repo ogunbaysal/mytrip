@@ -8,9 +8,14 @@ FROM node:22-bookworm-slim AS base
 # Bun version (match your repo)
 ARG BUN_VERSION=1.2.18
 
-# System deps: git for prune, build toolchain for native addons
+# System deps:
+# - unzip: required by bun installer
+# - git: for turbo prune
+# - python3/make/g++/pkg-config: native addons (node-gyp toolchain)
+# - ca-certificates/curl: download bun
+# - xz-utils: sometimes used by installers/assets
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates curl git \
+    ca-certificates curl unzip xz-utils git \
     python3 make g++ pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
