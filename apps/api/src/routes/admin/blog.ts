@@ -23,8 +23,8 @@ import {
   syncBlogImages,
   withDefaultPublishedAt,
 } from "../../lib/blog-relations.ts";
+import { getAdminUserFromContext } from "../../lib/admin-context.ts";
 import { resolvePublicFileUrl } from "../../lib/place-relations.ts";
-import { getSessionFromRequest } from "../../lib/session.ts";
 
 const app = new Hono();
 
@@ -874,8 +874,8 @@ app.post("/", async (c) => {
   try {
     const payload = await c.req.json();
     const title = String(payload.title || "").trim();
-    const session = await getSessionFromRequest(c);
-    const fallbackAuthorId = session?.user?.id ?? null;
+    const adminUser = getAdminUserFromContext(c);
+    const fallbackAuthorId = adminUser?.id ?? null;
 
     if (title.length < 2) {
       return c.json({ error: "Invalid title", message: "Title is required" }, 400);
