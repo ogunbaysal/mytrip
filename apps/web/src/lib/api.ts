@@ -23,6 +23,130 @@ type OwnerUploadUsage =
   | "blog_content"
   | "other";
 
+type ZodIssueLike = {
+  path?: Array<string | number>;
+  message?: string;
+};
+
+type APIErrorLike = {
+  name?: string;
+  message?: string;
+  issues?: ZodIssueLike[] | string;
+};
+
+type APIErrorResponse = {
+  success?: boolean;
+  message?: string;
+  error?: string | APIErrorLike;
+};
+
+const FIELD_LABELS: Record<string, string> = {
+  checkInInfo: "Check-in bilgisi",
+  checkOutInfo: "Check-out bilgisi",
+};
+
+const STATUS_MESSAGES: Record<number, string> = {
+  400: "Gönderilen bilgiler doğrulanamadı. Lütfen alanları kontrol edin.",
+  401: "Oturum süreniz dolmuş olabilir. Lütfen tekrar giriş yapın.",
+  403: "Bu işlem için yetkiniz bulunmuyor.",
+  404: "İstenen kayıt bulunamadı.",
+  409: "Bu işlem mevcut verilerle çakışıyor.",
+  429: "Çok fazla istek gönderildi. Lütfen biraz sonra tekrar deneyin.",
+  500: "Sunucu hatası oluştu. Lütfen tekrar deneyin.",
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function parseZodIssues(value: unknown): ZodIssueLike[] {
+  if (Array.isArray(value)) {
+    return value.filter(isRecord).map((issue) => ({
+      path: Array.isArray(issue.path)
+        ? issue.path.filter(
+            (part): part is string | number =>
+              typeof part === "string" || typeof part === "number",
+          )
+        : undefined,
+      message: typeof issue.message === "string" ? issue.message : undefined,
+    }));
+  }
+
+  if (typeof value === "string") {
+    try {
+      return parseZodIssues(JSON.parse(value));
+    } catch {
+      return [];
+    }
+  }
+
+  return [];
+}
+
+function formatZodIssues(issues: ZodIssueLike[]): string | null {
+  if (issues.length === 0) return null;
+
+  const fields = issues
+    .map((issue) => issue.path?.[0])
+    .filter((field): field is string => typeof field === "string");
+
+  const uniqueFields = [...new Set(fields)];
+  if (uniqueFields.length === 0) {
+    return "Gönderilen bilgiler doğrulanamadı. Lütfen alanları kontrol edin.";
+  }
+
+  const readableFields = uniqueFields.map((field) => FIELD_LABELS[field] || field);
+  return `Geçersiz alanlar: ${readableFields.join(", ")}.`;
+}
+
+function getAPIErrorMessage(payload: unknown, status: number): string {
+  if (typeof payload === "string" && payload.trim().length > 0) {
+    return payload;
+  }
+
+  if (isRecord(payload)) {
+    const data = payload as APIErrorResponse;
+
+    if (typeof data.message === "string" && data.message.trim().length > 0) {
+      return data.message;
+    }
+
+    if (typeof data.error === "string" && data.error.trim().length > 0) {
+      return data.error;
+    }
+
+    if (isRecord(data.error)) {
+      const apiError = data.error as APIErrorLike;
+      const issuesFromList = parseZodIssues(apiError.issues);
+      const issuesFromMessage =
+        issuesFromList.length === 0 ? parseZodIssues(apiError.message) : [];
+      const formattedIssues = formatZodIssues([
+        ...issuesFromList,
+        ...issuesFromMessage,
+      ]);
+
+      if (formattedIssues) return formattedIssues;
+
+      if (
+        apiError.name === "ZodError" &&
+        (!apiError.message || apiError.message.startsWith("["))
+      ) {
+        return STATUS_MESSAGES[400];
+      }
+
+      if (
+        typeof apiError.message === "string" &&
+        apiError.message.trim().length > 0 &&
+        !apiError.message.startsWith("[")
+      ) {
+        return apiError.message;
+      }
+    }
+  }
+
+  return STATUS_MESSAGES[status] || "İstek sırasında bir hata oluştu.";
+}
+
 async function request<T>(
   endpoint: string,
   options?: RequestOptions,
@@ -41,7 +165,19 @@ async function request<T>(
 
   if (!response.ok) {
     if (response.status === 404) return null as any;
-    throw new Error(`API request failed with status ${response.status}`);
+
+    const rawBody = await response.text();
+    let payload: unknown = null;
+
+    if (rawBody.trim().length > 0) {
+      try {
+        payload = JSON.parse(rawBody);
+      } catch {
+        payload = rawBody;
+      }
+    }
+
+    throw new Error(getAPIErrorMessage(payload, response.status));
   }
 
   return response.json() as Promise<T>;

@@ -16,6 +16,7 @@ import {
   Calendar,
   TrendingUp,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -72,7 +73,7 @@ export default function BlogsPage() {
     },
     onError: (error: Error) => {
       console.error("Delete error:", error);
-      alert(error.message || "Silme işlemi başarısız oldu");
+      toast.error(error.message || "Silme işlemi başarısız oldu");
     },
   });
 

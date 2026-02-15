@@ -5,6 +5,7 @@ import type { Route } from "next";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { authClient } from "@/lib/auth-client";
 import { resolveSafeRedirect } from "@/lib/redirect";
 import { Button } from "@/components/ui/button";
@@ -47,7 +48,7 @@ function LoginPageContent() {
     },
     onError: (error: Error) => {
       console.error("Login failed:", error);
-      alert(error.message);
+      toast.error(error.message || "Giriş işlemi başarısız oldu");
     },
   });
 

@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import type { Route } from "next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, Check, CreditCard, Lock } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -153,7 +154,9 @@ function CheckoutForm() {
       router.push("/dashboard" as Route);
     },
     onError: (error: Error) => {
-      alert(error.message || "Odeme islemi basarisiz oldu. Lutfen tekrar deneyiniz.");
+      toast.error(
+        error.message || "Odeme islemi basarisiz oldu. Lutfen tekrar deneyiniz.",
+      );
     },
   });
 

@@ -1,32 +1,27 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
 import Link from "next/link";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useParams, useRouter } from "next/navigation";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
+import { toast } from "sonner";
 import {
-  Save,
-  MapPin,
-  Upload,
   AlertTriangle,
   Building2,
-  Phone,
-  Globe,
-  Mail,
-  DollarSign,
-  ImageIcon,
-  Info,
   ChevronLeft,
-  Eye,
   Clock,
-  Wifi,
-  Car,
-  Wind,
-  Waves,
-  Sparkles,
-  CheckCircle2,
+  DollarSign,
+  Eye,
+  FileText,
+  Info,
+  Mail,
+  MapPin,
+  Phone,
+  Save,
+  Upload,
 } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -37,103 +32,166 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { TipTapEditor } from "@/components/ui/tiptap-editor";
 import { CoordinateMapPicker } from "@/components/ui/coordinate-map-picker";
+import { GalleryUpload } from "@/components/ui/gallery-upload";
 import {
-  PageHeader,
   DashboardCard,
-  ProgressBar,
+  PageHeader,
   SectionHeader,
   StatusBadge,
 } from "@/components/dashboard";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
-const PLACE_TYPES = [
-  { value: "hotel", label: "Otel/Pansiyon" },
-  { value: "villa", label: "Villa" },
-  { value: "restaurant", label: "Restoran" },
-  { value: "cafe", label: "Kafe" },
-  { value: "activity", label: "Aktivite/Tur" },
-  { value: "attraction", label: "Gezi Yeri" },
-];
-
-const PRICE_LEVELS = [
-  { value: "", label: "Seçiniz" },
-  { value: "budget", label: "Ekonomik" },
-  { value: "moderate", label: "Orta" },
-  { value: "expensive", label: "Lüks" },
-  { value: "luxury", label: "Ultra Lüks" },
-];
-
-const FEATURES = [
-  { id: "wifi", label: "Ücretsiz WiFi", icon: Wifi },
-  { id: "parking", label: "Ücretsiz Otopark", icon: Car },
-  { id: "pool", label: "Yüzme Havuzu", icon: Waves },
-  { id: "ac", label: "Klima", icon: Wind },
-  { id: "spa", label: "SPA", icon: Sparkles },
-  { id: "24h", label: "24 Saat Resepsiyon", icon: Clock },
-];
-
 const DEFAULT_COORDS = { lat: 39.0, lng: 35.0 };
+
+const FEATURE_OPTIONS = [
+  { id: "wifi", label: "Wi-Fi" },
+  { id: "parking", label: "Otopark" },
+  { id: "pool", label: "Havuz" },
+  { id: "spa", label: "Spa & Wellness" },
+  { id: "restaurant", label: "Restoran" },
+  { id: "bar", label: "Bar" },
+  { id: "air_conditioning", label: "Klima" },
+  { id: "sea_view", label: "Deniz Manzarası" },
+  { id: "beach_access", label: "Plaja Erişim" },
+  { id: "family_friendly", label: "Aile Dostu" },
+];
+
+type FormState = {
+  name: string;
+  categoryId: string;
+  shortDescription: string;
+  description: string;
+  address: string;
+  cityId: string;
+  districtId: string;
+  location: { lat: number; lng: number };
+  contactInfo: { phone: string; email: string; website: string };
+  nightlyPrice: string;
+  features: string[];
+  images: string[];
+  businessDocumentFileId: string;
+  businessDocumentUrl: string;
+  businessDocumentFilename: string;
+  checkInInfo: string;
+  checkOutInfo: string;
+};
+
+function parseJSON<T>(value: unknown, fallback: T): T {
+  if (!value) return fallback;
+  if (typeof value === "object") return value as T;
+
+  if (typeof value === "string") {
+    try {
+      return JSON.parse(value) as T;
+    } catch {
+      return fallback;
+    }
+  }
+
+  return fallback;
+}
+
+function toStringArray(value: unknown): string[] {
+  const parsed = parseJSON<unknown>(value, value);
+  if (!Array.isArray(parsed)) return [];
+  return parsed.map((item) => String(item)).filter(Boolean);
+}
+
+function normalizeCoordinates(value: unknown): { lat: number; lng: number } {
+  const parsed = parseJSON<{ lat?: unknown; lng?: unknown }>(value, DEFAULT_COORDS);
+  const lat = Number(parsed.lat);
+  const lng = Number(parsed.lng);
+
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return DEFAULT_COORDS;
+  }
+
+  return { lat, lng };
+}
+
+function extractCheckInfo(value: unknown, key: "checkIn" | "checkOut"): string {
+  const parsed = parseJSON<{ checkIn?: unknown; checkOut?: unknown } | string>(
+    value,
+    "",
+  );
+
+  if (typeof parsed === "string") return parsed;
+  const nested = parsed[key];
+  return typeof nested === "string" ? nested : "";
+}
 
 export default function EditPlacePage() {
   const router = useRouter();
   const params = useParams();
-  const placeId = params.id as string;
   const queryClient = useQueryClient();
+  const placeId = params.id as string;
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormState>({
     name: "",
-    type: "hotel" as string,
     categoryId: "",
-    category: "",
-    description: "",
     shortDescription: "",
+    description: "",
     address: "",
-    city: "",
-    district: "",
-    location: { lat: 0, lng: 0 },
+    cityId: "",
+    districtId: "",
+    location: DEFAULT_COORDS,
     contactInfo: { phone: "", email: "", website: "" },
-    priceLevel: "" as string,
-    nightlyPrice: 0,
-    features: [] as string[],
-    images: [] as string[],
-    openingHours: {},
+    nightlyPrice: "",
+    features: [],
+    images: [],
+    businessDocumentFileId: "",
+    businessDocumentUrl: "",
+    businessDocumentFilename: "",
     checkInInfo: "",
     checkOutInfo: "",
   });
 
-  const [imageUrl, setImageUrl] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isBusinessDocumentUploading, setIsBusinessDocumentUploading] =
+    useState(false);
   const [hasChanges, setHasChanges] = useState(false);
 
-  const { data: placeData, isLoading } = useQuery({
+  const { data: placeData, isLoading: isPlaceLoading } = useQuery({
     queryKey: ["owner-place-detail", placeId],
     queryFn: () => api.owner.places.getById(placeId),
-    enabled: !!placeId,
+    enabled: Boolean(placeId),
   });
 
-  const place = placeData?.place;
+  const { data: categoriesData, isLoading: isCategoriesLoading } = useQuery({
+    queryKey: ["owner-place-categories"],
+    queryFn: () => api.owner.places.categories(),
+  });
 
   const { data: citiesData, isLoading: isCitiesLoading } = useQuery({
     queryKey: ["place-location-cities"],
     queryFn: () => api.locations.cities(),
   });
 
-  const cities = citiesData?.cities ?? [];
-  const selectedCity = useMemo(
-    () => cities.find((city) => city.name === formData.city) ?? null,
-    [cities, formData.city],
-  );
-  const selectedCityId = selectedCity?.id ?? "";
-
   const { data: districtsData, isLoading: isDistrictsLoading } = useQuery({
-    queryKey: ["place-location-districts", selectedCityId],
-    queryFn: () => api.locations.districts(selectedCityId),
-    enabled: Boolean(selectedCityId),
+    queryKey: ["place-location-districts", formData.cityId],
+    queryFn: () => api.locations.districts(formData.cityId),
+    enabled: Boolean(formData.cityId),
   });
 
+  const place = placeData?.place;
+  const categories = categoriesData?.categories ?? [];
+  const cities = citiesData?.cities ?? [];
   const districts = districtsData?.districtItems ?? [];
+
+  const selectedCityName = useMemo(
+    () => cities.find((city) => city.id === formData.cityId)?.name ?? place?.city ?? "",
+    [cities, formData.cityId, place?.city],
+  );
+
+  const selectedDistrictName = useMemo(
+    () =>
+      districts.find((district) => district.id === formData.districtId)?.name ??
+      place?.district ??
+      "",
+    [districts, formData.districtId, place?.district],
+  );
 
   const resolveCoordinates = (
     latitude: number | null | undefined,
@@ -152,111 +210,223 @@ export default function EditPlacePage() {
   };
 
   useEffect(() => {
-    if (place) {
-      const parseJSON = (val: any, fallback: any) => {
-        if (!val) return fallback;
-        if (typeof val === "string") {
-          try {
-            return JSON.parse(val);
-          } catch {
-            return fallback;
-          }
-        }
-        return val;
-      };
+    if (!place) return;
 
-      setFormData({
-        name: place.name || "",
-        type: place.type || "hotel",
-        categoryId: place.categoryId || "",
-        category: place.category || "",
-        description: place.description || "",
-        shortDescription: place.shortDescription || "",
-        address: place.address || "",
-        city: place.city || "",
-        district: place.district || "",
-        location: parseJSON(place.location, { lat: 0, lng: 0 }),
-        contactInfo: parseJSON(place.contactInfo, {
-          phone: "",
-          email: "",
-          website: "",
-        }),
-        priceLevel: place.priceLevel || "",
-        nightlyPrice: parseFloat(place.nightlyPrice || "0"),
-        features: parseJSON(place.features, []),
-        images: parseJSON(place.images, []),
-        openingHours: parseJSON(place.openingHours, {}),
-        checkInInfo: place.checkInInfo || "",
-        checkOutInfo: place.checkOutInfo || "",
-      });
-    }
+    const contactInfo = parseJSON<{ phone?: string; email?: string; website?: string }>(
+      place.contactInfo,
+      {},
+    );
+
+    setFormData({
+      name: place.name || "",
+      categoryId: place.categoryId || "",
+      shortDescription: place.shortDescription || "",
+      description: place.description || "",
+      address: place.address || "",
+      cityId: place.cityId || "",
+      districtId: place.districtId || "",
+      location: normalizeCoordinates(place.location),
+      contactInfo: {
+        phone: contactInfo.phone || "",
+        email: contactInfo.email || "",
+        website: contactInfo.website || "",
+      },
+      nightlyPrice: place.nightlyPrice ? String(place.nightlyPrice) : "",
+      features: toStringArray(place.features),
+      images: toStringArray(place.images),
+      businessDocumentFileId:
+        place.businessDocumentFileId || place.businessDocument?.id || "",
+      businessDocumentUrl: place.businessDocument?.url || "",
+      businessDocumentFilename: place.businessDocument?.filename || "",
+      checkInInfo: extractCheckInfo(place.checkInInfo, "checkIn"),
+      checkOutInfo: extractCheckInfo(place.checkOutInfo, "checkOut"),
+    });
+
+    setHasChanges(false);
   }, [place]);
 
+  useEffect(() => {
+    if (!place?.city || formData.cityId || cities.length === 0) return;
+
+    const matchedCity = cities.find((city) => city.name === place.city);
+    if (!matchedCity) return;
+
+    setFormData((previous) => ({
+      ...previous,
+      cityId: matchedCity.id,
+    }));
+  }, [cities, formData.cityId, place?.city]);
+
+  useEffect(() => {
+    if (!place?.district || formData.districtId || districts.length === 0) return;
+
+    const matchedDistrict = districts.find(
+      (district) => district.name === place.district,
+    );
+    if (!matchedDistrict) return;
+
+    setFormData((previous) => ({
+      ...previous,
+      districtId: matchedDistrict.id,
+    }));
+  }, [districts, formData.districtId, place?.district]);
+
+  const setFormState = (updater: (previous: FormState) => FormState) => {
+    setFormData((previous) => updater(previous));
+    setHasChanges(true);
+  };
+
+  const setField = <K extends keyof FormState>(field: K, value: FormState[K]) => {
+    setFormState((previous) => ({ ...previous, [field]: value }));
+  };
+
+  const toggleFeature = (featureId: string) => {
+    setFormState((previous) => ({
+      ...previous,
+      features: previous.features.includes(featureId)
+        ? previous.features.filter((item) => item !== featureId)
+        : [...previous.features, featureId],
+    }));
+  };
+
+  const handleBusinessDocumentUpload = async (
+    event: ChangeEvent<HTMLInputElement>,
+  ) => {
+    const selectedFile = event.target.files?.[0];
+    if (!selectedFile) return;
+
+    try {
+      setIsBusinessDocumentUploading(true);
+      const response = await api.owner.upload.single(
+        selectedFile,
+        "business_document",
+      );
+      setFormState((previous) => ({
+        ...previous,
+        businessDocumentFileId: response.fileId,
+        businessDocumentUrl: response.url,
+        businessDocumentFilename: selectedFile.name,
+      }));
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Belge yüklenemedi";
+      toast.error(message);
+    } finally {
+      setIsBusinessDocumentUploading(false);
+      event.target.value = "";
+    }
+  };
+
   const updatePlaceMutation = useMutation({
-    mutationFn: (data: typeof formData) =>
-      api.owner.places.update(placeId, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["owner-place-detail", placeId],
-      });
-      queryClient.invalidateQueries({ queryKey: ["owner-places"] });
+    mutationFn: (payload: Record<string, unknown>) =>
+      api.owner.places.update(placeId, payload),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["owner-place-detail", placeId] }),
+        queryClient.invalidateQueries({ queryKey: ["owner-places"] }),
+      ]);
       router.push("/dashboard/places");
     },
     onError: (error: Error) => {
-      console.error("Update place error:", error);
-      setIsSubmitting(false);
-      alert(error.message || "Güncelleme başarısız oldu");
+      toast.error(error.message || "Mekan güncellenemedi");
     },
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
 
     if (!hasChanges) {
-      alert("Değişiklik bulunamadı");
+      toast.info("Değişiklik bulunamadı");
       return;
     }
 
-    setIsSubmitting(true);
-    updatePlaceMutation.mutate(formData);
-  };
-
-  const handleChange = (field: keyof typeof formData, value: any) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-    setHasChanges(true);
-  };
-
-  const handleAddImage = () => {
-    if (imageUrl.trim()) {
-      setFormData((prev) => ({
-        ...prev,
-        images: [...prev.images, imageUrl.trim()],
-      }));
-      setImageUrl("");
-      setHasChanges(true);
+    if (!formData.name.trim()) {
+      toast.error("Mekan adı zorunludur");
+      return;
     }
+
+    if (!formData.categoryId) {
+      toast.error("Kategori seçimi zorunludur");
+      return;
+    }
+
+    if (!formData.address.trim()) {
+      toast.error("Adres zorunludur");
+      return;
+    }
+
+    if (!formData.cityId || !formData.districtId) {
+      toast.error("İl ve ilçe seçimi zorunludur");
+      return;
+    }
+
+    if (
+      !Number.isFinite(formData.location.lat) ||
+      !Number.isFinite(formData.location.lng)
+    ) {
+      toast.error("Harita üzerinden geçerli konum seçin");
+      return;
+    }
+
+    if (formData.images.length === 0) {
+      toast.error("En az bir görsel yüklemelisiniz");
+      return;
+    }
+
+    if (!formData.businessDocumentFileId) {
+      toast.error("İşletme belgesi PDF yüklemek zorunludur");
+      return;
+    }
+
+    const parsedNightlyPrice =
+      formData.nightlyPrice.trim().length > 0
+        ? Number(formData.nightlyPrice.replace(",", "."))
+        : undefined;
+
+    if (
+      parsedNightlyPrice !== undefined &&
+      (!Number.isFinite(parsedNightlyPrice) || parsedNightlyPrice < 0)
+    ) {
+      toast.error("Gecelik fiyat geçersiz");
+      return;
+    }
+
+    const payload = {
+      name: formData.name.trim(),
+      categoryId: formData.categoryId,
+      shortDescription: formData.shortDescription.trim() || undefined,
+      description: formData.description.trim() || undefined,
+      address: formData.address.trim(),
+      cityId: formData.cityId,
+      districtId: formData.districtId,
+      city: selectedCityName,
+      district: selectedDistrictName,
+      location: {
+        lat: Number(formData.location.lat.toFixed(6)),
+        lng: Number(formData.location.lng.toFixed(6)),
+      },
+      contactInfo:
+        formData.contactInfo.phone ||
+        formData.contactInfo.email ||
+        formData.contactInfo.website
+          ? {
+              phone: formData.contactInfo.phone.trim() || undefined,
+              email: formData.contactInfo.email.trim() || undefined,
+              website: formData.contactInfo.website.trim() || undefined,
+            }
+          : undefined,
+      nightlyPrice: parsedNightlyPrice,
+      features: formData.features,
+      images: formData.images,
+      businessDocumentFileId: formData.businessDocumentFileId,
+      checkInInfo: { checkIn: formData.checkInInfo.trim() },
+      checkOutInfo: { checkOut: formData.checkOutInfo.trim() },
+    };
+
+    updatePlaceMutation.mutate(payload);
   };
 
-  const handleRemoveImage = (index: number) => {
-    setFormData((prev) => ({
-      ...prev,
-      images: prev.images.filter((_, i) => i !== index),
-    }));
-    setHasChanges(true);
-  };
-
-  const toggleFeature = (feature: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      features: prev.features.includes(feature)
-        ? prev.features.filter((f) => f !== feature)
-        : [...prev.features, feature],
-    }));
-    setHasChanges(true);
-  };
-
-  // Loading state
-  if (isLoading) {
+  if (isPlaceLoading) {
     return (
       <div className="flex min-h-[400px] items-center justify-center">
         <div className="flex flex-col items-center gap-3">
@@ -267,7 +437,6 @@ export default function EditPlacePage() {
     );
   }
 
-  // Not found state
   if (!place) {
     return (
       <div className="space-y-6">
@@ -290,15 +459,11 @@ export default function EditPlacePage() {
               <div className="mx-auto mb-4 flex size-16 items-center justify-center rounded-2xl bg-red-50 text-red-500">
                 <AlertTriangle className="size-8" />
               </div>
-              <h2 className="mb-2 text-xl font-bold text-foreground">
-                Mekan Bulunamadı
-              </h2>
+              <h2 className="mb-2 text-xl font-bold text-foreground">Mekan Bulunamadı</h2>
               <p className="mb-6 text-muted-foreground">
                 Aradığınız mekan bulunamadı veya silinmiş olabilir.
               </p>
-              <Button onClick={() => router.push("/dashboard/places")}>
-                Mekanlara Dön
-              </Button>
+              <Button onClick={() => router.push("/dashboard/places")}>Mekanlara Dön</Button>
             </div>
           </DashboardCard>
         </motion.div>
@@ -319,7 +484,7 @@ export default function EditPlacePage() {
     active: {
       title: "Mekan yayında",
       description:
-        "Değişiklik yapıldığında mekan tekrar inceleme durumuna geçecek.",
+        "Değişiklik yapıldığında mekan tekrar inceleme durumuna geçebilir.",
       type: "info",
     },
     rejected: {
@@ -344,7 +509,6 @@ export default function EditPlacePage() {
 
   return (
     <div className="space-y-6">
-      {/* Page Header */}
       <PageHeader
         title={place.name}
         description="Mekan bilgilerini güncelleyin"
@@ -374,7 +538,6 @@ export default function EditPlacePage() {
         }
       />
 
-      {/* Status Banner */}
       {statusMessage && (
         <DashboardCard padding="md">
           <div
@@ -420,10 +583,26 @@ export default function EditPlacePage() {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Basic Information */}
+        <DashboardCard padding="md">
+          <SectionHeader
+            title="Mekan Görselleri"
+            subtitle="Görsel ekleyin ve sıralayın. İlk görsel ana görsel olur."
+            icon={<Info className="size-5" />}
+            size="sm"
+            className="mb-6"
+          />
+
+          <GalleryUpload
+            value={formData.images}
+            onChange={(images) => setField("images", images)}
+            disabled={updatePlaceMutation.isPending}
+          />
+        </DashboardCard>
+
         <DashboardCard padding="md">
           <SectionHeader
             title="Temel Bilgiler"
+            subtitle="Mekan adı, kategori ve açıklama"
             icon={<Info className="size-5" />}
             size="sm"
             className="mb-6"
@@ -435,72 +614,62 @@ export default function EditPlacePage() {
               <Input
                 id="name"
                 value={formData.name}
-                onChange={(e) => handleChange("name", e.target.value)}
-                placeholder="Örn: Sunset Hotel"
-                required
+                onChange={(event) => setField("name", event.target.value)}
+                placeholder="Örn: Aegean Ula Boat Tours"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="type">Mekan Tipi *</Label>
-              <select
-                id="type"
-                value={formData.type}
-                onChange={(e) => handleChange("type", e.target.value)}
-                className="flex h-10 w-full rounded-lg border border-border bg-white px-3 py-2 text-sm transition-colors hover:border-primary/50 focus:border-primary focus:outline-none"
-                required
+              <Label>Kategori *</Label>
+              <Select
+                value={formData.categoryId || undefined}
+                onValueChange={(value) => setField("categoryId", value)}
+                disabled={isCategoriesLoading}
               >
-                {PLACE_TYPES.map((type) => (
-                  <option key={type.value} value={type.value}>
-                    {type.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="category">Kategori *</Label>
-              <Input
-                id="category"
-                value={formData.category}
-                onChange={(e) => handleChange("category", e.target.value)}
-                placeholder="Örn: Lüks, Butik, Aile"
-                required
-              />
+                <SelectTrigger>
+                  <SelectValue placeholder="Kategori seçin" />
+                </SelectTrigger>
+                <SelectContent>
+                  {formData.categoryId &&
+                    !categories.some((category) => category.id === formData.categoryId) && (
+                      <SelectItem value={formData.categoryId}>
+                        {place.category || "Seçili kategori"}
+                      </SelectItem>
+                    )}
+                  {categories.map((category) => (
+                    <SelectItem key={category.id} value={category.id}>
+                      {category.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="md:col-span-2 space-y-2">
-              <Label htmlFor="shortDescription">Kısa Açıklama *</Label>
-              <textarea
+              <Label htmlFor="shortDescription">Kısa Açıklama</Label>
+              <Input
                 id="shortDescription"
                 value={formData.shortDescription}
-                onChange={(e) =>
-                  handleChange("shortDescription", e.target.value)
-                }
-                placeholder="Mekanı 1-2 cümleyle özetleyin..."
-                className="flex min-h-[80px] w-full rounded-lg border border-border bg-white px-3 py-2 text-sm transition-colors hover:border-primary/50 focus:border-primary focus:outline-none resize-none"
+                onChange={(event) => setField("shortDescription", event.target.value)}
+                placeholder="Listelerde görünecek kısa özet"
                 maxLength={500}
-                required
               />
             </div>
 
             <div className="md:col-span-2 space-y-2">
-              <Label htmlFor="description">Detaylı Açıklama</Label>
-              <textarea
-                id="description"
-                value={formData.description}
-                onChange={(e) => handleChange("description", e.target.value)}
-                placeholder="Mekanın detaylı açıklaması..."
-                className="flex min-h-[150px] w-full rounded-lg border border-border bg-white px-3 py-2 text-sm transition-colors hover:border-primary/50 focus:border-primary focus:outline-none resize-none"
+              <Label>Detaylı Açıklama</Label>
+              <TipTapEditor
+                content={formData.description}
+                onChange={(description: string) => setField("description", description)}
               />
             </div>
           </div>
         </DashboardCard>
 
-        {/* Location Information */}
         <DashboardCard padding="md">
           <SectionHeader
             title="Konum Bilgileri"
+            subtitle="İl ve ilçe seçin, haritadan pin bırakın"
             icon={<MapPin className="size-5" />}
             size="sm"
             className="mb-6"
@@ -508,47 +677,45 @@ export default function EditPlacePage() {
 
           <div className="grid gap-6 md:grid-cols-2">
             <div className="md:col-span-2 space-y-2">
-              <Label htmlFor="address">Adres *</Label>
-              <Input
+              <Label htmlFor="address">Açık Adres *</Label>
+              <textarea
                 id="address"
                 value={formData.address}
-                onChange={(e) => handleChange("address", e.target.value)}
-                placeholder="Mahalle, Sokak No, İlçe, Şehir"
-                required
+                onChange={(event) => setField("address", event.target.value)}
+                className="flex min-h-[90px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                placeholder="Tam adres"
               />
             </div>
 
             <div className="space-y-2">
               <Label>Şehir *</Label>
               <Select
-                value={formData.city || undefined}
+                value={formData.cityId || undefined}
                 onValueChange={(value) => {
-                  const nextCity = cities.find((city) => city.name === value);
+                  const selectedCity = cities.find((city) => city.id === value);
                   const cityCoordinates = resolveCoordinates(
-                    nextCity?.latitude,
-                    nextCity?.longitude,
+                    selectedCity?.latitude,
+                    selectedCity?.longitude,
                   );
 
-                  setFormData((prev) => ({
-                    ...prev,
-                    city: value,
-                    district: "",
-                    location: cityCoordinates ?? prev.location,
+                  setFormState((previous) => ({
+                    ...previous,
+                    cityId: value,
+                    districtId: "",
+                    location: cityCoordinates ?? previous.location,
                   }));
-                  setHasChanges(true);
                 }}
                 disabled={isCitiesLoading}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Şehir seçin" />
                 </SelectTrigger>
-                <SelectContent className="z-[1200]">
-                  {formData.city &&
-                    !cities.some((city) => city.name === formData.city) && (
-                      <SelectItem value={formData.city}>{formData.city}</SelectItem>
-                    )}
+                <SelectContent>
+                  {formData.cityId && !cities.some((city) => city.id === formData.cityId) && (
+                    <SelectItem value={formData.cityId}>{place.city || "Seçili şehir"}</SelectItem>
+                  )}
                   {cities.map((city) => (
-                    <SelectItem key={city.id} value={city.name}>
+                    <SelectItem key={city.id} value={city.id}>
                       {city.name}
                     </SelectItem>
                   ))}
@@ -557,26 +724,24 @@ export default function EditPlacePage() {
             </div>
 
             <div className="space-y-2">
-              <Label>İlçe</Label>
+              <Label>İlçe *</Label>
               <Select
-                value={formData.district || undefined}
+                value={formData.districtId || undefined}
                 onValueChange={(value) => {
-                  const requestCityId = selectedCityId;
-                  const requestCityName = formData.city;
+                  const requestCityId = formData.cityId;
                   const selectedDistrict = districts.find(
-                    (district) => district.name === value,
+                    (district) => district.id === value,
                   );
                   const districtCoordinates = resolveCoordinates(
                     selectedDistrict?.latitude,
                     selectedDistrict?.longitude,
                   );
 
-                  setFormData((prev) => ({
-                    ...prev,
-                    district: value,
-                    location: districtCoordinates ?? prev.location,
+                  setFormState((previous) => ({
+                    ...previous,
+                    districtId: value,
+                    location: districtCoordinates ?? previous.location,
                   }));
-                  setHasChanges(true);
 
                   if (
                     districtCoordinates ||
@@ -603,36 +768,34 @@ export default function EditPlacePage() {
                     .then((center) => {
                       if (!center) return;
 
-                      setFormData((prev) => {
+                      setFormData((previous) => {
                         if (
-                          prev.city !== requestCityName ||
-                          prev.district !== value
+                          previous.cityId !== requestCityId ||
+                          previous.districtId !== value
                         ) {
-                          return prev;
+                          return previous;
                         }
 
-                        return { ...prev, location: center };
+                        return { ...previous, location: center };
                       });
                     });
                 }}
-                disabled={!selectedCityId || isDistrictsLoading}
+                disabled={!formData.cityId || isDistrictsLoading}
               >
                 <SelectTrigger>
                   <SelectValue
-                    placeholder={selectedCityId ? "İlçe seçin" : "Önce şehir seçin"}
+                    placeholder={formData.cityId ? "İlçe seçin" : "Önce şehir seçin"}
                   />
                 </SelectTrigger>
-                <SelectContent className="z-[1200]">
-                  {formData.district &&
-                    !districts.some(
-                      (district) => district.name === formData.district,
-                    ) && (
-                      <SelectItem value={formData.district}>
-                        {formData.district}
+                <SelectContent>
+                  {formData.districtId &&
+                    !districts.some((district) => district.id === formData.districtId) && (
+                      <SelectItem value={formData.districtId}>
+                        {place.district || "Seçili ilçe"}
                       </SelectItem>
                     )}
                   {districts.map((district) => (
-                    <SelectItem key={district.id} value={district.name}>
+                    <SelectItem key={district.id} value={district.id}>
                       {district.name}
                     </SelectItem>
                   ))}
@@ -645,60 +808,28 @@ export default function EditPlacePage() {
                 Haritada konuma tıklayın veya pini sürükleyin.
               </p>
               <CoordinateMapPicker
-                latitude={
-                  Number.isFinite(formData.location.lat)
-                    ? formData.location.lat
-                    : DEFAULT_COORDS.lat
-                }
-                longitude={
-                  Number.isFinite(formData.location.lng)
-                    ? formData.location.lng
-                    : DEFAULT_COORDS.lng
-                }
-                onChange={(coords) => handleChange("location", coords)}
+                latitude={formData.location.lat}
+                longitude={formData.location.lng}
+                onChange={(coords) => setField("location", coords)}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="lat">Enlem</Label>
-              <Input
-                id="lat"
-                type="number"
-                step="any"
-                value={formData.location.lat || ""}
-                onChange={(e) =>
-                  handleChange("location", {
-                    ...formData.location,
-                    lat: parseFloat(e.target.value) || 0,
-                  })
-                }
-                placeholder="37.0344"
-              />
+              <Label>Enlem</Label>
+              <Input value={String(formData.location.lat)} readOnly />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="lng">Boylam</Label>
-              <Input
-                id="lng"
-                type="number"
-                step="any"
-                value={formData.location.lng || ""}
-                onChange={(e) =>
-                  handleChange("location", {
-                    ...formData.location,
-                    lng: parseFloat(e.target.value) || 0,
-                  })
-                }
-                placeholder="27.4305"
-              />
+              <Label>Boylam</Label>
+              <Input value={String(formData.location.lng)} readOnly />
             </div>
           </div>
         </DashboardCard>
 
-        {/* Contact Information */}
         <DashboardCard padding="md">
           <SectionHeader
             title="İletişim Bilgileri"
+            subtitle="Opsiyonel"
             icon={<Phone className="size-5" />}
             size="sm"
             className="mb-6"
@@ -707,219 +838,172 @@ export default function EditPlacePage() {
           <div className="grid gap-6 md:grid-cols-3">
             <div className="space-y-2">
               <Label htmlFor="phone">Telefon</Label>
-              <div className="relative">
-                <Phone className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  id="phone"
-                  type="tel"
-                  value={formData.contactInfo.phone}
-                  onChange={(e) =>
-                    handleChange("contactInfo", {
-                      ...formData.contactInfo,
-                      phone: e.target.value,
-                    })
-                  }
-                  placeholder="+90 555 123 4567"
-                  className="pl-10"
-                />
-              </div>
+              <Input
+                id="phone"
+                value={formData.contactInfo.phone}
+                onChange={(event) =>
+                  setFormState((previous) => ({
+                    ...previous,
+                    contactInfo: {
+                      ...previous.contactInfo,
+                      phone: event.target.value,
+                    },
+                  }))
+                }
+                placeholder="+90 5xx xxx xx xx"
+              />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="email">E-posta</Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  id="email"
-                  type="email"
-                  value={formData.contactInfo.email}
-                  onChange={(e) =>
-                    handleChange("contactInfo", {
-                      ...formData.contactInfo,
-                      email: e.target.value,
-                    })
-                  }
-                  placeholder="iletisim@mekan.com"
-                  className="pl-10"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="website">Website</Label>
-              <div className="relative">
-                <Globe className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  id="website"
-                  type="url"
-                  value={formData.contactInfo.website}
-                  onChange={(e) =>
-                    handleChange("contactInfo", {
-                      ...formData.contactInfo,
-                      website: e.target.value,
-                    })
-                  }
-                  placeholder="https://"
-                  className="pl-10"
-                />
-              </div>
-            </div>
-          </div>
-        </DashboardCard>
-
-        {/* Pricing */}
-        <DashboardCard padding="md">
-          <SectionHeader
-            title="Fiyatlandırma"
-            icon={<DollarSign className="size-5" />}
-            size="sm"
-            className="mb-6"
-          />
-
-          <div className="grid gap-6 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="priceLevel">Fiyat Seviyesi</Label>
-              <select
-                id="priceLevel"
-                value={formData.priceLevel}
-                onChange={(e) => handleChange("priceLevel", e.target.value)}
-                className="flex h-10 w-full rounded-lg border border-border bg-white px-3 py-2 text-sm transition-colors hover:border-primary/50 focus:border-primary focus:outline-none"
-              >
-                {PRICE_LEVELS.map((level) => (
-                  <option key={level.value} value={level.value}>
-                    {level.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="nightlyPrice">Gecelik Fiyat (₺)</Label>
               <Input
-                id="nightlyPrice"
-                type="number"
-                step="0.01"
-                min="0"
-                value={formData.nightlyPrice || ""}
-                onChange={(e) =>
-                  handleChange("nightlyPrice", parseFloat(e.target.value) || 0)
+                id="email"
+                type="email"
+                value={formData.contactInfo.email}
+                onChange={(event) =>
+                  setFormState((previous) => ({
+                    ...previous,
+                    contactInfo: {
+                      ...previous.contactInfo,
+                      email: event.target.value,
+                    },
+                  }))
                 }
-                placeholder="Örn: 2500"
+                placeholder="info@ornek.com"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="website">Web Sitesi</Label>
+              <Input
+                id="website"
+                type="url"
+                value={formData.contactInfo.website}
+                onChange={(event) =>
+                  setFormState((previous) => ({
+                    ...previous,
+                    contactInfo: {
+                      ...previous.contactInfo,
+                      website: event.target.value,
+                    },
+                  }))
+                }
+                placeholder="https://"
               />
             </div>
           </div>
         </DashboardCard>
 
-        {/* Features */}
+        <DashboardCard padding="md">
+          <SectionHeader
+            title="Fiyatlandırma"
+            subtitle="Fiyat seviyesi API tarafından otomatik hesaplanır"
+            icon={<DollarSign className="size-5" />}
+            size="sm"
+            className="mb-6"
+          />
+
+          <div className="space-y-2">
+            <Label htmlFor="nightlyPrice">Gecelik Fiyat (₺)</Label>
+            <Input
+              id="nightlyPrice"
+              type="number"
+              min="0"
+              step="0.01"
+              value={formData.nightlyPrice}
+              onChange={(event) => setField("nightlyPrice", event.target.value)}
+              placeholder="Örn: 3500"
+            />
+          </div>
+        </DashboardCard>
+
         <DashboardCard padding="md">
           <SectionHeader
             title="Özellikler"
-            icon={<CheckCircle2 className="size-5" />}
+            subtitle="Mekana ait öne çıkan özellikleri işaretleyin"
+            icon={<Info className="size-5" />}
             size="sm"
             className="mb-6"
           />
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {FEATURES.map((feature) => {
-              const Icon = feature.icon;
-              const isSelected = formData.features.includes(feature.label);
+            {FEATURE_OPTIONS.map((feature) => {
+              const checked = formData.features.includes(feature.id);
               return (
-                <button
+                <label
                   key={feature.id}
-                  type="button"
-                  onClick={() => toggleFeature(feature.label)}
-                  className={cn(
-                    "flex items-center gap-3 rounded-xl border p-3 text-left transition-all",
-                    isSelected
-                      ? "border-primary bg-primary/5 text-primary"
-                      : "border-border hover:border-primary/50",
-                  )}
+                  className="flex cursor-pointer items-center gap-2 rounded-lg border p-3"
                 >
-                  <div
-                    className={cn(
-                      "flex size-9 items-center justify-center rounded-lg",
-                      isSelected ? "bg-primary text-white" : "bg-slate-100",
-                    )}
-                  >
-                    <Icon className="size-4" />
-                  </div>
-                  <span className="text-sm font-medium">{feature.label}</span>
-                </button>
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => toggleFeature(feature.id)}
+                    className="h-4 w-4"
+                  />
+                  <span className="text-sm">{feature.label}</span>
+                </label>
               );
             })}
           </div>
         </DashboardCard>
 
-        {/* Photos */}
         <DashboardCard padding="md">
           <SectionHeader
-            title="Fotoğraflar"
-            icon={<ImageIcon className="size-5" />}
+            title="İşletme Belgesi (PDF)"
+            subtitle="Doğrulama için zorunlu"
+            icon={<FileText className="size-5" />}
             size="sm"
             className="mb-6"
           />
 
-          {/* Add Image URL */}
-          <div className="mb-4 flex gap-2">
-            <Input
-              value={imageUrl}
-              onChange={(e) => setImageUrl(e.target.value)}
-              placeholder="Fotoğraf URL'si girin..."
-              className="flex-1"
-            />
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleAddImage}
-              disabled={!imageUrl.trim()}
-            >
-              <Upload className="mr-2 size-4" />
-              Ekle
-            </Button>
-          </div>
-
-          {/* Image Grid */}
-          {formData.images.length > 0 ? (
-            <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-              {formData.images.map((img, index) => (
-                <div
-                  key={index}
-                  className="group relative aspect-video overflow-hidden rounded-lg bg-slate-100"
-                >
-                  <img
-                    src={img}
-                    alt={`Fotoğraf ${index + 1}`}
-                    className="size-full object-cover"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveImage(index)}
-                    className="absolute right-2 top-2 flex size-6 items-center justify-center rounded-full bg-red-500 text-white opacity-0 transition-opacity group-hover:opacity-100"
-                  >
-                    ×
-                  </button>
-                  {index === 0 && (
-                    <span className="absolute bottom-2 left-2 rounded-full bg-black/70 px-2 py-0.5 text-xs text-white">
-                      Kapak
-                    </span>
-                  )}
+          <div className="space-y-4">
+            {formData.businessDocumentFileId ? (
+              <div className="rounded-lg border p-3">
+                <div className="text-sm font-medium">
+                  {formData.businessDocumentFilename || "Yüklenen belge"}
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-border bg-slate-50 py-12">
-              <ImageIcon className="mb-3 size-12 text-slate-300" />
-              <p className="text-sm text-muted-foreground">
-                Henüz fotoğraf eklenmedi
-              </p>
-            </div>
-          )}
+                {formData.businessDocumentUrl && (
+                  <a
+                    href={formData.businessDocumentUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-sm text-primary underline"
+                  >
+                    Belgeyi görüntüle
+                  </a>
+                )}
+              </div>
+            ) : null}
+
+            <label className="inline-flex">
+              <Input
+                type="file"
+                accept="application/pdf"
+                className="hidden"
+                onChange={handleBusinessDocumentUpload}
+                disabled={isBusinessDocumentUploading || updatePlaceMutation.isPending}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isBusinessDocumentUploading || updatePlaceMutation.isPending}
+                asChild
+              >
+                <span>
+                  <Upload className="mr-2 size-4" />
+                  {isBusinessDocumentUploading
+                    ? "Belge Yükleniyor..."
+                    : "PDF Belge Yükle / Değiştir"}
+                </span>
+              </Button>
+            </label>
+          </div>
         </DashboardCard>
 
-        {/* Check-in/out Info */}
         <DashboardCard padding="md">
           <SectionHeader
             title="Giriş/Çıkış Bilgileri"
+            subtitle="Opsiyonel"
             icon={<Clock className="size-5" />}
             size="sm"
             className="mb-6"
@@ -928,29 +1012,26 @@ export default function EditPlacePage() {
           <div className="grid gap-6 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="checkInInfo">Check-in Bilgisi</Label>
-              <textarea
+              <Input
                 id="checkInInfo"
                 value={formData.checkInInfo}
-                onChange={(e) => handleChange("checkInInfo", e.target.value)}
-                placeholder="Örn: 14:00 sonrası giriş yapılabilir"
-                className="flex min-h-[80px] w-full rounded-lg border border-border bg-white px-3 py-2 text-sm transition-colors hover:border-primary/50 focus:border-primary focus:outline-none resize-none"
+                onChange={(event) => setField("checkInInfo", event.target.value)}
+                placeholder="Örn: 14:00 sonrası"
               />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="checkOutInfo">Check-out Bilgisi</Label>
-              <textarea
+              <Input
                 id="checkOutInfo"
                 value={formData.checkOutInfo}
-                onChange={(e) => handleChange("checkOutInfo", e.target.value)}
-                placeholder="Örn: 11:00 öncesi çıkış yapılmalı"
-                className="flex min-h-[80px] w-full rounded-lg border border-border bg-white px-3 py-2 text-sm transition-colors hover:border-primary/50 focus:border-primary focus:outline-none resize-none"
+                onChange={(event) => setField("checkOutInfo", event.target.value)}
+                placeholder="Örn: 11:00 öncesi"
               />
             </div>
           </div>
         </DashboardCard>
 
-        {/* Submit Actions */}
         <div className="flex items-center justify-between rounded-xl border border-border bg-white p-4 shadow-sm">
           <Button
             type="button"
@@ -962,10 +1043,14 @@ export default function EditPlacePage() {
 
           <Button
             type="submit"
-            disabled={isSubmitting || !hasChanges}
-            className="min-w-[180px] gap-2"
+            disabled={
+              updatePlaceMutation.isPending ||
+              isBusinessDocumentUploading ||
+              !hasChanges
+            }
+            className="min-w-[170px] gap-2"
           >
-            {isSubmitting ? (
+            {updatePlaceMutation.isPending ? (
               <>
                 <span className="inline-block size-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
                 Kaydediliyor...
@@ -978,6 +1063,20 @@ export default function EditPlacePage() {
             )}
           </Button>
         </div>
+
+        <DashboardCard padding="md">
+          <div className="flex items-start gap-3">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-500">
+              <Mail className="size-5" />
+            </div>
+            <div>
+              <h4 className="mb-1 font-semibold text-foreground">Onay Süreci</h4>
+              <p className="text-sm text-muted-foreground">
+                Güncelleme sonrası mekanınız yöneticiler tarafından tekrar incelenebilir.
+              </p>
+            </div>
+          </div>
+        </DashboardCard>
       </form>
     </div>
   );

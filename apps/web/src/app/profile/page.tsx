@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { Route } from "next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { User, Mail, Phone, Calendar, LogOut } from "lucide-react";
+import { toast } from "sonner";
 
 import { api } from "@/lib/api";
 import { authClient } from "@/lib/auth-client";
@@ -64,7 +65,7 @@ export default function ProfilePage() {
     },
     onError: (error: Error) => {
       console.error("Profile update failed:", error);
-      alert(error.message || "Güncelleme başarısız");
+      toast.error(error.message || "Güncelleme başarısız");
     },
   });
 

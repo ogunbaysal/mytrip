@@ -15,6 +15,7 @@ import {
   Building2,
   FileText,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   PageHeader,
@@ -54,7 +55,7 @@ export default function SubscriptionPage() {
     },
     onError: (error: Error) => {
       console.error("Cancel error:", error);
-      alert(error.message || "İptal işlemi başarısız oldu");
+      toast.error(error.message || "İptal işlemi başarısız oldu");
     },
   });
 

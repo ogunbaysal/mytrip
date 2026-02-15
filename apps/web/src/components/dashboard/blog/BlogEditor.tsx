@@ -20,6 +20,7 @@ import {
   Tag,
   X,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -181,7 +182,7 @@ export function BlogEditor({ mode, blogId }: BlogEditorProps) {
     },
     onError: (error: Error) => {
       console.error("Create blog error:", error);
-      alert(error.message || "Blog oluşturulamadı");
+      toast.error(error.message || "Blog oluşturulamadı");
       setIsSubmitting(false);
     },
   });
@@ -200,7 +201,7 @@ export function BlogEditor({ mode, blogId }: BlogEditorProps) {
     },
     onError: (error: Error) => {
       console.error("Update blog error:", error);
-      alert(error.message || "Güncelleme başarısız");
+      toast.error(error.message || "Güncelleme başarısız");
       setIsSubmitting(false);
     },
   });
@@ -213,7 +214,7 @@ export function BlogEditor({ mode, blogId }: BlogEditorProps) {
     },
     onError: (error: Error) => {
       console.error("Publish blog error:", error);
-      alert(error.message || "Yayınlama başarısız");
+      toast.error(error.message || "Yayınlama başarısız");
     },
   });
 
@@ -261,12 +262,12 @@ export function BlogEditor({ mode, blogId }: BlogEditorProps) {
 
   const handleSave = async () => {
     if (!formData.title.trim()) {
-      alert("Blog başlığı gereklidir");
+      toast.error("Blog başlığı gereklidir");
       return;
     }
 
     if (!formData.categoryId) {
-      alert("Kategori seçimi zorunludur");
+      toast.error("Kategori seçimi zorunludur");
       return;
     }
 
@@ -281,7 +282,7 @@ export function BlogEditor({ mode, blogId }: BlogEditorProps) {
 
   const handlePublish = () => {
     if (hasChanges) {
-      alert("Önce değişiklikleri kaydedin");
+      toast.warning("Önce değişiklikleri kaydedin");
       return;
     }
 

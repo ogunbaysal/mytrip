@@ -3,6 +3,7 @@
 import { useMemo, useState, type ChangeEvent, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import {
   AlertTriangle,
   Building2,
@@ -125,7 +126,7 @@ export default function CreatePlacePage() {
       router.push("/dashboard/places");
     },
     onError: (error: Error) => {
-      alert(error.message || "Mekan oluşturulamadı");
+      toast.error(error.message || "Mekan oluşturulamadı");
     },
   });
 
@@ -197,7 +198,7 @@ export default function CreatePlacePage() {
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Belge yüklenemedi";
-      alert(message);
+      toast.error(message);
     } finally {
       setIsBusinessDocumentUploading(false);
       event.target.value = "";
@@ -208,37 +209,37 @@ export default function CreatePlacePage() {
     event.preventDefault();
 
     if (!formData.name.trim()) {
-      alert("Mekan adı zorunludur");
+      toast.error("Mekan adı zorunludur");
       return;
     }
 
     if (!formData.categoryId) {
-      alert("Kategori seçimi zorunludur");
+      toast.error("Kategori seçimi zorunludur");
       return;
     }
 
     if (!formData.address.trim()) {
-      alert("Adres zorunludur");
+      toast.error("Adres zorunludur");
       return;
     }
 
     if (!formData.cityId || !formData.districtId) {
-      alert("İl ve ilçe seçimi zorunludur");
+      toast.error("İl ve ilçe seçimi zorunludur");
       return;
     }
 
     if (!Number.isFinite(formData.location.lat) || !Number.isFinite(formData.location.lng)) {
-      alert("Harita üzerinden geçerli konum seçin");
+      toast.error("Harita üzerinden geçerli konum seçin");
       return;
     }
 
     if (formData.images.length === 0) {
-      alert("En az bir görsel yüklemelisiniz");
+      toast.error("En az bir görsel yüklemelisiniz");
       return;
     }
 
     if (!formData.businessDocumentFileId) {
-      alert("İşletme belgesi PDF yüklemek zorunludur");
+      toast.error("İşletme belgesi PDF yüklemek zorunludur");
       return;
     }
 
@@ -251,7 +252,7 @@ export default function CreatePlacePage() {
       parsedNightlyPrice !== undefined &&
       (!Number.isFinite(parsedNightlyPrice) || parsedNightlyPrice < 0)
     ) {
-      alert("Gecelik fiyat geçersiz");
+      toast.error("Gecelik fiyat geçersiz");
       return;
     }
 

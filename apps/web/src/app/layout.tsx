@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 import { SiteShell } from "@/components/layout/site-shell";
+import { Toaster } from "@/components/ui/sonner";
 import { AppProviders } from "@/providers/app-providers";
 import { fontClassName } from "@/styles/fonts";
 
@@ -30,6 +31,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       >
         <AppProviders>
           <SiteShell>{children}</SiteShell>
+          <Toaster />
         </AppProviders>
       </body>
     </html>

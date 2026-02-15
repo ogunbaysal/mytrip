@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { Route } from "next";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { ChevronRight, CheckCircle2, AlertCircle } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -51,7 +52,7 @@ export default function BusinessRegisterPage() {
     },
     onError: (error: Error) => {
       console.error("Registration error:", error);
-      alert(error.message || "Kayıt sırasında bir hata oluştu");
+      toast.error(error.message || "Kayıt sırasında bir hata oluştu");
     },
   });
 
