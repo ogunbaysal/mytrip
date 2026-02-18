@@ -26,9 +26,15 @@ import {
 } from "@/components/ui/select"
 import { toast } from "sonner"
 import { PlaceKindCapabilities } from "@/components/places/place-kind-capabilities"
-import { usePlace, usePlaceFeatures, useUpdatePlace } from "@/hooks/use-places"
+import {
+  type Place,
+  type PlaceKind,
+  usePlace,
+  usePlaceFeatures,
+  usePlaceKinds,
+  useUpdatePlace,
+} from "@/hooks/use-places"
 import { PlaceKindSelect } from "@/components/places/place-kind-select"
-import { usePlaceKinds } from "@/hooks/use-places"
 import {
   fetchDistrictCenter,
   getDistrictCenterQueryKey,
@@ -111,6 +117,62 @@ function formatFeatureLabel(featureSlug: string): string {
     .filter(Boolean)
     .map((word) => word.charAt(0).toLocaleUpperCase("tr-TR") + word.slice(1))
     .join(" ");
+}
+
+function normalizeKindToken(value: string | null | undefined): string {
+  if (!value) return "";
+  return value
+    .trim()
+    .toLocaleLowerCase("tr-TR")
+    .replace(/ı/g, "i")
+    .replace(/ğ/g, "g")
+    .replace(/ü/g, "u")
+    .replace(/ş/g, "s")
+    .replace(/ö/g, "o")
+    .replace(/ç/g, "c")
+    .replace(/[\s-]+/g, "_");
+}
+
+function resolveRawPlaceKindValue(place: Place): string {
+  const candidates = [
+    place.kind,
+    place.categoryId,
+    place.kindSlug,
+    place.categorySlug,
+    place.kindName,
+    place.categoryName,
+    place.type,
+    place.category,
+  ]
+    .filter((value): value is string => Boolean(value && value.trim()))
+    .map((value) => value.trim());
+
+  return candidates[0] ?? "";
+}
+
+function resolveKindIdFromRawValue(
+  rawValue: string,
+  kinds: PlaceKind[],
+): string | null {
+  if (!rawValue) return null;
+  const normalizedRawValue = normalizeKindToken(rawValue);
+
+  const matchedKind = kinds.find((kind) => {
+    const normalizedId = normalizeKindToken(kind.id);
+    const normalizedSlug = normalizeKindToken(kind.slug);
+    const normalizedName = normalizeKindToken(kind.name);
+    return (
+      rawValue === kind.id ||
+      rawValue === kind.slug ||
+      normalizedRawValue === normalizedId ||
+      normalizedRawValue === normalizedSlug ||
+      normalizedRawValue === normalizedName
+    );
+  });
+
+  if (matchedKind) return matchedKind.id;
+
+  return null;
 }
 
 const DEFAULT_COORDS = { lat: 39.0, lng: 35.0 };
@@ -237,6 +299,7 @@ export default function EditPlacePage() {
   useEffect(() => {
     if (place) {
       const coords = parseLocationInput(place.location);
+      const rawKindValue = resolveRawPlaceKindValue(place);
       const normalizedStatus: z.infer<typeof formSchema>["status"] =
         STATUS_OPTIONS.includes(place.status)
           ? (place.status as z.infer<typeof formSchema>["status"])
@@ -255,7 +318,7 @@ export default function EditPlacePage() {
       )
       form.reset({
         name: place.name,
-        kind: place.kind || place.categoryId || "",
+        kind: rawKindValue,
         description: place.description,
         shortDescription: place.shortDescription || "",
         address: place.address,
@@ -277,6 +340,35 @@ export default function EditPlacePage() {
       })
     }
   }, [place, form])
+
+  useEffect(() => {
+    if (!place) return;
+    const currentKind = form.getValues("kind");
+    if (currentKind) return;
+
+    const rawKindValue = resolveRawPlaceKindValue(place);
+    if (!rawKindValue) return;
+
+    form.setValue("kind", rawKindValue, {
+      shouldDirty: false,
+      shouldValidate: false,
+    });
+  }, [place, form]);
+
+  useEffect(() => {
+    if (!place || !placeKinds || placeKinds.length === 0) return;
+    if (form.getFieldState("kind").isDirty) return;
+
+    const currentKind = form.getValues("kind");
+    const rawKindValue = currentKind || resolveRawPlaceKindValue(place);
+    const resolvedKind = resolveKindIdFromRawValue(rawKindValue, placeKinds);
+    if (!resolvedKind || resolvedKind === currentKind) return;
+
+    form.setValue("kind", resolvedKind, {
+      shouldDirty: false,
+      shouldValidate: true,
+    });
+  }, [place, placeKinds, form]);
 
   const handleBusinessDocumentUpload = async (
     event: ChangeEvent<HTMLInputElement>,
@@ -354,7 +446,13 @@ export default function EditPlacePage() {
 
   const latitudeText = form.watch("latitude");
   const longitudeText = form.watch("longitude");
-  const selectedKind = form.watch("kind");
+  const selectedKindRaw = form.watch("kind");
+  const rawKindFromPlace = place ? resolveRawPlaceKindValue(place) : "";
+  const effectiveKindRaw = selectedKindRaw || rawKindFromPlace;
+  const selectedKind =
+    (placeKinds && placeKinds.length > 0
+      ? resolveKindIdFromRawValue(effectiveKindRaw, placeKinds)
+      : null) ?? effectiveKindRaw;
   const selectedCity = form.watch("city");
   const selectedDistrict = form.watch("district");
   const selectedFeatures = normalizeFeatureList(form.watch("features"));
@@ -491,12 +589,20 @@ export default function EditPlacePage() {
                                   <FormLabel>Yer Türü</FormLabel>
                                   <FormControl>
                                     <PlaceKindSelect
-                                      value={field.value}
+                                      value={selectedKind || field.value || rawKindFromPlace}
                                       onValueChange={field.onChange}
                                       kinds={placeKinds}
                                       disabled={isKindsLoading}
                                       includeUnknownValue
-                                      unknownLabel={place?.kindName || "Mevcut Tür"}
+                                      unknownLabel={
+                                        place?.kindName ||
+                                        place?.categoryName ||
+                                        place?.kindSlug ||
+                                        place?.categorySlug ||
+                                        place?.kind ||
+                                        place?.categoryId ||
+                                        "Mevcut Tür"
+                                      }
                                     />
                                   </FormControl>
                                   <PlaceKindCapabilities

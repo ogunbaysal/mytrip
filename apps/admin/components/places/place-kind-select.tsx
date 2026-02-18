@@ -23,23 +23,39 @@ export function PlaceKindSelect({
   includeUnknownValue = false,
   unknownLabel = "Mevcut Tür",
 }: PlaceKindSelectProps) {
-  const hasCurrentValue = Boolean(value);
-  const hasValueInOptions = Boolean(
-    value && kinds?.some((kind) => kind.id === value),
-  );
+  const normalizedValue = value?.trim().toLocaleLowerCase("tr-TR") ?? "";
+  const matchedKind = kinds?.find((kind) => {
+    const normalizedKindId = kind.id.trim().toLocaleLowerCase("tr-TR");
+    const normalizedKindSlug = kind.slug.trim().toLocaleLowerCase("tr-TR");
+    const normalizedKindName = kind.name.trim().toLocaleLowerCase("tr-TR");
+    return (
+      value === kind.id ||
+      value === kind.slug ||
+      normalizedValue === normalizedKindId ||
+      normalizedValue === normalizedKindSlug ||
+      normalizedValue === normalizedKindName
+    );
+  });
+  const unresolvedValue =
+    value && !matchedKind && includeUnknownValue ? value : undefined;
+  const resolvedValue = matchedKind?.id ?? unresolvedValue ?? "";
 
   return (
     <Select
-      value={value || ""}
+      value={resolvedValue}
       onValueChange={onValueChange}
       disabled={disabled}
     >
       <SelectTrigger>
-        <SelectValue placeholder={placeholder} />
+        {unresolvedValue ? (
+          <span className="line-clamp-1">{unknownLabel}</span>
+        ) : (
+          <SelectValue placeholder={placeholder} />
+        )}
       </SelectTrigger>
       <SelectContent>
-        {hasCurrentValue && includeUnknownValue && !hasValueInOptions ? (
-          <SelectItem value={value!}>
+        {unresolvedValue ? (
+          <SelectItem value={resolvedValue}>
             {unknownLabel}
           </SelectItem>
         ) : null}
