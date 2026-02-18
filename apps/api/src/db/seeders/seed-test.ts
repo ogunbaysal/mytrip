@@ -14,7 +14,7 @@
 
 import { db } from "../index.ts";
 import { nanoid } from "nanoid";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { replacePlaceAmenities } from "../../lib/place-relations.ts";
 
 // Schemas
@@ -25,7 +25,7 @@ import {
   blogImage,
   file,
   place,
-  placeCategory,
+  placeKind,
   placeImage,
 } from "../schemas/index.ts";
 import { collection } from "../schemas/collections.ts";
@@ -573,7 +573,7 @@ async function seedTestPlaces(userMap: Map<string, string>): Promise<string[]> {
   logSection("Seeding Test Places (50 places)");
 
   // Get categories
-  const categories = await db.select().from(placeCategory);
+  const categories = await db.select().from(placeKind);
   if (categories.length === 0) {
     logInfo("No categories found, run seed-core first");
     return [];
@@ -603,6 +603,17 @@ async function seedTestPlaces(userMap: Map<string, string>): Promise<string[]> {
   const ownerIds = TEST_USERS.filter((u) => u.role === "owner")
     .map((u) => userMap.get(u.email))
     .filter(Boolean) as string[];
+
+  const existingSeedPlaces = await db
+    .select({ id: place.id })
+    .from(place)
+    .where(sql`${place.slug} LIKE 'seed-place-%'`);
+  if (existingSeedPlaces.length > 0) {
+    logInfo(
+      `Found ${existingSeedPlaces.length} existing deterministic seed places, skipping`,
+    );
+    return existingSeedPlaces.map((item) => item.id);
+  }
 
   const placeIds: string[] = [];
   const placesToCreate = 50;
@@ -634,14 +645,17 @@ async function seedTestPlaces(userMap: Map<string, string>): Promise<string[]> {
     const category = categoryMap.get(categorySlug);
 
     const name = `${template.prefix} ${neighborhood} ${template.suffix}`;
-    const slug = `${slugify(name)}-${nanoid(6)}`;
+    const slug = `seed-place-${String(i + 1).padStart(3, "0")}`;
 
     // Check if slug exists
     const existing = await db.query.place.findFirst({
       where: eq(place.slug, slug),
     });
 
-    if (existing) continue;
+    if (existing) {
+      placeIds.push(existing.id);
+      continue;
+    }
 
     const lat = 36.5 + Math.random() * 0.8; // Muğla area
     const lng = 27.5 + Math.random() * 1.2;
@@ -722,7 +736,7 @@ async function seedTestPlaces(userMap: Map<string, string>): Promise<string[]> {
     placeIds.push(id);
   }
 
-  logSuccess(`Created ${placeIds.length} places`);
+  logSuccess(`Prepared ${placeIds.length} deterministic places`);
   return placeIds;
 }
 
@@ -737,7 +751,7 @@ async function seedTestBlogs(userMap: Map<string, string>): Promise<void> {
   const categoryBySlug = new Map(categories.map((item) => [item.slug, item.id]));
 
   for (const topic of BLOG_TOPICS) {
-    const slug = `${slugify(topic.title)}-${nanoid(4)}`;
+    const slug = `seed-blog-${slugify(topic.title)}`;
 
     // Check if exists
     const existing = await db.query.blog.findFirst({

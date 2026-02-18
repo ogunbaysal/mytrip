@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Çerez Politikası | TatilDesen",
+  title: "Çerez Politikası",
   description: "TatilDesen platformunda kullanılan çerezler ve yönetim tercihleri hakkında bilgi alın.",
 };
 

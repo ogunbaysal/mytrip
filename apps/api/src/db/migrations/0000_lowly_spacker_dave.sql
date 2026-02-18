@@ -5,19 +5,25 @@ CREATE TYPE "public"."user_status" AS ENUM('active', 'suspended', 'pending');-->
 CREATE TYPE "public"."blog_comment_status" AS ENUM('pending', 'published', 'rejected', 'spam');--> statement-breakpoint
 CREATE TYPE "public"."blog_status" AS ENUM('published', 'draft', 'archived', 'pending_review');--> statement-breakpoint
 CREATE TYPE "public"."language" AS ENUM('tr', 'en');--> statement-breakpoint
+CREATE TYPE "public"."booking_currency" AS ENUM('TRY', 'USD', 'EUR');--> statement-breakpoint
+CREATE TYPE "public"."booking_payment_status" AS ENUM('pending', 'paid', 'refunded');--> statement-breakpoint
 CREATE TYPE "public"."booking_status" AS ENUM('pending', 'confirmed', 'cancelled', 'completed');--> statement-breakpoint
-CREATE TYPE "public"."currency" AS ENUM('TRY', 'USD', 'EUR');--> statement-breakpoint
-CREATE TYPE "public"."payment_status" AS ENUM('success', 'failed', 'pending', 'refunded');--> statement-breakpoint
 CREATE TYPE "public"."collection_status" AS ENUM('published', 'draft', 'archived');--> statement-breakpoint
 CREATE TYPE "public"."file_type" AS ENUM('image', 'document', 'video', 'audio', 'other');--> statement-breakpoint
 CREATE TYPE "public"."file_usage" AS ENUM('blog_hero', 'blog_featured', 'blog_content', 'place_image', 'place_gallery', 'business_document', 'profile_avatar', 'profile_cover', 'other');--> statement-breakpoint
 CREATE TYPE "public"."billing_cycle" AS ENUM('monthly', 'quarterly', 'yearly');--> statement-breakpoint
 CREATE TYPE "public"."coupon_discount_type" AS ENUM('percent', 'fixed');--> statement-breakpoint
 CREATE TYPE "public"."coupon_scope" AS ENUM('all_plans', 'specific_plans');--> statement-breakpoint
+CREATE TYPE "public"."plan_resource_key" AS ENUM('place.hotel', 'place.villa', 'place.restaurant', 'place.cafe', 'place.bar_club', 'place.beach', 'place.natural_location', 'place.activity_location', 'place.visit_location', 'place.other_monetized', 'blog.post');--> statement-breakpoint
+CREATE TYPE "public"."place_kind" AS ENUM('hotel', 'villa', 'restaurant', 'cafe', 'bar_club', 'beach', 'natural_location', 'activity_location', 'visit_location', 'other_monetized');--> statement-breakpoint
+CREATE TYPE "public"."place_media_usage" AS ENUM('cover', 'gallery', 'menu', 'room', 'package', 'other');--> statement-breakpoint
 CREATE TYPE "public"."place_status" AS ENUM('active', 'inactive', 'pending', 'suspended', 'rejected');--> statement-breakpoint
 CREATE TYPE "public"."price_level" AS ENUM('budget', 'moderate', 'expensive', 'luxury');--> statement-breakpoint
+CREATE TYPE "public"."hotel_room_status" AS ENUM('active', 'inactive', 'maintenance');--> statement-breakpoint
 CREATE TYPE "public"."review_status" AS ENUM('published', 'hidden', 'flagged');--> statement-breakpoint
 CREATE TYPE "public"."business_registration_status" AS ENUM('pending', 'approved', 'rejected');--> statement-breakpoint
+CREATE TYPE "public"."currency" AS ENUM('TRY', 'USD', 'EUR');--> statement-breakpoint
+CREATE TYPE "public"."payment_status" AS ENUM('success', 'failed', 'pending', 'refunded');--> statement-breakpoint
 CREATE TYPE "public"."provider" AS ENUM('iyzico', 'paytr', 'stripe', 'mock');--> statement-breakpoint
 CREATE TABLE "analytics_event" (
 	"id" text PRIMARY KEY NOT NULL,
@@ -229,25 +235,31 @@ CREATE TABLE "booking" (
 	"check_out_date" date NOT NULL,
 	"guests" integer NOT NULL,
 	"total_price" numeric(10, 2) NOT NULL,
-	"currency" "currency" DEFAULT 'TRY' NOT NULL,
+	"currency" "booking_currency" DEFAULT 'TRY' NOT NULL,
 	"status" "booking_status" DEFAULT 'pending' NOT NULL,
 	"special_requests" text,
-	"payment_status" "payment_status" DEFAULT 'pending' NOT NULL,
+	"payment_status" "booking_payment_status" DEFAULT 'pending' NOT NULL,
 	"booking_reference" text NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "booking_booking_reference_unique" UNIQUE("booking_reference")
 );
 --> statement-breakpoint
-CREATE TABLE "place_category" (
+CREATE TABLE "place_kind_meta" (
 	"id" text PRIMARY KEY NOT NULL,
 	"slug" text NOT NULL,
 	"name" text NOT NULL,
 	"icon" text,
 	"description" text,
+	"monetized" boolean DEFAULT true NOT NULL,
+	"supports_rooms" boolean DEFAULT false NOT NULL,
+	"supports_menu" boolean DEFAULT false NOT NULL,
+	"supports_packages" boolean DEFAULT false NOT NULL,
+	"sort_order" integer DEFAULT 0 NOT NULL,
+	"active" boolean DEFAULT true NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "place_category_slug_unique" UNIQUE("slug")
+	CONSTRAINT "place_kind_meta_slug_unique" UNIQUE("slug")
 );
 --> statement-breakpoint
 CREATE TABLE "collection" (
@@ -404,12 +416,24 @@ CREATE TABLE "subscription_plan" (
 	"price" numeric(10, 2) NOT NULL,
 	"currency" "currency" DEFAULT 'TRY' NOT NULL,
 	"billing_cycle" "billing_cycle" NOT NULL,
-	"max_places" integer DEFAULT 1 NOT NULL,
-	"max_blogs" integer DEFAULT 1 NOT NULL,
+	"max_places" integer DEFAULT 0 NOT NULL,
+	"max_blogs" integer DEFAULT 0 NOT NULL,
 	"active" boolean DEFAULT true NOT NULL,
 	"sort_order" integer DEFAULT 0 NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "subscription_plan_entitlement" (
+	"id" text PRIMARY KEY NOT NULL,
+	"plan_id" text NOT NULL,
+	"resource_key" "plan_resource_key" NOT NULL,
+	"limit_count" integer,
+	"is_unlimited" boolean DEFAULT false NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "subscription_plan_entitlement_limit_check" CHECK ("subscription_plan_entitlement"."is_unlimited" = true OR "subscription_plan_entitlement"."limit_count" IS NOT NULL),
+	CONSTRAINT "subscription_plan_entitlement_positive_check" CHECK ("subscription_plan_entitlement"."limit_count" IS NULL OR "subscription_plan_entitlement"."limit_count" >= 0)
 );
 --> statement-breakpoint
 CREATE TABLE "subscription_plan_feature" (
@@ -446,19 +470,20 @@ CREATE TABLE "province" (
 	CONSTRAINT "province_slug_unique" UNIQUE("slug")
 );
 --> statement-breakpoint
-CREATE TABLE "amenity" (
+CREATE TABLE "place_feature" (
 	"id" text PRIMARY KEY NOT NULL,
 	"slug" text NOT NULL,
 	"label" text NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "amenity_slug_unique" UNIQUE("slug")
+	CONSTRAINT "place_feature_slug_unique" UNIQUE("slug")
 );
 --> statement-breakpoint
 CREATE TABLE "place" (
 	"id" text PRIMARY KEY NOT NULL,
 	"slug" text NOT NULL,
 	"name" text NOT NULL,
+	"kind" "place_kind" DEFAULT 'visit_location' NOT NULL,
 	"category_id" text,
 	"description" text,
 	"short_description" text,
@@ -471,6 +496,7 @@ CREATE TABLE "place" (
 	"rating" numeric(3, 2) DEFAULT '0.00',
 	"review_count" integer DEFAULT 0 NOT NULL,
 	"price_level" "price_level",
+	"starting_price" numeric(10, 2),
 	"nightly_price" numeric(10, 2),
 	"status" "place_status" DEFAULT 'pending' NOT NULL,
 	"verified" boolean DEFAULT false NOT NULL,
@@ -486,20 +512,239 @@ CREATE TABLE "place" (
 	CONSTRAINT "place_slug_unique" UNIQUE("slug")
 );
 --> statement-breakpoint
-CREATE TABLE "place_amenity" (
+CREATE TABLE "place_feature_assignment" (
 	"place_id" text NOT NULL,
 	"amenity_id" text NOT NULL,
 	"sort_order" integer DEFAULT 0 NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "place_amenity_pk" PRIMARY KEY("place_id","amenity_id")
+	CONSTRAINT "place_feature_assignment_pk" PRIMARY KEY("place_id","amenity_id")
 );
 --> statement-breakpoint
-CREATE TABLE "place_image" (
+CREATE TABLE "place_media" (
 	"place_id" text NOT NULL,
+	"file_id" text NOT NULL,
+	"usage" "place_media_usage" DEFAULT 'gallery' NOT NULL,
+	"sort_order" integer DEFAULT 0 NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "place_media_pk" PRIMARY KEY("place_id","file_id")
+);
+--> statement-breakpoint
+CREATE TABLE "place_activity_profile" (
+	"place_id" text PRIMARY KEY NOT NULL,
+	"starting_price" numeric(10, 2),
+	"average_duration_minutes" integer,
+	"requires_reservation" boolean DEFAULT false NOT NULL,
+	"safety_requirements" text,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "place_beach_profile" (
+	"place_id" text PRIMARY KEY NOT NULL,
+	"entrance_fee" numeric(10, 2),
+	"has_sunbed_rental" boolean DEFAULT false NOT NULL,
+	"has_shower" boolean DEFAULT false NOT NULL,
+	"has_lifeguard" boolean DEFAULT false NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "place_dining_profile" (
+	"place_id" text PRIMARY KEY NOT NULL,
+	"average_price_per_person" numeric(10, 2),
+	"reservation_required" boolean DEFAULT false NOT NULL,
+	"serves_alcohol" boolean DEFAULT false NOT NULL,
+	"dress_code" text,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "place_hotel_profile" (
+	"place_id" text PRIMARY KEY NOT NULL,
+	"star_rating" integer,
+	"minimum_stay_nights" integer,
+	"child_friendly" boolean DEFAULT true NOT NULL,
+	"allows_pets" boolean DEFAULT false NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "place_natural_profile" (
+	"place_id" text PRIMARY KEY NOT NULL,
+	"entry_fee" numeric(10, 2),
+	"difficulty_level" text,
+	"recommended_duration_minutes" integer,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "place_tag" (
+	"id" text PRIMARY KEY NOT NULL,
+	"slug" text NOT NULL,
+	"label" text NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "place_tag_slug_unique" UNIQUE("slug")
+);
+--> statement-breakpoint
+CREATE TABLE "place_tag_assignment" (
+	"place_id" text NOT NULL,
+	"tag_id" text NOT NULL,
+	"sort_order" integer DEFAULT 0 NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "place_tag_assignment_pk" PRIMARY KEY("place_id","tag_id")
+);
+--> statement-breakpoint
+CREATE TABLE "place_villa_profile" (
+	"place_id" text PRIMARY KEY NOT NULL,
+	"max_guests" integer,
+	"bedroom_count" integer,
+	"bathroom_count" integer,
+	"pool_available" boolean DEFAULT false NOT NULL,
+	"nightly_price" numeric(10, 2),
+	"cleaning_fee" numeric(10, 2),
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "place_visit_profile" (
+	"place_id" text PRIMARY KEY NOT NULL,
+	"recommended_duration_minutes" integer,
+	"ticket_price" numeric(10, 2),
+	"requires_guide" boolean DEFAULT false NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "hotel_reservation_policy" (
+	"place_id" text PRIMARY KEY NOT NULL,
+	"check_in_from_hour" integer,
+	"check_out_until_hour" integer,
+	"free_cancellation_until_hours" integer,
+	"policy_text" text,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "hotel_room" (
+	"id" text PRIMARY KEY NOT NULL,
+	"place_id" text NOT NULL,
+	"slug" text NOT NULL,
+	"name" text NOT NULL,
+	"description" text,
+	"max_adults" integer DEFAULT 2 NOT NULL,
+	"max_children" integer DEFAULT 0 NOT NULL,
+	"bed_count" integer,
+	"bathroom_count" integer,
+	"area_sqm" numeric(10, 2),
+	"base_nightly_price" numeric(10, 2),
+	"status" "hotel_room_status" DEFAULT 'active' NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "hotel_room_feature" (
+	"room_id" text NOT NULL,
+	"key" text NOT NULL,
+	"value" text,
+	"sort_order" integer DEFAULT 0 NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "hotel_room_feature_pk" PRIMARY KEY("room_id","key")
+);
+--> statement-breakpoint
+CREATE TABLE "hotel_room_media" (
+	"room_id" text NOT NULL,
 	"file_id" text NOT NULL,
 	"sort_order" integer DEFAULT 0 NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "place_image_pk" PRIMARY KEY("place_id","file_id")
+	CONSTRAINT "hotel_room_media_pk" PRIMARY KEY("room_id","file_id")
+);
+--> statement-breakpoint
+CREATE TABLE "hotel_room_rate" (
+	"id" text PRIMARY KEY NOT NULL,
+	"room_id" text NOT NULL,
+	"starts_on" date NOT NULL,
+	"ends_on" date NOT NULL,
+	"nightly_price" numeric(10, 2) NOT NULL,
+	"min_stay_nights" integer DEFAULT 1 NOT NULL,
+	"max_stay_nights" integer,
+	"is_refundable" boolean DEFAULT true NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "dining_menu" (
+	"id" text PRIMARY KEY NOT NULL,
+	"place_id" text NOT NULL,
+	"name" text NOT NULL,
+	"description" text,
+	"is_active" boolean DEFAULT true NOT NULL,
+	"sort_order" integer DEFAULT 0 NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "dining_menu_item" (
+	"id" text PRIMARY KEY NOT NULL,
+	"section_id" text NOT NULL,
+	"name" text NOT NULL,
+	"description" text,
+	"price" numeric(10, 2),
+	"image_file_id" text,
+	"is_available" boolean DEFAULT true NOT NULL,
+	"sort_order" integer DEFAULT 0 NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "dining_menu_item_tag" (
+	"item_id" text NOT NULL,
+	"tag" text NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "dining_menu_item_tag_pk" PRIMARY KEY("item_id","tag")
+);
+--> statement-breakpoint
+CREATE TABLE "dining_menu_section" (
+	"id" text PRIMARY KEY NOT NULL,
+	"menu_id" text NOT NULL,
+	"name" text NOT NULL,
+	"description" text,
+	"sort_order" integer DEFAULT 0 NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "activity_package" (
+	"id" text PRIMARY KEY NOT NULL,
+	"place_id" text NOT NULL,
+	"name" text NOT NULL,
+	"description" text,
+	"price" numeric(10, 2),
+	"duration_minutes" integer,
+	"min_participants" integer,
+	"max_participants" integer,
+	"is_active" boolean DEFAULT true NOT NULL,
+	"sort_order" integer DEFAULT 0 NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "activity_package_media" (
+	"package_id" text NOT NULL,
+	"file_id" text NOT NULL,
+	"sort_order" integer DEFAULT 0 NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "activity_package_media_pk" PRIMARY KEY("package_id","file_id")
+);
+--> statement-breakpoint
+CREATE TABLE "activity_package_price_tier" (
+	"id" text PRIMARY KEY NOT NULL,
+	"package_id" text NOT NULL,
+	"name" text NOT NULL,
+	"min_group_size" integer,
+	"max_group_size" integer,
+	"price" numeric(10, 2) NOT NULL,
+	"sort_order" integer DEFAULT 0 NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "review" (
@@ -562,17 +807,42 @@ ALTER TABLE "payment" ADD CONSTRAINT "payment_user_id_user_id_fk" FOREIGN KEY ("
 ALTER TABLE "subscription" ADD CONSTRAINT "subscription_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "subscription" ADD CONSTRAINT "subscription_plan_id_subscription_plan_id_fk" FOREIGN KEY ("plan_id") REFERENCES "public"."subscription_plan"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "subscription" ADD CONSTRAINT "subscription_coupon_id_coupon_id_fk" FOREIGN KEY ("coupon_id") REFERENCES "public"."coupon"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "subscription_plan_entitlement" ADD CONSTRAINT "subscription_plan_entitlement_plan_id_subscription_plan_id_fk" FOREIGN KEY ("plan_id") REFERENCES "public"."subscription_plan"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "subscription_plan_feature" ADD CONSTRAINT "subscription_plan_feature_plan_id_subscription_plan_id_fk" FOREIGN KEY ("plan_id") REFERENCES "public"."subscription_plan"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "district" ADD CONSTRAINT "district_province_id_province_id_fk" FOREIGN KEY ("province_id") REFERENCES "public"."province"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "place" ADD CONSTRAINT "place_category_id_place_category_id_fk" FOREIGN KEY ("category_id") REFERENCES "public"."place_category"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "place" ADD CONSTRAINT "place_category_id_place_kind_meta_id_fk" FOREIGN KEY ("category_id") REFERENCES "public"."place_kind_meta"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "place" ADD CONSTRAINT "place_city_id_province_id_fk" FOREIGN KEY ("city_id") REFERENCES "public"."province"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "place" ADD CONSTRAINT "place_district_id_district_id_fk" FOREIGN KEY ("district_id") REFERENCES "public"."district"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "place" ADD CONSTRAINT "place_business_document_file_id_file_id_fk" FOREIGN KEY ("business_document_file_id") REFERENCES "public"."file"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "place" ADD CONSTRAINT "place_owner_id_user_id_fk" FOREIGN KEY ("owner_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "place_amenity" ADD CONSTRAINT "place_amenity_place_id_place_id_fk" FOREIGN KEY ("place_id") REFERENCES "public"."place"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "place_amenity" ADD CONSTRAINT "place_amenity_amenity_id_amenity_id_fk" FOREIGN KEY ("amenity_id") REFERENCES "public"."amenity"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "place_image" ADD CONSTRAINT "place_image_place_id_place_id_fk" FOREIGN KEY ("place_id") REFERENCES "public"."place"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "place_image" ADD CONSTRAINT "place_image_file_id_file_id_fk" FOREIGN KEY ("file_id") REFERENCES "public"."file"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "place_feature_assignment" ADD CONSTRAINT "place_feature_assignment_place_id_place_id_fk" FOREIGN KEY ("place_id") REFERENCES "public"."place"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "place_feature_assignment" ADD CONSTRAINT "place_feature_assignment_amenity_id_place_feature_id_fk" FOREIGN KEY ("amenity_id") REFERENCES "public"."place_feature"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "place_media" ADD CONSTRAINT "place_media_place_id_place_id_fk" FOREIGN KEY ("place_id") REFERENCES "public"."place"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "place_media" ADD CONSTRAINT "place_media_file_id_file_id_fk" FOREIGN KEY ("file_id") REFERENCES "public"."file"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "place_activity_profile" ADD CONSTRAINT "place_activity_profile_place_id_place_id_fk" FOREIGN KEY ("place_id") REFERENCES "public"."place"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "place_beach_profile" ADD CONSTRAINT "place_beach_profile_place_id_place_id_fk" FOREIGN KEY ("place_id") REFERENCES "public"."place"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "place_dining_profile" ADD CONSTRAINT "place_dining_profile_place_id_place_id_fk" FOREIGN KEY ("place_id") REFERENCES "public"."place"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "place_hotel_profile" ADD CONSTRAINT "place_hotel_profile_place_id_place_id_fk" FOREIGN KEY ("place_id") REFERENCES "public"."place"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "place_natural_profile" ADD CONSTRAINT "place_natural_profile_place_id_place_id_fk" FOREIGN KEY ("place_id") REFERENCES "public"."place"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "place_tag_assignment" ADD CONSTRAINT "place_tag_assignment_place_id_place_id_fk" FOREIGN KEY ("place_id") REFERENCES "public"."place"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "place_tag_assignment" ADD CONSTRAINT "place_tag_assignment_tag_id_place_tag_id_fk" FOREIGN KEY ("tag_id") REFERENCES "public"."place_tag"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "place_villa_profile" ADD CONSTRAINT "place_villa_profile_place_id_place_id_fk" FOREIGN KEY ("place_id") REFERENCES "public"."place"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "place_visit_profile" ADD CONSTRAINT "place_visit_profile_place_id_place_id_fk" FOREIGN KEY ("place_id") REFERENCES "public"."place"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "hotel_reservation_policy" ADD CONSTRAINT "hotel_reservation_policy_place_id_place_id_fk" FOREIGN KEY ("place_id") REFERENCES "public"."place"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "hotel_room" ADD CONSTRAINT "hotel_room_place_id_place_id_fk" FOREIGN KEY ("place_id") REFERENCES "public"."place"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "hotel_room_feature" ADD CONSTRAINT "hotel_room_feature_room_id_hotel_room_id_fk" FOREIGN KEY ("room_id") REFERENCES "public"."hotel_room"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "hotel_room_media" ADD CONSTRAINT "hotel_room_media_room_id_hotel_room_id_fk" FOREIGN KEY ("room_id") REFERENCES "public"."hotel_room"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "hotel_room_media" ADD CONSTRAINT "hotel_room_media_file_id_file_id_fk" FOREIGN KEY ("file_id") REFERENCES "public"."file"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "hotel_room_rate" ADD CONSTRAINT "hotel_room_rate_room_id_hotel_room_id_fk" FOREIGN KEY ("room_id") REFERENCES "public"."hotel_room"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "dining_menu" ADD CONSTRAINT "dining_menu_place_id_place_id_fk" FOREIGN KEY ("place_id") REFERENCES "public"."place"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "dining_menu_item" ADD CONSTRAINT "dining_menu_item_section_id_dining_menu_section_id_fk" FOREIGN KEY ("section_id") REFERENCES "public"."dining_menu_section"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "dining_menu_item" ADD CONSTRAINT "dining_menu_item_image_file_id_file_id_fk" FOREIGN KEY ("image_file_id") REFERENCES "public"."file"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "dining_menu_item_tag" ADD CONSTRAINT "dining_menu_item_tag_item_id_dining_menu_item_id_fk" FOREIGN KEY ("item_id") REFERENCES "public"."dining_menu_item"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "dining_menu_section" ADD CONSTRAINT "dining_menu_section_menu_id_dining_menu_id_fk" FOREIGN KEY ("menu_id") REFERENCES "public"."dining_menu"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "activity_package" ADD CONSTRAINT "activity_package_place_id_place_id_fk" FOREIGN KEY ("place_id") REFERENCES "public"."place"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "activity_package_media" ADD CONSTRAINT "activity_package_media_package_id_activity_package_id_fk" FOREIGN KEY ("package_id") REFERENCES "public"."activity_package"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "activity_package_media" ADD CONSTRAINT "activity_package_media_file_id_file_id_fk" FOREIGN KEY ("file_id") REFERENCES "public"."file"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "activity_package_price_tier" ADD CONSTRAINT "activity_package_price_tier_package_id_activity_package_id_fk" FOREIGN KEY ("package_id") REFERENCES "public"."activity_package"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "review" ADD CONSTRAINT "review_place_id_place_id_fk" FOREIGN KEY ("place_id") REFERENCES "public"."place"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "review" ADD CONSTRAINT "review_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "blog_category_id_idx" ON "blog" USING btree ("category_id");--> statement-breakpoint
@@ -613,6 +883,10 @@ CREATE INDEX "subscription_coupon_id_idx" ON "subscription" USING btree ("coupon
 CREATE INDEX "subscription_next_billing_date_idx" ON "subscription" USING btree ("next_billing_date");--> statement-breakpoint
 CREATE INDEX "subscription_plan_billing_cycle_idx" ON "subscription_plan" USING btree ("billing_cycle");--> statement-breakpoint
 CREATE INDEX "subscription_plan_sort_order_idx" ON "subscription_plan" USING btree ("sort_order");--> statement-breakpoint
+CREATE INDEX "subscription_plan_active_idx" ON "subscription_plan" USING btree ("active");--> statement-breakpoint
+CREATE UNIQUE INDEX "subscription_plan_entitlement_plan_resource_uniq" ON "subscription_plan_entitlement" USING btree ("plan_id","resource_key");--> statement-breakpoint
+CREATE INDEX "subscription_plan_entitlement_plan_idx" ON "subscription_plan_entitlement" USING btree ("plan_id");--> statement-breakpoint
+CREATE INDEX "subscription_plan_entitlement_resource_idx" ON "subscription_plan_entitlement" USING btree ("resource_key");--> statement-breakpoint
 CREATE INDEX "subscription_plan_feature_plan_sort_idx" ON "subscription_plan_feature" USING btree ("plan_id","sort_order");--> statement-breakpoint
 CREATE UNIQUE INDEX "subscription_plan_feature_plan_label_uniq" ON "subscription_plan_feature" USING btree ("plan_id","label");--> statement-breakpoint
 CREATE INDEX "district_province_id_idx" ON "district" USING btree ("province_id");--> statement-breakpoint
@@ -620,8 +894,9 @@ CREATE INDEX "district_province_code_idx" ON "district" USING btree ("province_c
 CREATE INDEX "district_name_idx" ON "district" USING btree ("name");--> statement-breakpoint
 CREATE INDEX "province_code_idx" ON "province" USING btree ("code");--> statement-breakpoint
 CREATE INDEX "province_name_idx" ON "province" USING btree ("name");--> statement-breakpoint
-CREATE INDEX "amenity_slug_idx" ON "amenity" USING btree ("slug");--> statement-breakpoint
-CREATE INDEX "amenity_label_idx" ON "amenity" USING btree ("label");--> statement-breakpoint
+CREATE INDEX "place_feature_slug_idx" ON "place_feature" USING btree ("slug");--> statement-breakpoint
+CREATE INDEX "place_feature_label_idx" ON "place_feature" USING btree ("label");--> statement-breakpoint
+CREATE INDEX "place_kind_idx" ON "place" USING btree ("kind");--> statement-breakpoint
 CREATE INDEX "place_category_id_idx" ON "place" USING btree ("category_id");--> statement-breakpoint
 CREATE INDEX "place_city_id_idx" ON "place" USING btree ("city_id");--> statement-breakpoint
 CREATE INDEX "place_district_id_idx" ON "place" USING btree ("district_id");--> statement-breakpoint
@@ -631,9 +906,27 @@ CREATE INDEX "place_status_idx" ON "place" USING btree ("status");--> statement-
 CREATE INDEX "place_featured_idx" ON "place" USING btree ("featured");--> statement-breakpoint
 CREATE INDEX "place_verified_idx" ON "place" USING btree ("verified");--> statement-breakpoint
 CREATE INDEX "place_created_at_idx" ON "place" USING btree ("created_at");--> statement-breakpoint
-CREATE UNIQUE INDEX "place_amenity_place_sort_order_uniq" ON "place_amenity" USING btree ("place_id","sort_order");--> statement-breakpoint
-CREATE INDEX "place_amenity_place_sort_idx" ON "place_amenity" USING btree ("place_id","sort_order");--> statement-breakpoint
-CREATE INDEX "place_amenity_amenity_id_idx" ON "place_amenity" USING btree ("amenity_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "place_image_place_sort_order_uniq" ON "place_image" USING btree ("place_id","sort_order");--> statement-breakpoint
-CREATE INDEX "place_image_place_sort_idx" ON "place_image" USING btree ("place_id","sort_order");--> statement-breakpoint
-CREATE INDEX "place_image_file_id_idx" ON "place_image" USING btree ("file_id");
+CREATE UNIQUE INDEX "place_feature_assignment_place_sort_uniq" ON "place_feature_assignment" USING btree ("place_id","sort_order");--> statement-breakpoint
+CREATE INDEX "place_feature_assignment_place_sort_idx" ON "place_feature_assignment" USING btree ("place_id","sort_order");--> statement-breakpoint
+CREATE INDEX "place_feature_assignment_amenity_id_idx" ON "place_feature_assignment" USING btree ("amenity_id");--> statement-breakpoint
+CREATE INDEX "place_media_place_usage_sort_idx" ON "place_media" USING btree ("place_id","usage","sort_order");--> statement-breakpoint
+CREATE UNIQUE INDEX "place_media_place_sort_uniq" ON "place_media" USING btree ("place_id","sort_order");--> statement-breakpoint
+CREATE INDEX "place_media_file_id_idx" ON "place_media" USING btree ("file_id");--> statement-breakpoint
+CREATE INDEX "place_hotel_profile_star_rating_idx" ON "place_hotel_profile" USING btree ("star_rating");--> statement-breakpoint
+CREATE INDEX "place_tag_slug_idx" ON "place_tag" USING btree ("slug");--> statement-breakpoint
+CREATE INDEX "place_tag_assignment_place_sort_idx" ON "place_tag_assignment" USING btree ("place_id","sort_order");--> statement-breakpoint
+CREATE UNIQUE INDEX "hotel_room_place_slug_uniq" ON "hotel_room" USING btree ("place_id","slug");--> statement-breakpoint
+CREATE INDEX "hotel_room_place_status_idx" ON "hotel_room" USING btree ("place_id","status");--> statement-breakpoint
+CREATE INDEX "hotel_room_feature_room_sort_idx" ON "hotel_room_feature" USING btree ("room_id","sort_order");--> statement-breakpoint
+CREATE UNIQUE INDEX "hotel_room_media_room_sort_uniq" ON "hotel_room_media" USING btree ("room_id","sort_order");--> statement-breakpoint
+CREATE INDEX "hotel_room_rate_room_dates_idx" ON "hotel_room_rate" USING btree ("room_id","starts_on","ends_on");--> statement-breakpoint
+CREATE UNIQUE INDEX "dining_menu_place_name_uniq" ON "dining_menu" USING btree ("place_id","name");--> statement-breakpoint
+CREATE INDEX "dining_menu_place_sort_idx" ON "dining_menu" USING btree ("place_id","sort_order");--> statement-breakpoint
+CREATE INDEX "dining_menu_item_section_sort_idx" ON "dining_menu_item" USING btree ("section_id","sort_order");--> statement-breakpoint
+CREATE INDEX "dining_menu_item_available_idx" ON "dining_menu_item" USING btree ("is_available");--> statement-breakpoint
+CREATE INDEX "dining_menu_section_menu_sort_idx" ON "dining_menu_section" USING btree ("menu_id","sort_order");--> statement-breakpoint
+CREATE UNIQUE INDEX "activity_package_place_name_uniq" ON "activity_package" USING btree ("place_id","name");--> statement-breakpoint
+CREATE INDEX "activity_package_place_sort_idx" ON "activity_package" USING btree ("place_id","sort_order");--> statement-breakpoint
+CREATE INDEX "activity_package_place_active_idx" ON "activity_package" USING btree ("place_id","is_active");--> statement-breakpoint
+CREATE UNIQUE INDEX "activity_package_media_package_sort_uniq" ON "activity_package_media" USING btree ("package_id","sort_order");--> statement-breakpoint
+CREATE INDEX "activity_package_price_tier_package_sort_idx" ON "activity_package_price_tier" USING btree ("package_id","sort_order");

@@ -1,3 +1,22 @@
+export type PlanResourceKey =
+  | "place.hotel"
+  | "place.villa"
+  | "place.restaurant"
+  | "place.cafe"
+  | "place.bar_club"
+  | "place.beach"
+  | "place.natural_location"
+  | "place.activity_location"
+  | "place.visit_location"
+  | "place.other_monetized"
+  | "blog.post";
+
+export interface PlanEntitlement {
+  resourceKey: PlanResourceKey;
+  limitCount: number | null;
+  isUnlimited: boolean;
+}
+
 export interface SubscriptionPlan {
   id: string;
   name: string;
@@ -8,6 +27,7 @@ export interface SubscriptionPlan {
   maxPlaces: number;
   maxBlogs: number;
   features?: string[];
+  entitlements?: PlanEntitlement[];
   limits?: { maxPlaces: number; maxBlogs: number };
   active: boolean;
   sortOrder?: number;
@@ -42,12 +62,14 @@ export interface Subscription {
 
   // Features & Usage
   features: string[];
+  entitlements?: PlanEntitlement[];
   limits: { maxPlaces: number; maxBlogs: number };
   usage: {
     currentPlaces: number;
     currentBlogs: number;
     currentPhotos: number;
     featuredListingsUsed: number;
+    resources?: Partial<Record<PlanResourceKey, number>>;
   };
 
   // Payment Info

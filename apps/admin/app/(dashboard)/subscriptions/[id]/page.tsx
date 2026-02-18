@@ -9,6 +9,14 @@ import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { PlanEntitlement } from "@/types/subscriptions"
+import {
+  formatLimit,
+  getBlogUsageSummary,
+  getMonetizedPlaceUsageSummary,
+  getVisitLocationUsageSummary,
+  normalizeUsageByResource,
+} from "@/lib/subscription-entitlements"
 
 interface SubscriptionDetail {
   id: string
@@ -27,6 +35,7 @@ interface SubscriptionDetail {
   usage?: {
     currentPlaces: number
     currentBlogs: number
+    resources?: Record<string, unknown>
   }
   user: {
     id: string
@@ -41,6 +50,7 @@ interface SubscriptionDetail {
     maxPlaces: number
     maxBlogs: number
     features?: string[]
+    entitlements?: PlanEntitlement[]
   }
   paymentHistory?: Array<{
     id: string
@@ -167,6 +177,20 @@ export default function SubscriptionDetailPage() {
     )
   }
 
+  const usageByResource = normalizeUsageByResource(subscription.usage?.resources)
+  const monetizedUsage = getMonetizedPlaceUsageSummary(
+    subscription.plan.entitlements,
+    usageByResource,
+  )
+  const visitUsage = getVisitLocationUsageSummary(
+    subscription.plan.entitlements,
+    usageByResource,
+  )
+  const blogUsage = getBlogUsageSummary(
+    subscription.plan.entitlements,
+    usageByResource,
+  )
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -227,9 +251,17 @@ export default function SubscriptionDetailPage() {
             {subscription.plan.description && (
               <p className="text-muted-foreground">{subscription.plan.description}</p>
             )}
-            <p className="text-muted-foreground">
-              Limitler: {subscription.plan.maxPlaces} mekan / {subscription.plan.maxBlogs} blog
-            </p>
+            <div className="space-y-1 text-muted-foreground">
+              <p>
+                Ücretli Mekanlar: {formatLimit(monetizedUsage.max, monetizedUsage.isUnlimited)}
+              </p>
+              <p>
+                Gezi Lokasyonları: {formatLimit(visitUsage.max, visitUsage.isUnlimited)}
+              </p>
+              <p>
+                Blog Yazıları: {formatLimit(blogUsage.max, blogUsage.isUnlimited)}
+              </p>
+            </div>
           </CardContent>
         </Card>
 
@@ -283,12 +315,17 @@ export default function SubscriptionDetailPage() {
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
             <p>
-              <span className="text-muted-foreground">Mekan:</span>{" "}
-              {subscription.usage?.currentPlaces ?? 0} / {subscription.plan.maxPlaces}
+              <span className="text-muted-foreground">Ücretli Mekanlar:</span>{" "}
+              {monetizedUsage.current} /{" "}
+              {formatLimit(monetizedUsage.max, monetizedUsage.isUnlimited)}
             </p>
             <p>
-              <span className="text-muted-foreground">Blog:</span>{" "}
-              {subscription.usage?.currentBlogs ?? 0} / {subscription.plan.maxBlogs}
+              <span className="text-muted-foreground">Gezi Lokasyonları:</span>{" "}
+              {visitUsage.current} / {formatLimit(visitUsage.max, visitUsage.isUnlimited)}
+            </p>
+            <p>
+              <span className="text-muted-foreground">Blog Yazıları:</span>{" "}
+              {blogUsage.current} / {formatLimit(blogUsage.max, blogUsage.isUnlimited)}
             </p>
           </CardContent>
         </Card>

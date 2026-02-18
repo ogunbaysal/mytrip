@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
 export const metadata: Metadata = {
-  title: "Hakkımızda | TatilDesen",
+  title: "Hakkımızda",
   description: "TatilDesen hikayesini, ekibini ve Muğla deneyimini yeniden tanımlama vizyonumuzu keşfedin.",
 };
 

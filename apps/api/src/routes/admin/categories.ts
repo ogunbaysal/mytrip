@@ -1,7 +1,7 @@
 
 import { Hono } from "hono";
 import { db } from "../../db/index.ts";
-import { placeCategory } from "../../db/schemas/index.ts";
+import { placeKind } from "../../db/schemas/index.ts";
 import { eq, desc, ilike, sql } from "drizzle-orm";
 import { nanoid } from "nanoid";
 
@@ -12,8 +12,8 @@ app.get("/", async (c) => {
   try {
     const categories = await db
       .select()
-      .from(placeCategory)
-      .orderBy(desc(placeCategory.createdAt));
+      .from(placeKind)
+      .orderBy(desc(placeKind.createdAt));
 
     return c.json({ categories });
   } catch (error) {
@@ -28,8 +28,8 @@ app.get("/:id", async (c) => {
     const { id } = c.req.param();
     const [category] = await db
       .select()
-      .from(placeCategory)
-      .where(eq(placeCategory.id, id))
+      .from(placeKind)
+      .where(eq(placeKind.id, id))
       .limit(1);
 
     if (!category) return c.json({ error: "Category not found" }, 404);
@@ -46,7 +46,7 @@ app.post("/", async (c) => {
     const slug = data.slug || data.name.toLowerCase().replace(/\s+/g, "-") + "-" + nanoid(4);
 
     const [newCategory] = await db
-      .insert(placeCategory)
+      .insert(placeKind)
       .values({
         id: nanoid(),
         name: data.name,
@@ -71,9 +71,9 @@ app.put("/:id", async (c) => {
     const { id: _, createdAt, updatedAt, ...updates } = data;
 
     const [updatedCategory] = await db
-      .update(placeCategory)
+      .update(placeKind)
       .set({ ...updates, updatedAt: new Date() })
-      .where(eq(placeCategory.id, id))
+      .where(eq(placeKind.id, id))
       .returning();
 
     if (!updatedCategory) return c.json({ error: "Category not found" }, 404);
@@ -89,8 +89,8 @@ app.delete("/:id", async (c) => {
   try {
     const { id } = c.req.param();
     const [deleted] = await db
-      .delete(placeCategory)
-      .where(eq(placeCategory.id, id))
+      .delete(placeKind)
+      .where(eq(placeKind.id, id))
       .returning();
 
     if (!deleted) return c.json({ error: "Category not found" }, 404);

@@ -48,16 +48,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Skeleton } from "@/components/ui/skeleton"
-
-const PLACE_TYPE_LABELS: Record<string, string> = {
-  restaurant: "Restoran",
-  hotel: "Otel",
-  activity: "Aktivite",
-  attraction: "Gezilecek Yer",
-  service: "Hizmet",
-  shopping: "Mağaza",
-  cafe: "Kafe",
-}
+import { getPlaceKindLabel, resolvePlaceKindFromPlace } from "@/components/places/place-kind"
 
 const PLACE_STATUS_LABELS: Record<string, string> = {
   active: "Aktif",
@@ -72,10 +63,6 @@ const PRICE_LEVEL_LABELS: Record<string, string> = {
   moderate: "Orta",
   expensive: "Pahalı",
   luxury: "Lüks",
-}
-
-const getTypeLabel = (type: string) => {
-  return PLACE_TYPE_LABELS[type] || type
 }
 
 const getStatusLabel = (status: string) => {
@@ -318,7 +305,11 @@ export function PlacesTable({ data, isLoading }: { data: Place[], isLoading: boo
               )}
             </div>
             <div className="text-sm text-muted-foreground">
-              {place.category} • {place.district}, {place.city}
+              {getPlaceKindLabel(
+                resolvePlaceKindFromPlace(place),
+                place.kindName || place.category,
+              )}{" "}
+              • {place.district}, {place.city}
             </div>
             <div className="text-xs text-muted-foreground">
               Sahip: {place.ownerName}
@@ -328,13 +319,14 @@ export function PlacesTable({ data, isLoading }: { data: Place[], isLoading: boo
       },
     },
     {
-      accessorKey: "type",
+      accessorKey: "kind",
       header: "Tür",
       cell: ({ row }) => {
-        const type = row.getValue("type") as string
+        const rowPlace = row.original
+        const kind = (row.getValue("kind") as string) || resolvePlaceKindFromPlace(rowPlace)
         return (
           <Badge variant="outline">
-            {getTypeLabel(type)}
+            {getPlaceKindLabel(kind, rowPlace.kindName || rowPlace.category)}
           </Badge>
         )
       },
@@ -521,7 +513,7 @@ export function PlacesTable({ data, isLoading }: { data: Place[], isLoading: boo
                     }
                   >
                     {column.id === "name" ? "Mekan" :
-                         column.id === "type" ? "Tür" :
+                         column.id === "kind" ? "Tür" :
                          column.id === "status" ? "Durum" :
                          column.id === "rating" ? "Değerlendirme" :
                          column.id === "priceLevel" ? "Fiyat" :
@@ -530,7 +522,6 @@ export function PlacesTable({ data, isLoading }: { data: Place[], isLoading: boo
                          column.id === "createdAt" ? "Kayıt Tarihi" :
                          column.id === "actions" ? "İşlemler" :
                          column.id === "ownerName" ? "Mekan Sahibi" :
-                         column.id === "category" ? "Kategori" :
                          column.id === "flags" ? "Özellikler" :
                          column.id}
                   </DropdownMenuCheckboxItem>

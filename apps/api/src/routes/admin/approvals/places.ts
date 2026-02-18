@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { db } from "../../../db/index.ts";
-import { district, file, place, placeCategory, province, user } from "../../../db/schemas/index.ts";
+import { district, file, place, placeKind, province, user } from "../../../db/schemas/index.ts";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { getAdminUserFromContext } from "../../../lib/admin-context.ts";
 import {
@@ -51,14 +51,14 @@ app.get("/places", async (c) => {
         ownerName: user.name,
         ownerEmail: user.email,
         createdAt: place.createdAt,
-        categoryName: placeCategory.name,
-        categorySlug: placeCategory.slug,
+        categoryName: placeKind.name,
+        categorySlug: placeKind.slug,
         cityName: province.name,
         districtName: district.name,
       })
       .from(place)
       .innerJoin(user, eq(place.ownerId, user.id))
-      .leftJoin(placeCategory, eq(place.categoryId, placeCategory.id))
+      .leftJoin(placeKind, eq(place.kind, placeKind.id as any))
       .leftJoin(province, eq(place.cityId, province.id))
       .leftJoin(district, eq(place.districtId, district.id))
       .where(and(...whereConditions))
@@ -126,13 +126,13 @@ app.get("/places/:id", async (c) => {
         checkOutInfo: place.checkOutInfo,
         createdAt: place.createdAt,
         updatedAt: place.updatedAt,
-        categoryName: placeCategory.name,
-        categorySlug: placeCategory.slug,
+        categoryName: placeKind.name,
+        categorySlug: placeKind.slug,
         cityName: province.name,
         districtName: district.name,
       })
       .from(place)
-      .leftJoin(placeCategory, eq(place.categoryId, placeCategory.id))
+      .leftJoin(placeKind, eq(place.kind, placeKind.id as any))
       .leftJoin(province, eq(place.cityId, province.id))
       .leftJoin(district, eq(place.districtId, district.id))
       .where(eq(place.id, id))

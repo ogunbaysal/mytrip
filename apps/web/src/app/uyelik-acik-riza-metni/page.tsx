@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Üyelik Açık Rıza Metni | TatilDesen",
+  title: "Üyelik Açık Rıza Metni",
   description: "Üyelik açık rıza metni.",
 };
 

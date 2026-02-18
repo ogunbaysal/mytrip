@@ -25,7 +25,9 @@ import {
 } from "@/components/ui/select"
 import { toast } from "sonner"
 import { useCreatePlace } from "@/hooks/use-places"
-import { useCategories } from "@/hooks/use-categories"
+import { PlaceKindCapabilities } from "@/components/places/place-kind-capabilities"
+import { PlaceKindSelect } from "@/components/places/place-kind-select"
+import { usePlaceKinds } from "@/hooks/use-places"
 import { useCities, useDistricts } from "@/hooks/use-locations"
 import { useUsers } from "@/hooks/use-users"
 import { useRouter } from "next/navigation"
@@ -38,9 +40,7 @@ import { CoordinateMapPicker } from "@/components/ui/coordinate-map-picker"
 const formSchema = z.object({
   images: z.array(z.string()).optional(),
   name: z.string().min(2, "Mekan adı en az 2 karakter olmalıdır"),
-  type: z.string().min(1, "Tip seçimi zorunludur"),
-  category: z.string().optional(), // Make optional string
-  categoryId: z.string().min(1, "Kategori seçimi zorunludur"),
+  kind: z.string().min(1, "Yer türü seçimi zorunludur"),
   description: z.string().min(10, "Açıklama en az 10 karakter olmalıdır"),
   shortDescription: z.string().max(160, "Kısa açıklama 160 karakteri geçemez").optional(),
   address: z.string().min(5, "Adres zorunludur"),
@@ -58,7 +58,7 @@ const DEFAULT_COORDS = { lat: 39.0, lng: 35.0 }
 export default function CreatePlacePage() {
   const router = useRouter()
   const { mutate: createPlace, isPending } = useCreatePlace()
-  const { data: categories } = useCategories()
+  const { data: placeKinds, isLoading: isKindsLoading } = usePlaceKinds()
   const { data: cities } = useCities()
   const [ownerSearchInput, setOwnerSearchInput] = useState("")
   const [ownerSearch, setOwnerSearch] = useState("")
@@ -107,9 +107,7 @@ export default function CreatePlacePage() {
     defaultValues: {
       images: [],
       name: "",
-      type: "hotel",
-      category: "", // Legacy
-      categoryId: "",
+      kind: "",
       description: "",
       shortDescription: "",
       address: "",
@@ -123,6 +121,7 @@ export default function CreatePlacePage() {
     },
   })
   const selectedOwnerId = form.watch("ownerId")
+  const selectedKind = form.watch("kind")
 
   useEffect(() => {
     if (!selectedOwnerId) {
@@ -151,7 +150,6 @@ export default function CreatePlacePage() {
     // Transform values for API
     const apiData = {
         ...values,
-        category: categories?.find(c => c.id === values.categoryId)?.name || values.category || "", // Fallback
         location: hasValidCoordinates
           ? { lat: parsedLat, lng: parsedLng }
           : undefined,
@@ -236,42 +234,27 @@ export default function CreatePlacePage() {
                             )}
                         />
                         <div className="grid grid-cols-2 gap-4">
-                             <FormField
-                                control={form.control}
-                                name="type"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Tip</FormLabel>
-                                        <Select onValueChange={field.onChange} value={field.value}>
-                                            <FormControl><SelectTrigger><SelectValue placeholder="Seçiniz" /></SelectTrigger></FormControl>
-                                            <SelectContent>
-                                                <SelectItem value="hotel">Otel</SelectItem>
-                                                <SelectItem value="restaurant">Restoran</SelectItem>
-                                                <SelectItem value="activity">Aktivite</SelectItem>
-                                                <SelectItem value="museum">Müze</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                             <FormField
-                                control={form.control}
-                                name="categoryId"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Kategori</FormLabel>
-                                        <Select onValueChange={field.onChange} value={field.value}>
-                                            <FormControl><SelectTrigger><SelectValue placeholder="Kategori Seçiniz" /></SelectTrigger></FormControl>
-                                            <SelectContent>
-                                                {categories?.map((cat) => (
-                                                    <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
+                            <FormField
+                              control={form.control}
+                              name="kind"
+                              render={({ field }) => (
+                                <FormItem className="col-span-2">
+                                  <FormLabel>Yer Türü</FormLabel>
+                                  <FormControl>
+                                    <PlaceKindSelect
+                                      value={field.value}
+                                      onValueChange={field.onChange}
+                                      kinds={placeKinds}
+                                      disabled={isKindsLoading}
+                                    />
+                                  </FormControl>
+                                  <PlaceKindCapabilities
+                                    kindId={selectedKind}
+                                    kinds={placeKinds}
+                                  />
+                                  <FormMessage />
+                                </FormItem>
+                              )}
                             />
                         </div>
                         <FormField

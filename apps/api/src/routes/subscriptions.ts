@@ -1,21 +1,25 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { and, asc, desc, eq, inArray, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, or, sql } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { db } from "../db/index.ts";
 import {
-  blogPost,
   coupon,
   couponPlan,
   couponRedemption,
   payment,
-  place,
   subscription,
   subscriptionPlan,
   subscriptionPlanFeature,
   user,
 } from "../db/schemas/index.ts";
+import {
+  getCurrentUsageByResource,
+  getEntitlementsForPlan,
+  getLatestSubscriptionForUser,
+  hydratePlansWithFeaturesAndEntitlements,
+} from "../lib/plan-entitlements.ts";
 import { getSessionFromRequest } from "../lib/session.ts";
 import { paymentProvider } from "../lib/payment-provider.ts";
 
@@ -41,7 +45,6 @@ const validateCouponSchema = z.object({
   code: z.string().trim().min(1),
 });
 
-type PlanRow = typeof subscriptionPlan.$inferSelect;
 type CouponRow = typeof coupon.$inferSelect;
 
 const normalizeCode = (code: string) => code.trim().toUpperCase();
@@ -50,47 +53,6 @@ const roundCurrency = (value: number) => Math.round(value * 100) / 100;
 const parseNumeric = (value: string | number | null | undefined) => {
   if (value === null || value === undefined) return 0;
   return typeof value === "number" ? value : Number.parseFloat(value);
-};
-
-const hydratePlansWithFeatures = async (plans: PlanRow[]) => {
-  if (plans.length === 0) {
-    return [];
-  }
-
-  const planIds = plans.map((plan) => plan.id);
-  const features = await db
-    .select({
-      planId: subscriptionPlanFeature.planId,
-      label: subscriptionPlanFeature.label,
-    })
-    .from(subscriptionPlanFeature)
-    .where(inArray(subscriptionPlanFeature.planId, planIds))
-    .orderBy(
-      asc(subscriptionPlanFeature.planId),
-      asc(subscriptionPlanFeature.sortOrder),
-    );
-
-  const featureMap = new Map<string, string[]>();
-  for (const feature of features) {
-    if (!featureMap.has(feature.planId)) {
-      featureMap.set(feature.planId, []);
-    }
-    featureMap.get(feature.planId)!.push(feature.label);
-  }
-
-  return plans.map((plan) => {
-    const planFeatures = featureMap.get(plan.id) ?? [];
-    const limits = {
-      maxPlaces: plan.maxPlaces,
-      maxBlogs: plan.maxBlogs,
-    };
-    return {
-      ...plan,
-      billingCycle: "yearly" as const,
-      features: planFeatures,
-      limits,
-    };
-  });
 };
 
 const calculateCouponDiscount = ({
@@ -217,7 +179,9 @@ app.get("/plans", async (c) => {
       )
       .orderBy(subscriptionPlan.sortOrder, desc(subscriptionPlan.createdAt));
 
-    return c.json({ plans: await hydratePlansWithFeatures(plans) });
+    return c.json({
+      plans: await hydratePlansWithFeaturesAndEntitlements(plans),
+    });
   } catch (error) {
     console.error("Failed to fetch plans:", error);
     return c.json({ error: "Failed to fetch plans" }, 500);
@@ -235,43 +199,19 @@ app.get("/current", async (c) => {
     }
 
     const userId = session.user.id;
-
-    const [currentSub] = await db
-      .select({
-        id: subscription.id,
-        status: subscription.status,
-        startDate: subscription.startDate,
-        endDate: subscription.endDate,
-        nextBillingDate: subscription.nextBillingDate,
-        cancelledAt: subscription.cancelledAt,
-        planId: subscription.planId,
-        price: subscription.price,
-        basePrice: subscription.basePrice,
-        discountAmount: subscription.discountAmount,
-        couponCode: subscription.couponCode,
-        currency: subscription.currency,
-        billingCycle: subscription.billingCycle,
-        planName: subscriptionPlan.name,
-        planDescription: subscriptionPlan.description,
-        planMaxPlaces: subscriptionPlan.maxPlaces,
-        planMaxBlogs: subscriptionPlan.maxBlogs,
-      })
-      .from(subscription)
-      .innerJoin(subscriptionPlan, eq(subscription.planId, subscriptionPlan.id))
-      .where(eq(subscription.userId, userId))
-      .orderBy(desc(subscription.createdAt))
-      .limit(1);
+    const currentSub = await getLatestSubscriptionForUser(userId);
 
     if (!currentSub) {
       return c.json({ subscription: null, hasSubscription: false });
     }
 
-    const [featureRows] = await Promise.all([
+    const [featureRows, planEntitlements] = await Promise.all([
       db
         .select({ label: subscriptionPlanFeature.label })
         .from(subscriptionPlanFeature)
         .where(eq(subscriptionPlanFeature.planId, currentSub.planId))
         .orderBy(asc(subscriptionPlanFeature.sortOrder)),
+      getEntitlementsForPlan(currentSub.planId),
     ]);
 
     const planFeatures = featureRows.map((item) => item.label);
@@ -284,6 +224,7 @@ app.get("/current", async (c) => {
       subscription: {
         ...currentSub,
         planFeatures,
+        planEntitlements,
         planLimits,
       },
       hasSubscription: true,
@@ -555,7 +496,7 @@ app.post("/create", zValidator("json", createSubscriptionSchema), async (c) => {
       })
       .where(eq(user.id, userId));
 
-    const [hydratedPlan] = await hydratePlansWithFeatures([plan]);
+    const [hydratedPlan] = await hydratePlansWithFeaturesAndEntitlements([plan]);
 
     return c.json(
       {
@@ -657,22 +598,7 @@ app.get("/usage", async (c) => {
     }
 
     const userId = session.user.id;
-
-    const [subscriptionData] = await db
-      .select({
-        id: subscription.id,
-        status: subscription.status,
-        endDate: subscription.endDate,
-        nextBillingDate: subscription.nextBillingDate,
-        planId: subscription.planId,
-        planMaxPlaces: subscriptionPlan.maxPlaces,
-        planMaxBlogs: subscriptionPlan.maxBlogs,
-      })
-      .from(subscription)
-      .innerJoin(subscriptionPlan, eq(subscription.planId, subscriptionPlan.id))
-      .where(eq(subscription.userId, userId))
-      .orderBy(desc(subscription.createdAt))
-      .limit(1);
+    const subscriptionData = await getLatestSubscriptionForUser(userId);
 
     if (!subscriptionData) {
       return c.json(
@@ -684,24 +610,56 @@ app.get("/usage", async (c) => {
       );
     }
 
-    const [placeCount] = await db
-      .select({ count: sql<number>`COUNT(*)::int` })
-      .from(place)
-      .where(eq(place.ownerId, userId));
+    const [usageByResource, planEntitlements] = await Promise.all([
+      getCurrentUsageByResource(userId),
+      getEntitlementsForPlan(subscriptionData.planId),
+    ]);
 
-    const [blogCount] = await db
-      .select({ count: sql<number>`COUNT(*)::int` })
-      .from(blogPost)
-      .where(eq(blogPost.authorId, userId));
+    const placeResourceKeys = [
+      "place.hotel",
+      "place.villa",
+      "place.restaurant",
+      "place.cafe",
+      "place.bar_club",
+      "place.beach",
+      "place.natural_location",
+      "place.activity_location",
+      "place.visit_location",
+      "place.other_monetized",
+    ] as const;
+
+    const placesCurrent = placeResourceKeys.reduce(
+      (sum, key) => sum + (usageByResource[key] ?? 0),
+      0,
+    );
+    const blogsCurrent = usageByResource["blog.post"] ?? 0;
+
+    const resourceUsage = planEntitlements.map((entitlement) => {
+      const current = usageByResource[entitlement.resourceKey] ?? 0;
+      const max = entitlement.isUnlimited ? null : entitlement.limitCount;
+      const remaining =
+        entitlement.isUnlimited || entitlement.limitCount === null
+          ? null
+          : Math.max(0, entitlement.limitCount - current);
+
+      return {
+        resourceKey: entitlement.resourceKey,
+        current,
+        max,
+        remaining,
+        isUnlimited: entitlement.isUnlimited,
+      };
+    });
 
     return c.json({
       usage: {
+        resources: resourceUsage,
         places: {
-          current: placeCount.count,
+          current: placesCurrent,
           max: subscriptionData.planMaxPlaces,
         },
         blogs: {
-          current: blogCount.count,
+          current: blogsCurrent,
           max: subscriptionData.planMaxBlogs,
         },
       },
@@ -710,6 +668,7 @@ app.get("/usage", async (c) => {
         endDate: subscriptionData.endDate,
         nextBillingDate: subscriptionData.nextBillingDate,
         planId: subscriptionData.planId,
+        planEntitlements,
       },
     });
   } catch (error) {

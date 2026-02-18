@@ -4,7 +4,7 @@ import {
   collection,
   district,
   place,
-  placeCategory,
+  placeKind,
   province,
 } from "../db/schemas/index.ts";
 import { eq, desc, ilike, sql, and, inArray, ne } from "drizzle-orm";
@@ -230,13 +230,13 @@ app.get("/:slug", async (c) => {
               priceLevel: place.priceLevel,
               nightlyPrice: place.nightlyPrice,
               verified: place.verified,
-              categorySlug: placeCategory.slug,
-              categoryName: placeCategory.name,
+              categorySlug: placeKind.slug,
+              categoryName: placeKind.name,
               cityName: province.name,
               districtName: district.name,
             })
             .from(place)
-            .leftJoin(placeCategory, eq(place.categoryId, placeCategory.id))
+            .leftJoin(placeKind, eq(place.kind, placeKind.id as any))
             .leftJoin(province, eq(place.cityId, province.id))
             .leftJoin(district, eq(place.districtId, district.id))
             .where(and(

@@ -3,8 +3,8 @@
  *
  * Seeds essential system data that is required for the application to function:
  * - Admin user with roles and permissions
- * - Subscription plans
- * - Place categories
+ * - Subscription plans + entitlement limits
+ * - Place kinds metadata
  * - Turkey provinces and districts
  *
  * This seeder should be run on fresh database setup and is idempotent.
@@ -27,9 +27,10 @@ import {
   coupon,
   couponPlan,
   subscriptionPlan,
+  subscriptionPlanEntitlement,
   subscriptionPlanFeature,
 } from "../schemas/subscriptions.ts";
-import { placeCategory } from "../schemas/categories.ts";
+import { placeKind } from "../schemas/categories.ts";
 import { blogCategory } from "../schemas/blog.ts";
 import { province, district } from "../schemas/locations.ts";
 
@@ -134,6 +135,23 @@ const ROLES = [
   },
 ] as const;
 
+type PlanEntitlementSeed = {
+  resourceKey:
+    | "place.hotel"
+    | "place.villa"
+    | "place.restaurant"
+    | "place.cafe"
+    | "place.bar_club"
+    | "place.beach"
+    | "place.natural_location"
+    | "place.activity_location"
+    | "place.visit_location"
+    | "place.other_monetized"
+    | "blog.post";
+  limitCount: number | null;
+  isUnlimited?: boolean;
+};
+
 const SUBSCRIPTION_PLANS = [
   {
     id: "plan-starter-yearly",
@@ -144,8 +162,22 @@ const SUBSCRIPTION_PLANS = [
     billingCycle: "yearly" as const,
     maxPlaces: 1,
     maxBlogs: 1,
+    entitlements: [
+      { resourceKey: "place.hotel", limitCount: 1 },
+      { resourceKey: "place.villa", limitCount: 1 },
+      { resourceKey: "place.restaurant", limitCount: 1 },
+      { resourceKey: "place.cafe", limitCount: 1 },
+      { resourceKey: "place.bar_club", limitCount: 1 },
+      { resourceKey: "place.beach", limitCount: 1 },
+      { resourceKey: "place.natural_location", limitCount: 1 },
+      { resourceKey: "place.activity_location", limitCount: 1 },
+      { resourceKey: "place.other_monetized", limitCount: 1 },
+      { resourceKey: "place.visit_location", limitCount: null, isUnlimited: true },
+      { resourceKey: "blog.post", limitCount: 1 },
+    ] as PlanEntitlementSeed[],
     features: [
-      "1 mekan yayınlama hakkı",
+      "Monetize edilen her mekan türü için 1 ilan hakkı",
+      "Ziyaret lokasyonlarında sınırsız ilan",
       "1 blog yazısı hakkı",
       "Temel görünürlük",
       "E-posta desteği",
@@ -161,8 +193,22 @@ const SUBSCRIPTION_PLANS = [
     billingCycle: "yearly" as const,
     maxPlaces: 5,
     maxBlogs: 10,
+    entitlements: [
+      { resourceKey: "place.hotel", limitCount: 5 },
+      { resourceKey: "place.villa", limitCount: 5 },
+      { resourceKey: "place.restaurant", limitCount: 5 },
+      { resourceKey: "place.cafe", limitCount: 5 },
+      { resourceKey: "place.bar_club", limitCount: 5 },
+      { resourceKey: "place.beach", limitCount: 5 },
+      { resourceKey: "place.natural_location", limitCount: 5 },
+      { resourceKey: "place.activity_location", limitCount: 5 },
+      { resourceKey: "place.other_monetized", limitCount: 5 },
+      { resourceKey: "place.visit_location", limitCount: null, isUnlimited: true },
+      { resourceKey: "blog.post", limitCount: 10 },
+    ] as PlanEntitlementSeed[],
     features: [
-      "5 mekan yayınlama hakkı",
+      "Monetize edilen her mekan türü için 5 ilan hakkı",
+      "Ziyaret lokasyonlarında sınırsız ilan",
       "10 blog yazısı hakkı",
       "Öne çıkan listeleme desteği",
       "Gelişmiş raporlama",
@@ -179,8 +225,22 @@ const SUBSCRIPTION_PLANS = [
     billingCycle: "yearly" as const,
     maxPlaces: 20,
     maxBlogs: 40,
+    entitlements: [
+      { resourceKey: "place.hotel", limitCount: 20 },
+      { resourceKey: "place.villa", limitCount: 20 },
+      { resourceKey: "place.restaurant", limitCount: 20 },
+      { resourceKey: "place.cafe", limitCount: 20 },
+      { resourceKey: "place.bar_club", limitCount: 20 },
+      { resourceKey: "place.beach", limitCount: 20 },
+      { resourceKey: "place.natural_location", limitCount: 20 },
+      { resourceKey: "place.activity_location", limitCount: 20 },
+      { resourceKey: "place.other_monetized", limitCount: 20 },
+      { resourceKey: "place.visit_location", limitCount: null, isUnlimited: true },
+      { resourceKey: "blog.post", limitCount: 40 },
+    ] as PlanEntitlementSeed[],
     features: [
-      "20 mekan yayınlama hakkı",
+      "Monetize edilen her mekan türü için 20 ilan hakkı",
+      "Ziyaret lokasyonlarında sınırsız ilan",
       "40 blog yazısı hakkı",
       "Premium görünürlük",
       "Detaylı performans paneli",
@@ -230,78 +290,126 @@ const COUPONS: CouponSeed[] = [
   },
 ];
 
-const PLACE_CATEGORIES = [
+const PLACE_KINDS = [
   {
-    name: "Oteller",
-    slug: "hotels",
+    id: "hotel",
+    name: "Otel",
+    slug: "hotel",
     icon: "hotel",
-    description: "Lüks oteller, butik konaklamalar ve apart oteller",
+    description: "Oda bazlı konaklama işletmeleri",
+    monetized: true,
+    supportsRooms: true,
+    supportsMenu: false,
+    supportsPackages: false,
+    sortOrder: 0,
   },
   {
-    name: "Villalar",
-    slug: "villas",
+    id: "villa",
+    name: "Villa",
+    slug: "villa",
     icon: "home",
-    description: "Özel havuzlu ve manzaralı villalar",
+    description: "Müstakil konaklama birimleri",
+    monetized: true,
+    supportsRooms: false,
+    supportsMenu: false,
+    supportsPackages: false,
+    sortOrder: 1,
   },
   {
-    name: "Pansiyonlar",
-    slug: "guesthouses",
-    icon: "cottage",
-    description: "Aile pansiyonları ve küçük konaklamalar",
-  },
-  {
-    name: "Apart Oteller",
-    slug: "apart-hotels",
-    icon: "apartment",
-    description: "Uzun süreli konaklamalar için apart daireler",
-  },
-  {
-    name: "Restoranlar",
-    slug: "restaurants",
+    id: "restaurant",
+    name: "Restoran",
+    slug: "restaurant",
     icon: "restaurant",
-    description: "Yerel lezzetler ve dünya mutfağı",
+    description: "Yeme-içme işletmeleri",
+    monetized: true,
+    supportsRooms: false,
+    supportsMenu: true,
+    supportsPackages: false,
+    sortOrder: 2,
   },
   {
-    name: "Kafeler",
-    slug: "cafes",
+    id: "cafe",
+    name: "Kafe",
+    slug: "cafe",
     icon: "local_cafe",
-    description: "Kahve dükkanları, pastaneler ve çay bahçeleri",
+    description: "Kafe ve kahve dükkanları",
+    monetized: true,
+    supportsRooms: false,
+    supportsMenu: true,
+    supportsPackages: false,
+    sortOrder: 3,
   },
   {
-    name: "Beach Clublar",
-    slug: "beach-clubs",
-    icon: "beach_access",
-    description: "Plaj kulüpleri ve sahil tesisleri",
-  },
-  {
-    name: "Barlar",
-    slug: "bars",
+    id: "bar_club",
+    name: "Bar/Club",
+    slug: "bar-club",
     icon: "local_bar",
-    description: "Barlar, pub'lar ve gece kulüpleri",
+    description: "Bar, kulüp ve gece hayatı işletmeleri",
+    monetized: true,
+    supportsRooms: false,
+    supportsMenu: true,
+    supportsPackages: false,
+    sortOrder: 4,
   },
   {
-    name: "Gezilecek Yerler",
-    slug: "attractions",
-    icon: "place",
-    description: "Tarihi ve turistik mekanlar",
+    id: "beach",
+    name: "Plaj",
+    slug: "beach",
+    icon: "beach_access",
+    description: "Plaj ve beach facility lokasyonları",
+    monetized: true,
+    supportsRooms: false,
+    supportsMenu: false,
+    supportsPackages: false,
+    sortOrder: 5,
   },
   {
-    name: "Doğa & Plajlar",
-    slug: "nature-beaches",
-    icon: "water",
-    description: "Koylar, plajlar ve doğal güzellikler",
+    id: "natural_location",
+    name: "Doğal Lokasyon",
+    slug: "natural-location",
+    icon: "terrain",
+    description: "Doğa odaklı gezilecek lokasyonlar",
+    monetized: true,
+    supportsRooms: false,
+    supportsMenu: false,
+    supportsPackages: false,
+    sortOrder: 6,
   },
   {
-    name: "Aktiviteler",
-    slug: "activities",
+    id: "activity_location",
+    name: "Aktivite Lokasyonu",
+    slug: "activity-location",
     icon: "directions_boat",
-    description: "Tekne turları, dalış, yamaç paraşütü",
+    description: "Dalış, paraşüt vb. aktivite işletmeleri",
+    monetized: true,
+    supportsRooms: false,
+    supportsMenu: false,
+    supportsPackages: true,
+    sortOrder: 7,
   },
   {
-    name: "Spa & Wellness",
-    slug: "spa-wellness",
-    icon: "spa",
-    description: "Spa merkezleri, hamamlar ve sağlık tesisleri",
+    id: "visit_location",
+    name: "Ziyaret Lokasyonu",
+    slug: "visit-location",
+    icon: "explore",
+    description: "Ziyaret ve keşif amaçlı lokasyonlar",
+    monetized: false,
+    supportsRooms: false,
+    supportsMenu: false,
+    supportsPackages: false,
+    sortOrder: 8,
+  },
+  {
+    id: "other_monetized",
+    name: "Diğer Monetize",
+    slug: "other-monetized",
+    icon: "store",
+    description: "Diğer ücretli/rentable lokasyonlar",
+    monetized: true,
+    supportsRooms: false,
+    supportsMenu: false,
+    supportsPackages: false,
+    sortOrder: 9,
   },
 ] as const;
 
@@ -643,6 +751,23 @@ async function seedSubscriptionPlans(): Promise<void> {
         })),
       );
     }
+
+    await db
+      .delete(subscriptionPlanEntitlement)
+      .where(eq(subscriptionPlanEntitlement.planId, plan.id));
+
+    if (plan.entitlements.length > 0) {
+      await db.insert(subscriptionPlanEntitlement).values(
+        plan.entitlements.map((entitlement) => ({
+          id: nanoid(),
+          planId: plan.id,
+          resourceKey: entitlement.resourceKey,
+          limitCount: entitlement.limitCount,
+          isUnlimited: Boolean(entitlement.isUnlimited),
+          updatedAt: new Date(),
+        })),
+      );
+    }
   }
 }
 
@@ -704,27 +829,49 @@ async function seedCoupons(): Promise<void> {
   }
 }
 
-async function seedPlaceCategories(): Promise<void> {
-  logSection("Seeding Place Categories");
+async function seedPlaceKinds(): Promise<void> {
+  logSection("Seeding Place Kinds");
 
-  for (const cat of PLACE_CATEGORIES) {
-    const existing = await db.query.placeCategory.findFirst({
-      where: eq(placeCategory.slug, cat.slug),
+  for (const kind of PLACE_KINDS) {
+    const existing = await db.query.placeKind.findFirst({
+      where: eq(placeKind.id, kind.id),
     });
 
     if (existing) {
-      logSkip(`Category "${cat.name}" already exists`);
+      await db
+        .update(placeKind)
+        .set({
+          slug: kind.slug,
+          name: kind.name,
+          icon: kind.icon,
+          description: kind.description,
+          monetized: kind.monetized,
+          supportsRooms: kind.supportsRooms,
+          supportsMenu: kind.supportsMenu,
+          supportsPackages: kind.supportsPackages,
+          sortOrder: kind.sortOrder,
+          active: true,
+          updatedAt: new Date(),
+        })
+        .where(eq(placeKind.id, kind.id));
+      logSkip(`Place kind "${kind.name}" already exists, updated`);
       continue;
     }
 
-    await db.insert(placeCategory).values({
-      id: nanoid(),
-      slug: cat.slug,
-      name: cat.name,
-      icon: cat.icon,
-      description: cat.description,
+    await db.insert(placeKind).values({
+      id: kind.id,
+      slug: kind.slug,
+      name: kind.name,
+      icon: kind.icon,
+      description: kind.description,
+      monetized: kind.monetized,
+      supportsRooms: kind.supportsRooms,
+      supportsMenu: kind.supportsMenu,
+      supportsPackages: kind.supportsPackages,
+      sortOrder: kind.sortOrder,
+      active: true,
     });
-    logSuccess(`Created category: ${cat.name}`);
+    logSuccess(`Created place kind: ${kind.name}`);
   }
 }
 
@@ -886,8 +1033,8 @@ async function main(): Promise<void> {
     // 5. Seed coupons
     await seedCoupons();
 
-    // 6. Seed place categories
-    await seedPlaceCategories();
+    // 6. Seed place kinds
+    await seedPlaceKinds();
 
     // 7. Seed blog categories
     await seedBlogCategories();
@@ -908,7 +1055,7 @@ async function main(): Promise<void> {
     console.log(`    • 1 admin user`);
     console.log(`    • ${SUBSCRIPTION_PLANS.length} subscription plans`);
     console.log(`    • ${COUPONS.length} coupons`);
-    console.log(`    • ${PLACE_CATEGORIES.length} place categories`);
+    console.log(`    • ${PLACE_KINDS.length} place kinds`);
     console.log(`    • ${BLOG_CATEGORIES.length} blog categories`);
     console.log(`    • 81 provinces`);
     console.log(`    • ~970 districts`);

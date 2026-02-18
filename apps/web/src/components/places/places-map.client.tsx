@@ -4,7 +4,7 @@ import "leaflet/dist/leaflet.css";
 
 import L from "leaflet";
 import type { LatLngBoundsExpression, LatLngTuple } from "leaflet";
-import { Check, Minus, Plus, Square } from "lucide-react";
+import { Check, Minus, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   MapContainer,
@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils";
 import type { PlaceSummary } from "@/types";
 
 import { createMarkerHtml } from "./map-price-marker";
+import { MapPlacePreviewCard } from "./map-place-preview-card";
 
 // Custom hook for map bounds and events
 function MapController({
@@ -173,6 +174,9 @@ type PlacesMapClientProps = {
   onPlaceHover?: (placeId: string | null) => void;
   searchAsMove?: boolean;
   onSearchAsMoveChange?: (enabled: boolean) => void;
+  markerMode?: "price" | "pin";
+  showSearchAsMoveToggle?: boolean;
+  initialZoom?: number;
   onBoundsChange?: (bounds: {
     minLat: number;
     minLng: number;
@@ -189,6 +193,9 @@ export function PlacesMapClient({
   onPlaceHover,
   searchAsMove = false,
   onSearchAsMoveChange,
+  markerMode = "price",
+  showSearchAsMoveToggle = true,
+  initialZoom = 9,
   onBoundsChange,
 }: PlacesMapClientProps) {
   const bounds = useMemo(() => computeBounds(places), [places]);
@@ -201,12 +208,25 @@ export function PlacesMapClient({
     onSearchAsMoveChange?.(newValue);
   }, [localSearchAsMove, onSearchAsMoveChange]);
 
+  const createPinIcon = useCallback((isActive: boolean) => {
+    return L.divIcon({
+      className: "!bg-transparent !border-none",
+      html: `<div class="${
+        isActive
+          ? "h-4 w-4 rounded-full border-2 border-white bg-gray-900 shadow-lg"
+          : "h-4 w-4 rounded-full border-2 border-white bg-primary shadow-md"
+      }"></div>`,
+      iconSize: [16, 16],
+      iconAnchor: [8, 8],
+    });
+  }, []);
+
   return (
     <div className={cn("relative h-full w-full", className)}>
       <MapContainer
-        className="h-full w-full"
+        className="h-full w-full bg-slate-100"
         center={center}
-        zoom={9}
+        zoom={initialZoom}
         scrollWheelZoom
         attributionControl={false}
         zoomControl={false}
@@ -230,23 +250,28 @@ export function PlacesMapClient({
               <Marker
                 key={place.id}
                 position={[place.coordinates.lat, place.coordinates.lng]}
-                icon={createPriceIcon(place.nightlyPrice, isActive)}
+                icon={
+                  markerMode === "pin"
+                    ? createPinIcon(isActive)
+                    : createPriceIcon(place.nightlyPrice, isActive)
+                }
                 eventHandlers={{
-                  click: () => onPlaceClick?.(place.id),
                   mouseover: () => onPlaceHover?.(place.id),
                   mouseout: () => onPlaceHover?.(null),
                 }}
               >
-                <Popup>
-                  <div className="min-w-[200px] space-y-2">
-                    <h3 className="text-base font-semibold text-gray-900">
-                      {place.name}
-                    </h3>
-                    <p className="text-sm text-gray-500">{place.city}</p>
-                    <p className="text-sm font-medium text-gray-700">
-                      ₺{place.nightlyPrice.toLocaleString("tr-TR")}/gece
-                    </p>
-                  </div>
+                <Popup
+                  closeButton={false}
+                  offset={[0, -12]}
+                  className="places-map-preview-popup"
+                  maxWidth={340}
+                  minWidth={300}
+                  autoPanPadding={[20, 20]}
+                >
+                  <MapPlacePreviewCard
+                    place={place}
+                    onViewPlace={onPlaceClick}
+                  />
                 </Popup>
               </Marker>
             );
@@ -254,26 +279,28 @@ export function PlacesMapClient({
       </MapContainer>
 
       {/* Search as I move toggle */}
-      <div className="absolute bottom-6 left-1/2 z-[1000] -translate-x-1/2">
-        <button
-          onClick={handleSearchAsMoveToggle}
-          className="flex items-center gap-2 rounded-lg bg-white px-3 py-2 shadow-md transition-all hover:shadow-lg"
-        >
-          <div
-            className={cn(
-              "flex size-5 items-center justify-center rounded border transition-colors",
-              localSearchAsMove
-                ? "border-gray-900 bg-gray-900"
-                : "border-gray-300 bg-white",
-            )}
+      {showSearchAsMoveToggle ? (
+        <div className="absolute bottom-6 left-1/2 z-[1000] -translate-x-1/2">
+          <button
+            onClick={handleSearchAsMoveToggle}
+            className="flex items-center gap-2 rounded-lg bg-white px-3 py-2 shadow-md transition-all hover:shadow-lg"
           >
-            {localSearchAsMove && <Check className="size-3 text-white" />}
-          </div>
-          <span className="text-sm font-medium text-gray-700">
-            Haritayı hareket ettirirken ara
-          </span>
-        </button>
-      </div>
+            <div
+              className={cn(
+                "flex size-5 items-center justify-center rounded border transition-colors",
+                localSearchAsMove
+                  ? "border-gray-900 bg-gray-900"
+                  : "border-gray-300 bg-white",
+              )}
+            >
+              {localSearchAsMove && <Check className="size-3 text-white" />}
+            </div>
+            <span className="text-sm font-medium text-gray-700">
+              Haritayı hareket ettirirken ara
+            </span>
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

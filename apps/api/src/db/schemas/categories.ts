@@ -1,19 +1,34 @@
+import {
+  pgTable,
+  text,
+  boolean,
+  integer,
+  timestamp,
+  customType,
+} from "drizzle-orm/pg-core";
 
-import { pgTable, text, timestamp } from "drizzle-orm/pg-core";
-import { nanoid } from "nanoid";
+const placeKindId = customType<{ data: string }>({
+  dataType() {
+    return "place_kind";
+  },
+});
 
 // ============================================================================
-// PLACE CATEGORIES TABLE
+// PLACE KIND METADATA TABLE
 // ============================================================================
 
-export const placeCategory = pgTable("place_category", {
-  id: text("id")
-    .primaryKey()
-    .$defaultFn(() => nanoid()),
+export const placeKind = pgTable("place_kind_meta", {
+  id: placeKindId("id").primaryKey(),
   slug: text("slug").notNull().unique(),
   name: text("name").notNull(),
-  icon: text("icon"), // Material icon name or URL
+  icon: text("icon"),
   description: text("description"),
+  monetized: boolean("monetized").notNull().default(true),
+  supportsRooms: boolean("supports_rooms").notNull().default(false),
+  supportsMenu: boolean("supports_menu").notNull().default(false),
+  supportsPackages: boolean("supports_packages").notNull().default(false),
+  sortOrder: integer("sort_order").notNull().default(0),
+  active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -22,5 +37,5 @@ export const placeCategory = pgTable("place_category", {
     .defaultNow(),
 });
 
-export type PlaceCategory = typeof placeCategory.$inferSelect;
-export type NewPlaceCategory = typeof placeCategory.$inferInsert;
+export type PlaceKind = typeof placeKind.$inferSelect;
+export type NewPlaceKind = typeof placeKind.$inferInsert;

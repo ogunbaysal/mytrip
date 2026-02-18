@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Mesafeli Satış Sözleşmesi | TatilDesen",
+  title: "Mesafeli Satış Sözleşmesi",
   description: "Mesafeli satış sözleşmesi metni.",
 };
 

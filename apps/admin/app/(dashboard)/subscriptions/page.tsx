@@ -2,8 +2,12 @@
 
 import { useEffect, useState } from "react"
 import { SubscriptionsTable } from "@/components/tables/subscriptions-table"
-import { Subscription } from "@/types/subscriptions"
+import { PlanEntitlement, Subscription } from "@/types/subscriptions"
 import { toast } from "sonner"
+import {
+  deriveLegacyLimitsFromEntitlements,
+  normalizeUsageByResource,
+} from "@/lib/subscription-entitlements"
 
 interface ApiSubscription {
   id: string
@@ -21,6 +25,7 @@ interface ApiSubscription {
   usage?: {
     currentPlaces?: number
     currentBlogs?: number
+    resources?: Record<string, unknown>
   }
   paymentMethod?: {
     type?: string
@@ -37,6 +42,7 @@ interface ApiSubscription {
     name?: string
     maxPlaces?: number
     maxBlogs?: number
+    entitlements?: PlanEntitlement[]
   }
   createdAt?: string
   updatedAt?: string
@@ -56,6 +62,7 @@ export default function SubscriptionsPage() {
         const data = await res.json();
         if (data.subscriptions) {
           const mappedSubs: Subscription[] = data.subscriptions.map((sub: ApiSubscription) => ({
+            entitlements: sub.plan?.entitlements ?? [],
             id: sub.id,
             userId: sub.userId || sub.user?.id || "",
             planId: sub.planId || sub.plan?.id || "",
@@ -73,15 +80,16 @@ export default function SubscriptionsPage() {
             currency: sub.currency || "TRY",
             billingCycle: "yearly",
             features: [],
-            limits: {
+            limits: deriveLegacyLimitsFromEntitlements(sub.plan?.entitlements, {
               maxPlaces: sub.plan?.maxPlaces ?? 0,
               maxBlogs: sub.plan?.maxBlogs ?? 0,
-            },
+            }),
             usage: {
               currentPlaces: sub.usage?.currentPlaces ?? 0,
               currentBlogs: sub.usage?.currentBlogs ?? 0,
               currentPhotos: 0,
               featuredListingsUsed: 0,
+              resources: normalizeUsageByResource(sub.usage?.resources),
             },
             paymentMethod: {
               type:

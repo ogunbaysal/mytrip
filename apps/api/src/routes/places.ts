@@ -5,7 +5,7 @@ import {
   district,
   place,
   placeAmenity,
-  placeCategory,
+  placeKind,
   province,
   review,
   user,
@@ -14,7 +14,7 @@ import { and, asc, desc, eq, gt, inArray, sql } from "drizzle-orm";
 import {
   derivePlaceTypeFromCategorySlug,
   hydratePlaceMediaAndAmenities,
-  resolveCategorySlugsForType,
+  resolvePlaceKindIdsForType,
 } from "../lib/place-relations.ts";
 
 const app = new Hono();
@@ -23,6 +23,7 @@ type PlaceRow = {
   id: string;
   slug: string;
   name: string;
+  kind: string;
   categoryId: string | null;
   description: string | null;
   shortDescription: string | null;
@@ -45,6 +46,8 @@ type PlaceRow = {
   checkOutInfo: string | null;
   createdAt: Date;
   updatedAt: Date;
+  kindName: string | null;
+  kindSlug: string | null;
   categoryName: string | null;
   categorySlug: string | null;
   cityName: string | null;
@@ -57,8 +60,10 @@ type PlaceRow = {
 function toLegacyPlace(row: PlaceRow) {
   return {
     ...row,
-    type: derivePlaceTypeFromCategorySlug(row.categorySlug),
-    category: row.categoryName ?? "",
+    type: derivePlaceTypeFromCategorySlug(row.kindSlug),
+    category: row.kindName ?? "",
+    categoryId: row.kind,
+    categorySlug: row.kindSlug,
     city: row.cityName ?? "",
     district: row.districtName ?? "",
   };
@@ -128,22 +133,24 @@ app.get("/", async (c) => {
           LOWER(${place.name}) ILIKE ${"%" + search.toLowerCase() + "%"}
           OR LOWER(COALESCE(${place.description}, '')) ILIKE ${"%" + search.toLowerCase() + "%"}
           OR LOWER(COALESCE(${place.shortDescription}, '')) ILIKE ${"%" + search.toLowerCase() + "%"}
-          OR LOWER(COALESCE(${placeCategory.name}, '')) ILIKE ${"%" + search.toLowerCase() + "%"}
+          OR LOWER(COALESCE(${placeKind.name}, '')) ILIKE ${"%" + search.toLowerCase() + "%"}
           OR LOWER(COALESCE(${place.address}, '')) ILIKE ${"%" + search.toLowerCase() + "%"}
         )`,
       );
     }
 
     if (type) {
-      const slugs = resolveCategorySlugsForType(type);
-      if (slugs.length > 0) {
-        conditions.push(inArray(placeCategory.slug, slugs));
+      const kindIds = resolvePlaceKindIdsForType(type);
+      if (kindIds.length > 0) {
+        conditions.push(inArray(place.kind, kindIds as any));
       }
     }
 
     if (category) {
       conditions.push(
-        sql`LOWER(COALESCE(${placeCategory.name}, '')) ILIKE ${"%" + category.toLowerCase() + "%"} OR LOWER(COALESCE(${placeCategory.slug}, '')) ILIKE ${"%" + category.toLowerCase() + "%"}`,
+        sql`${place.kind} = ${category}
+          OR LOWER(COALESCE(${placeKind.name}, '')) ILIKE ${"%" + category.toLowerCase() + "%"}
+          OR LOWER(COALESCE(${placeKind.slug}, '')) ILIKE ${"%" + category.toLowerCase() + "%"}`,
       );
     }
 
@@ -200,15 +207,15 @@ app.get("/", async (c) => {
     if (amenities) {
       const amenityList = amenities
         .split(",")
-        .map((item) => item.trim().toLowerCase())
+        .map((item) => normalizeFilterSlug(item))
         .filter(Boolean);
 
       for (const amenitySlug of amenityList) {
         conditions.push(sql`
           EXISTS (
             SELECT 1
-            FROM place_amenity pa
-            INNER JOIN amenity a ON a.id = pa.amenity_id
+            FROM place_feature_assignment pa
+            INNER JOIN place_feature a ON a.id = pa.amenity_id
             WHERE pa.place_id = ${place.id}
               AND a.slug = ${amenitySlug}
           )
@@ -247,7 +254,7 @@ app.get("/", async (c) => {
     const countRows = await db
       .select({ count: sql<number>`COUNT(*)::int` })
       .from(place)
-      .leftJoin(placeCategory, eq(place.categoryId, placeCategory.id))
+      .leftJoin(placeKind, eq(place.kind, placeKind.id as any))
       .leftJoin(province, eq(place.cityId, province.id))
       .leftJoin(district, eq(place.districtId, district.id))
       .where(whereClause);
@@ -259,7 +266,8 @@ app.get("/", async (c) => {
         id: place.id,
         slug: place.slug,
         name: place.name,
-        categoryId: place.categoryId,
+        kind: place.kind,
+        categoryId: place.kind,
         description: place.description,
         shortDescription: place.shortDescription,
         address: place.address,
@@ -281,13 +289,15 @@ app.get("/", async (c) => {
         checkOutInfo: place.checkOutInfo,
         createdAt: place.createdAt,
         updatedAt: place.updatedAt,
-        categoryName: placeCategory.name,
-        categorySlug: placeCategory.slug,
+        kindName: placeKind.name,
+        kindSlug: placeKind.slug,
+        categoryName: placeKind.name,
+        categorySlug: placeKind.slug,
         cityName: province.name,
         districtName: district.name,
       })
       .from(place)
-      .leftJoin(placeCategory, eq(place.categoryId, placeCategory.id))
+      .leftJoin(placeKind, eq(place.kind, placeKind.id as any))
       .leftJoin(province, eq(place.cityId, province.id))
       .leftJoin(district, eq(place.districtId, district.id))
       .where(whereClause)
@@ -345,9 +355,9 @@ app.get("/featured", async (c) => {
     const conditions: any[] = [eq(place.status, "active"), eq(place.featured, true)];
 
     if (type) {
-      const slugs = resolveCategorySlugsForType(type);
-      if (slugs.length > 0) {
-        conditions.push(inArray(placeCategory.slug, slugs));
+      const kindIds = resolvePlaceKindIdsForType(type);
+      if (kindIds.length > 0) {
+        conditions.push(inArray(place.kind, kindIds as any));
       }
     }
 
@@ -356,7 +366,8 @@ app.get("/featured", async (c) => {
         id: place.id,
         slug: place.slug,
         name: place.name,
-        categoryId: place.categoryId,
+        kind: place.kind,
+        categoryId: place.kind,
         description: place.description,
         shortDescription: place.shortDescription,
         address: place.address,
@@ -378,13 +389,15 @@ app.get("/featured", async (c) => {
         checkOutInfo: place.checkOutInfo,
         createdAt: place.createdAt,
         updatedAt: place.updatedAt,
-        categoryName: placeCategory.name,
-        categorySlug: placeCategory.slug,
+        kindName: placeKind.name,
+        kindSlug: placeKind.slug,
+        categoryName: placeKind.name,
+        categorySlug: placeKind.slug,
         cityName: province.name,
         districtName: district.name,
       })
       .from(place)
-      .leftJoin(placeCategory, eq(place.categoryId, placeCategory.id))
+      .leftJoin(placeKind, eq(place.kind, placeKind.id as any))
       .leftJoin(province, eq(place.cityId, province.id))
       .leftJoin(district, eq(place.districtId, district.id))
       .where(and(...conditions))
@@ -423,9 +436,9 @@ app.get("/popular", async (c) => {
     const conditions: any[] = [eq(place.status, "active"), gt(place.reviewCount, 0)];
 
     if (type) {
-      const slugs = resolveCategorySlugsForType(type);
-      if (slugs.length > 0) {
-        conditions.push(inArray(placeCategory.slug, slugs));
+      const kindIds = resolvePlaceKindIdsForType(type);
+      if (kindIds.length > 0) {
+        conditions.push(inArray(place.kind, kindIds as any));
       }
     }
 
@@ -434,7 +447,8 @@ app.get("/popular", async (c) => {
         id: place.id,
         slug: place.slug,
         name: place.name,
-        categoryId: place.categoryId,
+        kind: place.kind,
+        categoryId: place.kind,
         description: place.description,
         shortDescription: place.shortDescription,
         address: place.address,
@@ -456,13 +470,15 @@ app.get("/popular", async (c) => {
         checkOutInfo: place.checkOutInfo,
         createdAt: place.createdAt,
         updatedAt: place.updatedAt,
-        categoryName: placeCategory.name,
-        categorySlug: placeCategory.slug,
+        kindName: placeKind.name,
+        kindSlug: placeKind.slug,
+        categoryName: placeKind.name,
+        categorySlug: placeKind.slug,
         cityName: province.name,
         districtName: district.name,
       })
       .from(place)
-      .leftJoin(placeCategory, eq(place.categoryId, placeCategory.id))
+      .leftJoin(placeKind, eq(place.kind, placeKind.id as any))
       .leftJoin(province, eq(place.cityId, province.id))
       .leftJoin(district, eq(place.districtId, district.id))
       .where(and(...conditions))
@@ -490,33 +506,56 @@ app.get("/popular", async (c) => {
 });
 
 /**
- * Get place categories
+ * Get place kinds
  * GET /places/categories
  */
 app.get("/categories", async (c) => {
   try {
-    const categories = await db
+    const kinds = await db
       .select({
-        id: placeCategory.id,
-        name: placeCategory.name,
-        slug: placeCategory.slug,
-        description: placeCategory.description,
-        icon: placeCategory.icon,
+        id: placeKind.id,
+        name: placeKind.name,
+        slug: placeKind.slug,
+        description: placeKind.description,
+        icon: placeKind.icon,
+        monetized: placeKind.monetized,
+        supportsRooms: placeKind.supportsRooms,
+        supportsMenu: placeKind.supportsMenu,
+        supportsPackages: placeKind.supportsPackages,
         count: sql<number>`COUNT(${place.id})::int`,
       })
-      .from(placeCategory)
+      .from(placeKind)
       .leftJoin(
         place,
-        and(eq(place.categoryId, placeCategory.id), eq(place.status, "active")),
+        and(eq(place.kind, placeKind.id as any), eq(place.status, "active")),
       )
-      .groupBy(placeCategory.id)
+      .where(eq(placeKind.active, true))
+      .groupBy(placeKind.id)
       .orderBy(sql`COUNT(${place.id}) DESC`);
 
     return c.json({
-      categories: categories.map((cat) => ({
-        id: cat.slug,
+      categories: kinds.map((cat) => ({
+        id: cat.id,
         title: cat.name,
+        slug: cat.slug,
+        icon: cat.icon,
+        monetized: cat.monetized,
+        supportsRooms: cat.supportsRooms,
+        supportsMenu: cat.supportsMenu,
+        supportsPackages: cat.supportsPackages,
         description: cat.description || `${cat.count} seçenek`,
+        count: Number(cat.count),
+      })),
+      kinds: kinds.map((cat) => ({
+        id: cat.id,
+        name: cat.name,
+        slug: cat.slug,
+        icon: cat.icon,
+        description: cat.description,
+        monetized: cat.monetized,
+        supportsRooms: cat.supportsRooms,
+        supportsMenu: cat.supportsMenu,
+        supportsPackages: cat.supportsPackages,
         count: Number(cat.count),
       })),
     });
@@ -526,6 +565,43 @@ app.get("/categories", async (c) => {
       {
         error: "Failed to fetch categories",
         message: "Unable to retrieve place categories",
+      },
+      500,
+    );
+  }
+});
+
+app.get("/kinds", async (c) => {
+  try {
+    const kinds = await db
+      .select({
+        id: placeKind.id,
+        name: placeKind.name,
+        slug: placeKind.slug,
+        description: placeKind.description,
+        icon: placeKind.icon,
+        monetized: placeKind.monetized,
+        supportsRooms: placeKind.supportsRooms,
+        supportsMenu: placeKind.supportsMenu,
+        supportsPackages: placeKind.supportsPackages,
+        count: sql<number>`COUNT(${place.id})::int`,
+      })
+      .from(placeKind)
+      .leftJoin(
+        place,
+        and(eq(place.kind, placeKind.id as any), eq(place.status, "active")),
+      )
+      .where(eq(placeKind.active, true))
+      .groupBy(placeKind.id)
+      .orderBy(sql`COUNT(${place.id}) DESC`);
+
+    return c.json({ kinds });
+  } catch (error) {
+    console.error("Failed to fetch kinds:", error);
+    return c.json(
+      {
+        error: "Failed to fetch kinds",
+        message: "Unable to retrieve place kinds",
       },
       500,
     );
@@ -616,18 +692,18 @@ app.get("/types", async (c) => {
   try {
     const rows = await db
       .select({
-        categorySlug: placeCategory.slug,
+        kindSlug: placeKind.slug,
         count: sql<number>`COUNT(*)::int`,
       })
       .from(place)
-      .leftJoin(placeCategory, eq(place.categoryId, placeCategory.id))
+      .leftJoin(placeKind, eq(place.kind, placeKind.id as any))
       .where(eq(place.status, "active"))
-      .groupBy(placeCategory.slug)
+      .groupBy(placeKind.slug)
       .orderBy(sql`COUNT(*) DESC`);
 
     const countsByType = rows.reduce(
       (acc, row) => {
-        const type = derivePlaceTypeFromCategorySlug(row.categorySlug);
+        const type = derivePlaceTypeFromCategorySlug(row.kindSlug);
         acc[type] = (acc[type] ?? 0) + Number(row.count);
         return acc;
       },
@@ -669,7 +745,8 @@ app.get("/:slug", async (c) => {
         id: place.id,
         slug: place.slug,
         name: place.name,
-        categoryId: place.categoryId,
+        kind: place.kind,
+        categoryId: place.kind,
         description: place.description,
         shortDescription: place.shortDescription,
         address: place.address,
@@ -691,8 +768,10 @@ app.get("/:slug", async (c) => {
         checkOutInfo: place.checkOutInfo,
         createdAt: place.createdAt,
         updatedAt: place.updatedAt,
-        categoryName: placeCategory.name,
-        categorySlug: placeCategory.slug,
+        kindName: placeKind.name,
+        kindSlug: placeKind.slug,
+        categoryName: placeKind.name,
+        categorySlug: placeKind.slug,
         cityName: province.name,
         districtName: district.name,
         ownerName: user.name,
@@ -700,7 +779,7 @@ app.get("/:slug", async (c) => {
         ownerCreatedAt: user.createdAt,
       })
       .from(place)
-      .leftJoin(placeCategory, eq(place.categoryId, placeCategory.id))
+      .leftJoin(placeKind, eq(place.kind, placeKind.id as any))
       .leftJoin(province, eq(place.cityId, province.id))
       .leftJoin(district, eq(place.districtId, district.id))
       .leftJoin(user, eq(place.ownerId, user.id))
@@ -749,7 +828,8 @@ app.get("/:slug", async (c) => {
           id: place.id,
           slug: place.slug,
           name: place.name,
-          categoryId: place.categoryId,
+          kind: place.kind,
+          categoryId: place.kind,
           description: place.description,
           shortDescription: place.shortDescription,
           address: place.address,
@@ -771,8 +851,10 @@ app.get("/:slug", async (c) => {
           checkOutInfo: place.checkOutInfo,
           createdAt: place.createdAt,
           updatedAt: place.updatedAt,
-          categoryName: placeCategory.name,
-          categorySlug: placeCategory.slug,
+          kindName: placeKind.name,
+          kindSlug: placeKind.slug,
+          categoryName: placeKind.name,
+          categorySlug: placeKind.slug,
           cityName: province.name,
           districtName: district.name,
           ownerName: user.name,
@@ -780,7 +862,7 @@ app.get("/:slug", async (c) => {
           ownerCreatedAt: user.createdAt,
         })
         .from(place)
-        .leftJoin(placeCategory, eq(place.categoryId, placeCategory.id))
+        .leftJoin(placeKind, eq(place.kind, placeKind.id as any))
         .leftJoin(province, eq(place.cityId, province.id))
         .leftJoin(district, eq(place.districtId, district.id))
         .leftJoin(user, eq(place.ownerId, user.id))

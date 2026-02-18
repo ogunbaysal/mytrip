@@ -16,6 +16,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { TiptapEditor } from "@/components/ui/tiptap-editor"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Select,
   SelectContent,
@@ -24,8 +25,10 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { toast } from "sonner"
-import { usePlace, useUpdatePlace } from "@/hooks/use-places"
-import { useCategories } from "@/hooks/use-categories"
+import { PlaceKindCapabilities } from "@/components/places/place-kind-capabilities"
+import { usePlace, usePlaceFeatures, useUpdatePlace } from "@/hooks/use-places"
+import { PlaceKindSelect } from "@/components/places/place-kind-select"
+import { usePlaceKinds } from "@/hooks/use-places"
 import {
   fetchDistrictCenter,
   getDistrictCenterQueryKey,
@@ -46,9 +49,7 @@ import { api } from "@/lib/api"
 const formSchema = z.object({
   images: z.array(z.string()).optional(),
   name: z.string().min(2, "Mekan adı en az 2 karakter olmalıdır"),
-  type: z.string().min(1, "Tip seçimi zorunludur"),
-  category: z.string().optional(),
-  categoryId: z.string().min(1, "Kategori seçimi zorunludur"),
+  kind: z.string().min(1, "Yer türü seçimi zorunludur"),
   description: z.string().min(10, "Açıklama en az 10 karakter olmalıdır"),
   shortDescription: z.string().max(160, "Kısa açıklama 160 karakteri geçemez").optional(),
   address: z.string().min(5, "Adres zorunludur"),
@@ -69,55 +70,80 @@ const formSchema = z.object({
 })
 
 const COMMON_FEATURES = [
-    { id: "wifi", label: "Wi-Fi" },
-    { id: "parking", label: "Otopark" },
-    { id: "pool", label: "Havuz" },
-    { id: "spa", label: "Spa & Wellness" },
-    { id: "gym", label: "Spor Salonu" },
-    { id: "restaurant", label: "Restoran" },
-    { id: "bar", label: "Bar" },
-    { id: "room_service", label: "Oda Servisi" },
-    { id: "air_conditioning", label: "Klima" },
-    { id: "heating", label: "Isıtma" },
-    { id: "sea_view", label: "Deniz Manzarası" },
-    { id: "beach_access", label: "Plaja Erişim" },
-    { id: "pet_friendly", label: "Evcil Hayvan Dostu" },
-    { id: "wheelchair_accessible", label: "Engelli Erişimi" },
-    { id: "family_friendly", label: "Aile Dostu" },
+  { id: "wifi", label: "Wi-Fi" },
+  { id: "parking", label: "Otopark" },
+  { id: "pool", label: "Havuz" },
+  { id: "spa", label: "Spa & Wellness" },
+  { id: "gym", label: "Spor Salonu" },
+  { id: "restaurant", label: "Restoran" },
+  { id: "bar", label: "Bar" },
+  { id: "room-service", label: "Oda Servisi" },
+  { id: "air-conditioning", label: "Klima" },
+  { id: "heating", label: "Isıtma" },
+  { id: "sea-view", label: "Deniz Manzarası" },
+  { id: "beach-access", label: "Plaja Erişim" },
+  { id: "pet-friendly", label: "Evcil Hayvan Dostu" },
+  { id: "wheelchair-accessible", label: "Engelli Erişimi" },
+  { id: "family-friendly", label: "Aile Dostu" },
 ];
 
+function normalizeAmenitySlug(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9\s_-]/g, "")
+    .replace(/[\s_]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+function normalizeFeatureList(values: string[] | undefined): string[] {
+  if (!values || values.length === 0) return [];
+  const normalized = values.map((value) => normalizeAmenitySlug(value)).filter(Boolean);
+  return Array.from(new Set(normalized));
+}
+
+function formatFeatureLabel(featureSlug: string): string {
+  return featureSlug
+    .split("-")
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toLocaleUpperCase("tr-TR") + word.slice(1))
+    .join(" ");
+}
+
 const DEFAULT_COORDS = { lat: 39.0, lng: 35.0 };
-const TYPE_OPTIONS = [
-  { value: "hotel", label: "Otel" },
-  { value: "restaurant", label: "Restoran" },
-  { value: "cafe", label: "Kafe" },
-  { value: "activity", label: "Aktivite" },
-  { value: "attraction", label: "Gezi Noktası" },
-  { value: "transport", label: "Ulaşım" },
-];
 const PRICE_LEVEL_OPTIONS = ["budget", "moderate", "expensive", "luxury"];
 const STATUS_OPTIONS = ["active", "pending", "suspended", "inactive", "rejected"];
 
 function parseLocationInput(input: unknown): { lat: string; lng: string } {
   if (!input) return { lat: "", lng: "" };
 
-  let value = input as any;
+  let value: Record<string, unknown> = {};
+  if (typeof input === "object" && input !== null) {
+    value = input as Record<string, unknown>;
+  }
   if (typeof input === "string") {
     try {
-      value = JSON.parse(input);
+      const parsed = JSON.parse(input);
+      if (typeof parsed === "object" && parsed !== null) {
+        value = parsed as Record<string, unknown>;
+      }
     } catch {
       return { lat: "", lng: "" };
     }
   }
 
-  const directLat = Number(value?.lat);
-  const directLng = Number(value?.lng);
+  const directLat = Number(value.lat);
+  const directLng = Number(value.lng);
   if (!Number.isNaN(directLat) && !Number.isNaN(directLng)) {
     return { lat: String(directLat), lng: String(directLng) };
   }
 
-  const coordLng = Number(value?.coordinates?.[0]);
-  const coordLat = Number(value?.coordinates?.[1]);
+  const coordinates = Array.isArray(value.coordinates) ? value.coordinates : [];
+  const coordLng = Number(coordinates[0]);
+  const coordLat = Number(coordinates[1]);
   if (!Number.isNaN(coordLat) && !Number.isNaN(coordLng)) {
     return { lat: String(coordLat), lng: String(coordLng) };
   }
@@ -167,7 +193,8 @@ export default function EditPlacePage() {
 
   const { data: place, isLoading: isPlaceLoading } = usePlace(placeId)
   const { mutate: updatePlace, isPending: isUpdating } = useUpdatePlace()
-  const { data: categories } = useCategories()
+  const { data: placeKinds, isLoading: isKindsLoading } = usePlaceKinds()
+  const { data: placeFeatures = [] } = usePlaceFeatures()
   const [isBusinessDocumentUploading, setIsBusinessDocumentUploading] = useState(false)
   const [businessDocument, setBusinessDocument] = useState<{
     fileId: string
@@ -181,9 +208,7 @@ export default function EditPlacePage() {
     defaultValues: {
       images: [],
       name: "",
-      type: "hotel",
-      category: "",
-      categoryId: "",
+      kind: "",
       description: "",
       shortDescription: "",
       address: "",
@@ -212,9 +237,6 @@ export default function EditPlacePage() {
   useEffect(() => {
     if (place) {
       const coords = parseLocationInput(place.location);
-      const normalizedType = TYPE_OPTIONS.some((opt) => opt.value === place.type)
-        ? place.type
-        : "activity";
       const normalizedStatus: z.infer<typeof formSchema>["status"] =
         STATUS_OPTIONS.includes(place.status)
           ? (place.status as z.infer<typeof formSchema>["status"])
@@ -222,14 +244,6 @@ export default function EditPlacePage() {
       const normalizedPriceLevel = PRICE_LEVEL_OPTIONS.includes(place.priceLevel)
         ? place.priceLevel
         : "";
-      const matchedCategoryId =
-        place.categoryId ||
-        categories?.find(
-          (cat) =>
-            cat.name.toLowerCase() === (place.category || "").toLowerCase() ||
-            cat.slug.toLowerCase() === (place.categorySlug || "").toLowerCase(),
-        )?.id ||
-        "";
       setBusinessDocument(
         place.businessDocument
           ? {
@@ -241,9 +255,7 @@ export default function EditPlacePage() {
       )
       form.reset({
         name: place.name,
-        type: normalizedType,
-        category: place.category,
-        categoryId: matchedCategoryId,
+        kind: place.kind || place.categoryId || "",
         description: place.description,
         shortDescription: place.shortDescription || "",
         address: place.address,
@@ -261,10 +273,10 @@ export default function EditPlacePage() {
             email: place.contactInfo?.email || "",
             website: place.contactInfo?.website || "",
         },
-        features: place.features || [],
+        features: normalizeFeatureList(place.features),
       })
     }
-  }, [place, form, categories])
+  }, [place, form])
 
   const handleBusinessDocumentUpload = async (
     event: ChangeEvent<HTMLInputElement>,
@@ -302,13 +314,13 @@ export default function EditPlacePage() {
 
     const apiData = {
         ...values,
+        features: normalizeFeatureList(values.features),
         location: hasValidCoordinates
           ? { lat: parsedLat, lng: parsedLng }
           : undefined,
         priceLevel: values.priceLevel || undefined,
         businessDocumentFileId:
           businessDocument?.fileId || values.businessDocumentFileId || undefined,
-        category: categories?.find(c => c.id === values.categoryId)?.name || values.category || "", // Sync category name
     }
 
     updatePlace({ placeId, data: apiData }, {
@@ -342,9 +354,38 @@ export default function EditPlacePage() {
 
   const latitudeText = form.watch("latitude");
   const longitudeText = form.watch("longitude");
-  const selectedCategoryId = form.watch("categoryId");
+  const selectedKind = form.watch("kind");
   const selectedCity = form.watch("city");
   const selectedDistrict = form.watch("district");
+  const selectedFeatures = normalizeFeatureList(form.watch("features"));
+  const selectedFeatureSet = new Set(selectedFeatures);
+  const optionMap = new Map<string, { id: string; label: string }>();
+
+  for (const feature of placeFeatures) {
+    const normalizedId = normalizeAmenitySlug(feature.slug);
+    if (!normalizedId) continue;
+    optionMap.set(normalizedId, {
+      id: normalizedId,
+      label: feature.label?.trim() || formatFeatureLabel(normalizedId),
+    });
+  }
+
+  for (const feature of COMMON_FEATURES) {
+    if (!optionMap.has(feature.id)) {
+      optionMap.set(feature.id, feature);
+    }
+  }
+
+  for (const selectedFeature of selectedFeatures) {
+    if (!optionMap.has(selectedFeature)) {
+      optionMap.set(selectedFeature, {
+        id: selectedFeature,
+        label: formatFeatureLabel(selectedFeature),
+      });
+    }
+  }
+
+  const allFeatureOptions = Array.from(optionMap.values());
   const parsedLatitude = latitudeText ? Number(latitudeText) : Number.NaN;
   const parsedLongitude = longitudeText ? Number(longitudeText) : Number.NaN;
   const mapLatitude = Number.isNaN(parsedLatitude)
@@ -353,10 +394,6 @@ export default function EditPlacePage() {
   const mapLongitude = Number.isNaN(parsedLongitude)
     ? DEFAULT_COORDS.lng
     : parsedLongitude;
-  const hasCurrentCategoryInOptions = Boolean(
-    selectedCategoryId &&
-      categories?.some((cat) => cat.id === selectedCategoryId),
-  );
   const normalizedCityValue = selectedCity || "";
   const normalizedDistrictValue = selectedDistrict || "";
   const hasCurrentCityInOptions = Boolean(
@@ -376,6 +413,19 @@ export default function EditPlacePage() {
       shouldValidate: true,
     })
   }
+  const toggleFeature = (featureId: string, checked: boolean) => {
+    const normalizedFeatureId = normalizeAmenitySlug(featureId);
+    if (!normalizedFeatureId) return;
+
+    const nextFeatures = checked
+      ? [...selectedFeatures, normalizedFeatureId]
+      : selectedFeatures.filter((value) => value !== normalizedFeatureId);
+
+    form.setValue("features", normalizeFeatureList(nextFeatures), {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+  };
 
   return (
     <div className="flex-1 space-y-4 p-8 pt-6">
@@ -418,7 +468,7 @@ export default function EditPlacePage() {
                     <Card>
                         <CardHeader>
                             <CardTitle>Temel Bilgiler</CardTitle>
-                            <CardDescription>Mekanın adı, tipi ve açıklaması.</CardDescription>
+                            <CardDescription>Mekanın adı, türü ve açıklaması.</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
                         <FormField
@@ -433,36 +483,29 @@ export default function EditPlacePage() {
                             )}
                         />
                         <div className="grid grid-cols-2 gap-4">
-                             <FormField
-                                control={form.control}
-                                name="type"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Tip</FormLabel>
-                                        <Select
-                                          key={`type-${field.value ?? "empty"}`}
-                                          name={field.name}
-                                          onValueChange={field.onChange}
-                                          value={field.value || ""}
-                                        >
-                                            <FormControl><SelectTrigger><SelectValue placeholder="Seçiniz" /></SelectTrigger></FormControl>
-                                            <SelectContent>
-                                                {field.value &&
-                                                  !TYPE_OPTIONS.some((option) => option.value === field.value) && (
-                                                  <SelectItem value={field.value}>
-                                                    {field.value}
-                                                  </SelectItem>
-                                                )}
-                                                {TYPE_OPTIONS.map((option) => (
-                                                  <SelectItem key={option.value} value={option.value}>
-                                                    {option.label}
-                                                  </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
+                            <FormField
+                              control={form.control}
+                              name="kind"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Yer Türü</FormLabel>
+                                  <FormControl>
+                                    <PlaceKindSelect
+                                      value={field.value}
+                                      onValueChange={field.onChange}
+                                      kinds={placeKinds}
+                                      disabled={isKindsLoading}
+                                      includeUnknownValue
+                                      unknownLabel={place?.kindName || "Mevcut Tür"}
+                                    />
+                                  </FormControl>
+                                  <PlaceKindCapabilities
+                                    kindId={selectedKind}
+                                    kinds={placeKinds}
+                                  />
+                                  <FormMessage />
+                                </FormItem>
+                              )}
                             />
                             <FormField
                                 control={form.control}
@@ -496,34 +539,6 @@ export default function EditPlacePage() {
                                 )}
                             />
                         </div>
-                        <FormField
-                            control={form.control}
-                            name="categoryId"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Kategori</FormLabel>
-                                        <Select
-                                          key={`category-${field.value ?? "empty"}-${categories?.length ?? 0}`}
-                                          name={field.name}
-                                          onValueChange={field.onChange}
-                                          value={field.value || ""}
-                                        >
-                                            <FormControl><SelectTrigger><SelectValue placeholder="Kategori Seçiniz" /></SelectTrigger></FormControl>
-                                            <SelectContent>
-                                                {field.value && !hasCurrentCategoryInOptions && (
-                                                  <SelectItem value={field.value}>
-                                                    {place.category || "Mevcut Kategori"}
-                                                  </SelectItem>
-                                                )}
-                                                {categories?.map((cat) => (
-                                                    <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
                         <FormField
                             control={form.control}
                             name="shortDescription"
@@ -928,40 +943,21 @@ export default function EditPlacePage() {
                                 render={() => (
                                     <FormItem>
                                         <div className="grid grid-cols-2 gap-4">
-                                            {COMMON_FEATURES.map((feature) => (
-                                                <FormField
-                                                    key={feature.id}
-                                                    control={form.control}
-                                                    name="features"
-                                                    render={({ field }) => {
-                                                        return (
-                                                            <FormItem
-                                                                key={feature.id}
-                                                                className="flex flex-row items-start space-x-3 space-y-0"
-                                                            >
-                                                                <FormControl>
-                                                                    <input
-                                                                        type="checkbox"
-                                                                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                                                                        checked={field.value?.includes(feature.id)}
-                                                                        onChange={(checked) => {
-                                                                            return checked.target.checked
-                                                                                ? field.onChange([...(field.value || []), feature.id])
-                                                                                : field.onChange(
-                                                                                    field.value?.filter(
-                                                                                        (value) => value !== feature.id
-                                                                                    )
-                                                                                )
-                                                                        }}
-                                                                    />
-                                                                </FormControl>
-                                                                <FormLabel className="font-normal">
-                                                                    {feature.label}
-                                                                </FormLabel>
-                                                            </FormItem>
-                                                        )
-                                                    }}
-                                                />
+                                            {allFeatureOptions.map((feature) => (
+                                                <label
+                                                  key={feature.id}
+                                                  className="flex cursor-pointer items-center gap-3 rounded-md border border-border p-3"
+                                                >
+                                                  <Checkbox
+                                                    checked={selectedFeatureSet.has(feature.id)}
+                                                    onCheckedChange={(checked) =>
+                                                      toggleFeature(feature.id, checked === true)
+                                                    }
+                                                  />
+                                                  <span className="text-sm font-medium leading-none">
+                                                    {feature.label}
+                                                  </span>
+                                                </label>
                                             ))}
                                         </div>
                                         <FormMessage />

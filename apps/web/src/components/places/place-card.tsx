@@ -5,13 +5,15 @@ import Link from "next/link";
 import type { Route } from "next";
 
 import { useLocalizedFormatting } from "@/lib/i18n";
+import { getPlacePriceUnitLabel } from "@/lib/place-kind";
 import type { PlaceSummary } from "@/types";
 
 const PRICE_PREFIX = "başlayan";
-const PER_NIGHT = "gece";
 
 export function PlaceCard({ place }: { place: PlaceSummary }) {
   const { formatPrice } = useLocalizedFormatting();
+  const hasPrice = Number(place.nightlyPrice) > 0;
+  const priceUnitLabel = getPlacePriceUnitLabel(place.kind);
 
   return (
     <Link
@@ -39,9 +41,15 @@ export function PlaceCard({ place }: { place: PlaceSummary }) {
         </div>
         <p className="line-clamp-2 text-sm text-muted-foreground">{place.shortDescription}</p>
         <div className="flex items-baseline gap-1 text-sm font-semibold text-foreground">
-          <span>{PRICE_PREFIX}</span>
-          <span>{formatPrice(place.nightlyPrice)}</span>
-          <span className="text-xs font-medium text-muted-foreground">{PER_NIGHT}</span>
+          {hasPrice ? (
+            <>
+              <span>{PRICE_PREFIX}</span>
+              <span>{formatPrice(place.nightlyPrice)}</span>
+              <span className="text-xs font-medium text-muted-foreground">{priceUnitLabel}</span>
+            </>
+          ) : (
+            <span className="text-xs font-medium text-muted-foreground">Fiyat belirtilmedi</span>
+          )}
         </div>
       </div>
     </Link>

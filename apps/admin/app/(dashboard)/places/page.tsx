@@ -1,8 +1,8 @@
 "use client"
 
 import { PlacesTable } from "@/components/tables/places-table"
-import { usePlaces } from "@/hooks/use-places"
-import { useCategories } from "@/hooks/use-categories"
+import { getPlaceKindLabel } from "@/components/places/place-kind"
+import { PlaceKindId, usePlaceKinds, usePlaces } from "@/hooks/use-places"
 import { useState } from "react"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -13,16 +13,16 @@ import { Plus } from "lucide-react"
 export default function PlacesPage() {
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState("")
-  const [category, setCategory] = useState("")
+  const [kind, setKind] = useState<PlaceKindId | "">("")
   const [status, setStatus] = useState("")
-  const { data: categories } = useCategories()
-  const hasActiveFilters = Boolean(search || category || status)
+  const { data: kinds } = usePlaceKinds()
+  const hasActiveFilters = Boolean(search || kind || status)
 
   const { data, isLoading } = usePlaces({
     page: page.toString(),
     limit: "10",
     search,
-    category,
+    kind: kind || undefined,
     status
   })
 
@@ -50,20 +50,20 @@ export default function PlacesPage() {
           className="max-w-sm"
         />
         <Select
-          value={category || "all"}
+          value={kind || "all"}
           onValueChange={(v) => {
-            setCategory(v === "all" ? "" : v)
+            setKind(v === "all" ? "" : (v as PlaceKindId))
             setPage(1)
           }}
         >
           <SelectTrigger className="w-[180px]">
-             <SelectValue placeholder="Kategori Filtrele" />
+             <SelectValue placeholder="Tür Filtrele" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Tüm Kategoriler</SelectItem>
-            {categories?.map((cat) => (
-              <SelectItem key={cat.id} value={cat.id}>
-                {cat.name}
+            <SelectItem value="all">Tüm Türler</SelectItem>
+            {kinds?.map((kindItem) => (
+              <SelectItem key={kindItem.id} value={kindItem.id}>
+                {getPlaceKindLabel(kindItem.id, kindItem.name)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -94,7 +94,7 @@ export default function PlacesPage() {
              variant="ghost" 
              onClick={() => {
                setSearch("")
-               setCategory("")
+               setKind("")
                setStatus("")
                setPage(1)
              }}

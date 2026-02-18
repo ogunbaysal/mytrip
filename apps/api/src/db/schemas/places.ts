@@ -1,4 +1,3 @@
-import { sql } from "drizzle-orm";
 import {
   pgTable,
   text,
@@ -7,12 +6,15 @@ import {
   boolean,
   timestamp,
   pgEnum,
+  customType,
   index,
   primaryKey,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
+import { placeKindEnum } from "./place-kind-enum.ts";
+import { sql } from "drizzle-orm";
 import { user } from "./auth.ts";
-import { placeCategory } from "./categories.ts";
+import { placeKind } from "./categories.ts";
 import { district, province } from "./locations.ts";
 import { file } from "./files.ts";
 
@@ -35,8 +37,23 @@ export const priceLevelEnum = pgEnum("price_level", [
   "luxury",
 ]);
 
+export const placeMediaUsageEnum = pgEnum("place_media_usage", [
+  "cover",
+  "gallery",
+  "menu",
+  "room",
+  "package",
+  "other",
+]);
+
+const placeKindId = customType<{ data: string }>({
+  dataType() {
+    return "place_kind";
+  },
+});
+
 // ============================================================================
-// PLACES TABLE
+// PLACES TABLE (CORE)
 // ============================================================================
 
 const placeTable = pgTable(
@@ -45,7 +62,9 @@ const placeTable = pgTable(
     id: text("id").primaryKey(),
     slug: text("slug").notNull().unique(),
     name: text("name").notNull(),
-    categoryId: text("category_id").references(() => placeCategory.id, {
+    kind: placeKindEnum("kind").notNull().default("visit_location"),
+    // Legacy category reference kept temporarily for incremental route migration.
+    categoryId: placeKindId("category_id").references(() => placeKind.id, {
       onDelete: "set null",
     }),
     description: text("description"),
@@ -57,8 +76,8 @@ const placeTable = pgTable(
     districtId: text("district_id").references(() => district.id, {
       onDelete: "set null",
     }),
-    location: text("location"), // JSON string for GPS coordinates {lat, lng}
-    contactInfo: text("contact_info"), // JSON string for phone, email, website
+    location: text("location"),
+    contactInfo: text("contact_info"),
     businessDocumentFileId: text("business_document_file_id").references(
       () => file.id,
       {
@@ -68,6 +87,8 @@ const placeTable = pgTable(
     rating: numeric("rating", { precision: 3, scale: 2 }).default("0.00"),
     reviewCount: integer("review_count").notNull().default(0),
     priceLevel: priceLevelEnum("price_level"),
+    startingPrice: numeric("starting_price", { precision: 10, scale: 2 }),
+    // Legacy field kept while routes are moved to kind profiles.
     nightlyPrice: numeric("nightly_price", { precision: 10, scale: 2 }),
     status: placeStatusEnum("status").notNull().default("pending"),
     verified: boolean("verified").notNull().default(false),
@@ -75,7 +96,8 @@ const placeTable = pgTable(
     ownerId: text("owner_id").references(() => user.id, { onDelete: "cascade" }),
     views: integer("views").notNull().default(0),
     bookingCount: integer("booking_count").notNull().default(0),
-    openingHours: text("opening_hours"), // JSON object for weekly schedule
+    openingHours: text("opening_hours"),
+    // Legacy fields kept while routes are moved to kind profiles.
     checkInInfo: text("check_in_info"),
     checkOutInfo: text("check_out_info"),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -86,6 +108,7 @@ const placeTable = pgTable(
       .defaultNow(),
   },
   (table) => [
+    index("place_kind_idx").on(table.kind),
     index("place_category_id_idx").on(table.categoryId),
     index("place_city_id_idx").on(table.cityId),
     index("place_district_id_idx").on(table.districtId),
@@ -99,9 +122,9 @@ const placeTable = pgTable(
 );
 
 export const place = Object.assign(placeTable, {
-  // Backward-compatible column aliases for route refactors.
-  type: placeTable.categoryId,
-  category: placeTable.categoryId,
+  // Legacy aliases still used in current route layer.
+  type: placeTable.kind,
+  category: placeTable.kind,
   city: placeTable.cityId,
   district: placeTable.districtId,
   images: sql<string>`NULL`,
@@ -109,40 +132,42 @@ export const place = Object.assign(placeTable, {
 });
 
 // ============================================================================
-// PLACE IMAGES TABLE
+// PLACE MEDIA TABLE
 // ============================================================================
 
-export const placeImage = pgTable(
-  "place_image",
+export const placeMedia = pgTable(
+  "place_media",
   {
     placeId: text("place_id")
       .notNull()
-      .references(() => placeTable.id, { onDelete: "cascade" }),
+      .references(() => place.id, { onDelete: "cascade" }),
     fileId: text("file_id")
       .notNull()
       .references(() => file.id, { onDelete: "cascade" }),
+    usage: placeMediaUsageEnum("usage").notNull().default("gallery"),
     sortOrder: integer("sort_order").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
   },
   (table) => [
-    primaryKey({ columns: [table.placeId, table.fileId], name: "place_image_pk" }),
-    uniqueIndex("place_image_place_sort_order_uniq").on(
+    primaryKey({ columns: [table.placeId, table.fileId], name: "place_media_pk" }),
+    index("place_media_place_usage_sort_idx").on(
       table.placeId,
+      table.usage,
       table.sortOrder,
     ),
-    index("place_image_place_sort_idx").on(table.placeId, table.sortOrder),
-    index("place_image_file_id_idx").on(table.fileId),
+    uniqueIndex("place_media_place_sort_uniq").on(table.placeId, table.sortOrder),
+    index("place_media_file_id_idx").on(table.fileId),
   ],
 );
 
 // ============================================================================
-// AMENITIES TABLE
+// FEATURES (SHARED TAG-LIKE FEATURES)
 // ============================================================================
 
-export const amenity = pgTable(
-  "amenity",
+export const placeFeature = pgTable(
+  "place_feature",
   {
     id: text("id").primaryKey(),
     slug: text("slug").notNull().unique(),
@@ -155,24 +180,20 @@ export const amenity = pgTable(
       .defaultNow(),
   },
   (table) => [
-    index("amenity_slug_idx").on(table.slug),
-    index("amenity_label_idx").on(table.label),
+    index("place_feature_slug_idx").on(table.slug),
+    index("place_feature_label_idx").on(table.label),
   ],
 );
 
-// ============================================================================
-// PLACE AMENITIES TABLE
-// ============================================================================
-
-export const placeAmenity = pgTable(
-  "place_amenity",
+export const placeFeatureAssignment = pgTable(
+  "place_feature_assignment",
   {
     placeId: text("place_id")
       .notNull()
-      .references(() => placeTable.id, { onDelete: "cascade" }),
+      .references(() => place.id, { onDelete: "cascade" }),
     amenityId: text("amenity_id")
       .notNull()
-      .references(() => amenity.id, { onDelete: "cascade" }),
+      .references(() => placeFeature.id, { onDelete: "cascade" }),
     sortOrder: integer("sort_order").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -181,16 +202,28 @@ export const placeAmenity = pgTable(
   (table) => [
     primaryKey({
       columns: [table.placeId, table.amenityId],
-      name: "place_amenity_pk",
+      name: "place_feature_assignment_pk",
     }),
-    uniqueIndex("place_amenity_place_sort_order_uniq").on(
+    uniqueIndex("place_feature_assignment_place_sort_uniq").on(
       table.placeId,
       table.sortOrder,
     ),
-    index("place_amenity_place_sort_idx").on(table.placeId, table.sortOrder),
-    index("place_amenity_amenity_id_idx").on(table.amenityId),
+    index("place_feature_assignment_place_sort_idx").on(table.placeId, table.sortOrder),
+    index("place_feature_assignment_amenity_id_idx").on(table.amenityId),
   ],
 );
+
+export const placeFeatureAssignmentAlias = Object.assign(placeFeatureAssignment, {
+  featureId: placeFeatureAssignment.amenityId,
+});
+
+// ============================================================================
+// LEGACY ALIASES (FOR INCREMENTAL APP LAYER MIGRATION)
+// ============================================================================
+
+export const placeImage = placeMedia;
+export const amenity = placeFeature;
+export const placeAmenity = placeFeatureAssignmentAlias;
 
 // ============================================================================
 // TYPE EXPORTS
@@ -198,9 +231,12 @@ export const placeAmenity = pgTable(
 
 export type Place = typeof place.$inferSelect;
 export type NewPlace = typeof place.$inferInsert;
-export type PlaceImage = typeof placeImage.$inferSelect;
-export type NewPlaceImage = typeof placeImage.$inferInsert;
-export type Amenity = typeof amenity.$inferSelect;
-export type NewAmenity = typeof amenity.$inferInsert;
-export type PlaceAmenity = typeof placeAmenity.$inferSelect;
-export type NewPlaceAmenity = typeof placeAmenity.$inferInsert;
+
+export type PlaceMedia = typeof placeMedia.$inferSelect;
+export type NewPlaceMedia = typeof placeMedia.$inferInsert;
+
+export type PlaceFeature = typeof placeFeature.$inferSelect;
+export type NewPlaceFeature = typeof placeFeature.$inferInsert;
+
+export type PlaceFeatureAssignment = typeof placeFeatureAssignment.$inferSelect;
+export type NewPlaceFeatureAssignment = typeof placeFeatureAssignment.$inferInsert;

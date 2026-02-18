@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Gizlilik Politikası | TatilDesen",
+  title: "Gizlilik Politikası",
   description: "TatilDesen gizlilik politikası ve kişisel verilerin korunmasına ilişkin bilgiler.",
 };
 

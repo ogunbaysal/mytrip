@@ -1,4 +1,10 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+
+export const metadata: Metadata = {
+  title: "Rezervasyonlarım",
+  description: "TatilDesen rezervasyonlarınızı görüntüleyin ve yönetin.",
+};
 
 export default function BookingsPage() {
   return (

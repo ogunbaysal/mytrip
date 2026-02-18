@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { CheckoutContent } from "./checkout-content";
 
 export const metadata: Metadata = {
-  title: "Ödeme | MyTrip",
+  title: "Ödeme",
   description: "Abonelik ödemesi yapın ve işletme hesabınızı aktifleştirin.",
 };
 

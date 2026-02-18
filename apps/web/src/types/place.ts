@@ -1,3 +1,15 @@
+export type PlaceKind =
+  | "hotel"
+  | "villa"
+  | "restaurant"
+  | "cafe"
+  | "bar_club"
+  | "beach"
+  | "natural_location"
+  | "activity_location"
+  | "visit_location"
+  | "other_monetized";
+
 export type PlaceCategory =
   | "beachfront"
   | "design"
@@ -18,6 +30,9 @@ export type PlaceSummary = {
   city: string;
   district: string;
   type: "stay" | "experience" | "restaurant";
+  kind: PlaceKind | string;
+  kindSlug?: string | null;
+  kindName?: string | null;
   category: PlaceCategory;
   coordinates: {
     lat: number;
@@ -45,12 +60,18 @@ export type PlaceHost = {
   name: string;
   avatar: string;
   isSuperhost?: boolean;
-  joinedDate: string;
+  joinedDate?: string;
   reviewCount: number;
   isVerified?: boolean;
   responseRate?: number;
   responseTime?: string;
   description?: string;
+};
+
+export type PlaceContactInfo = {
+  phone?: string;
+  email?: string;
+  website?: string;
 };
 
 export type PlaceReview = {
@@ -99,6 +120,8 @@ export type PlaceDetail = PlaceSummary & {
   shortHighlights: string[];
   description: string;
   amenities: PlaceAmenity[];
+  contactInfo?: PlaceContactInfo | null;
+  typeProfile?: Record<string, unknown> | null;
   checkInInfo?: string;
   checkOutInfo?: string;
   featuredCollections?: CollectionSummary[];

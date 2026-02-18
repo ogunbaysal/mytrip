@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { Button } from "@/components/ui/button";
 
 export const metadata: Metadata = {
-  title: "Kariyer | TatilDesen",
+  title: "Kariyer",
   description: "TatilDesen ekibine katılın ve seyahat deneyimini yeniden tasarlayın.",
 };
 

@@ -26,6 +26,20 @@ import {
 } from "@/components/dashboard";
 import { api } from "@/lib/api";
 
+const RESOURCE_LABELS: Record<string, string> = {
+  "place.hotel": "Otel",
+  "place.villa": "Villa",
+  "place.restaurant": "Restoran",
+  "place.cafe": "Kafe",
+  "place.bar_club": "Bar/Club",
+  "place.beach": "Plaj",
+  "place.natural_location": "Doğal Lokasyon",
+  "place.activity_location": "Aktivite Lokasyonu",
+  "place.visit_location": "Ziyaret Lokasyonu",
+  "place.other_monetized": "Diğer Monetize",
+  "blog.post": "Blog Yazısı",
+};
+
 export default function SubscriptionPage() {
   const queryClient = useQueryClient();
   const [showCancelModal, setShowCancelModal] = useState(false);
@@ -62,6 +76,12 @@ export default function SubscriptionPage() {
   const subscription = subscriptionData?.subscription;
   const usage = usageData?.usage;
   const plans = plansData?.plans || [];
+  const resourceUsage: Array<{
+    resourceKey: string;
+    current: number;
+    max: number | null;
+    isUnlimited: boolean;
+  }> = usage?.resources ?? [];
 
   // Loading state
   if (subscriptionLoading) {
@@ -117,14 +137,6 @@ export default function SubscriptionPage() {
   }
 
   const plan = plans.find((p) => p.id === subscription.planId);
-  const planLimits =
-    plan?.limits ||
-    (plan
-      ? {
-          maxPlaces: plan.maxPlaces,
-          maxBlogs: plan.maxBlogs,
-        }
-      : undefined);
   const planFeatures = plan?.features ?? subscription?.planFeatures ?? [];
 
   const formatDate = (dateStr: string) => {
@@ -144,9 +156,12 @@ export default function SubscriptionPage() {
     ? Math.round(((usage.blogs.current || 0) / (usage.blogs.max || 1)) * 100)
     : 0;
 
-  const isAtLimit =
-    (usage?.places.current || 0) >= (usage?.places.max || 1) ||
-    (usage?.blogs.current || 0) >= (usage?.blogs.max || 1);
+  const isAtLimit = resourceUsage.some(
+    (item) =>
+      !item.isUnlimited &&
+      item.max !== null &&
+      (item.current ?? 0) >= (item.max ?? 0),
+  );
 
   return (
     <div className="space-y-6">
@@ -370,31 +385,30 @@ export default function SubscriptionPage() {
             )}
           </DashboardCard>
 
-          {/* Plan Limits Card */}
-          {planLimits && (
+          {/* Resource Limits Card */}
+          {resourceUsage.length > 0 ? (
             <DashboardCard padding="md">
               <SectionHeader
-                title="Plan Limitleri"
+                title="Kaynak Limitleri"
                 size="sm"
                 className="mb-4"
               />
 
-              <div className="space-y-3">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="flex items-center gap-2 text-muted-foreground">
-                    <Building2 className="size-4" />
-                    Mekan Limiti
-                  </span>
-                  <span className="font-medium">{planLimits.maxPlaces}</span>
-                </div>
-
-                <div className="flex items-center justify-between text-sm">
-                  <span className="flex items-center gap-2 text-muted-foreground">
-                    <FileText className="size-4" />
-                    Blog Limiti
-                  </span>
-                  <span className="font-medium">{planLimits.maxBlogs}</span>
-                </div>
+              <div className="space-y-2">
+                {resourceUsage.map((item) => (
+                  <div
+                    key={item.resourceKey}
+                    className="flex items-center justify-between text-sm"
+                  >
+                    <span className="text-muted-foreground">
+                      {RESOURCE_LABELS[item.resourceKey] ?? item.resourceKey}
+                    </span>
+                    <span className="font-medium">
+                      {item.current} /{" "}
+                      {item.isUnlimited || item.max === null ? "∞" : item.max}
+                    </span>
+                  </div>
+                ))}
 
                 <div className="rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">
                   Plan detaylari ve ek avantajlar icin "Plan Ozellikleri"
@@ -402,7 +416,7 @@ export default function SubscriptionPage() {
                 </div>
               </div>
             </DashboardCard>
-          )}
+          ) : null}
         </div>
       </div>
 

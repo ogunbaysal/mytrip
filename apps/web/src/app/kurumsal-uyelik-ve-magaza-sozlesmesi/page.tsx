@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Kurumsal Üyelik ve Mağaza Sözleşmesi | TatilDesen",
+  title: "Kurumsal Üyelik ve Mağaza Sözleşmesi",
   description: "Kurumsal üyelik ve mağaza sözleşmesi metni.",
 };
 

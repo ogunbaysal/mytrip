@@ -22,14 +22,14 @@ export async function generateMetadata({ params }: { params: PageParams }) {
 
   if (!data) {
     return {
-        title: "Koleksiyon | TatilDesen",
+        title: "Koleksiyon",
     };
   }
   
   const { collection } = data;
 
   return {
-    title: `${collection.name} | TatilDesen`,
+    title: collection.name,
     description: collection.description,
   };
 }

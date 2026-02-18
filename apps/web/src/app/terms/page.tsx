@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Kullanım Şartları | TatilDesen",
+  title: "Kullanım Şartları",
   description: "TatilDesen platformunun kullanım koşulları ve hizmet şartları.",
 };
 

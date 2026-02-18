@@ -3,14 +3,23 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { db } from "../../db/index.ts";
 import {
+  activityPackage,
+  activityPackageMedia,
+  activityPackagePriceTier,
+  diningMenu,
+  diningMenuItem,
+  diningMenuItemTag,
+  diningMenuSection,
   district,
   file,
+  hotelRoom,
+  hotelRoomFeature,
+  hotelRoomMedia,
+  hotelRoomRate,
   place,
-  placeCategory,
+  placeKind,
   placeImage,
   province,
-  subscription,
-  subscriptionPlan,
   user,
 } from "../../db/schemas/index.ts";
 import { and, asc, desc, eq, ilike, inArray, sql } from "drizzle-orm";
@@ -20,9 +29,21 @@ import {
   hydratePlaceMediaAndAmenities,
   replacePlaceAmenities,
   resolvePublicFileUrl,
-  resolveCategorySlugsForType,
+  resolvePlaceKindIdsForType,
   resolveProvinceDistrictIds,
 } from "../../lib/place-relations.ts";
+import {
+  getActiveSubscriptionForUser,
+  getCurrentUsageByResource,
+  getEntitlementsForPlan,
+  resolveResourceKeyForPlaceKind,
+} from "../../lib/plan-entitlements.ts";
+import { evaluateEntitlementLimit } from "../../lib/entitlement-evaluator.ts";
+import {
+  supportsMenuForKind,
+  supportsPackagesForKind,
+  supportsRoomsForKind,
+} from "../../lib/place-kind-registry.ts";
 
 const app = new Hono();
 
@@ -34,7 +55,20 @@ const placeStatusEnum = [
   "rejected",
 ] as const;
 
-const createPlaceSchema = z.object({
+const placeKindEnum = z.enum([
+  "hotel",
+  "villa",
+  "restaurant",
+  "cafe",
+  "bar_club",
+  "beach",
+  "natural_location",
+  "activity_location",
+  "visit_location",
+  "other_monetized",
+]);
+
+const placeBaseSchema = z.object({
   name: z.string().min(2).max(200),
   type: z.string().optional(),
   category: z.string().optional(),
@@ -47,18 +81,121 @@ const createPlaceSchema = z.object({
   cityId: z.string().optional(),
   districtId: z.string().optional(),
   location: z.object({ lat: z.number(), lng: z.number() }).optional(),
-  contactInfo: z.record(z.string(), z.any()).optional(),
+  contactInfo: z.record(z.string(), z.unknown()).optional(),
   priceLevel: z.enum(["budget", "moderate", "expensive", "luxury"]).optional(),
   nightlyPrice: z.number().min(0).optional(),
   businessDocumentFileId: z.string().optional(),
   features: z.array(z.string()).optional(),
   images: z.array(z.string()).min(1).max(50),
-  openingHours: z.record(z.string(), z.any()).optional(),
-  checkInInfo: z.record(z.string(), z.any()).optional(),
-  checkOutInfo: z.record(z.string(), z.any()).optional(),
+  openingHours: z.record(z.string(), z.unknown()).optional(),
+  checkInInfo: z.record(z.string(), z.unknown()).optional(),
+  checkOutInfo: z.record(z.string(), z.unknown()).optional(),
 });
 
-const updatePlaceSchema = createPlaceSchema.partial();
+const createPlaceSchema = z.discriminatedUnion("kind", [
+  placeBaseSchema.extend({ kind: z.literal("hotel") }),
+  placeBaseSchema.extend({ kind: z.literal("villa") }),
+  placeBaseSchema.extend({ kind: z.literal("restaurant") }),
+  placeBaseSchema.extend({ kind: z.literal("cafe") }),
+  placeBaseSchema.extend({ kind: z.literal("bar_club") }),
+  placeBaseSchema.extend({ kind: z.literal("beach") }),
+  placeBaseSchema.extend({ kind: z.literal("natural_location") }),
+  placeBaseSchema.extend({ kind: z.literal("activity_location") }),
+  placeBaseSchema.extend({ kind: z.literal("visit_location") }),
+  placeBaseSchema.extend({ kind: z.literal("other_monetized") }),
+]);
+
+const updatePlaceSchema = placeBaseSchema
+  .partial()
+  .extend({
+    kind: placeKindEnum.optional(),
+  });
+
+const roomFeatureSchema = z.object({
+  key: z.string().trim().min(1).max(80),
+  value: z.string().trim().max(500).optional(),
+  sortOrder: z.number().int().min(0).optional(),
+});
+
+const createRoomSchema = z.object({
+  name: z.string().trim().min(1).max(200),
+  slug: z.string().trim().max(200).optional(),
+  description: z.string().trim().max(2000).optional(),
+  maxAdults: z.number().int().min(1).max(20).default(2),
+  maxChildren: z.number().int().min(0).max(20).default(0),
+  bedCount: z.number().int().min(0).max(20).optional(),
+  bathroomCount: z.number().int().min(0).max(20).optional(),
+  areaSqm: z.number().min(0).optional(),
+  baseNightlyPrice: z.number().min(0).optional(),
+  status: z.enum(["active", "inactive", "maintenance"]).default("active"),
+  features: z.array(roomFeatureSchema).optional(),
+  mediaFileIds: z.array(z.string()).max(30).optional(),
+});
+
+const updateRoomSchema = createRoomSchema.partial();
+
+const createRoomRateSchema = z.object({
+  startsOn: z.string().min(1),
+  endsOn: z.string().min(1),
+  nightlyPrice: z.number().min(0),
+  minStayNights: z.number().int().min(1).default(1),
+  maxStayNights: z.number().int().min(1).optional(),
+  isRefundable: z.boolean().default(true),
+});
+
+const updateRoomRateSchema = createRoomRateSchema.partial();
+
+const menuItemInputSchema = z.object({
+  name: z.string().trim().min(1).max(200),
+  description: z.string().trim().max(2000).optional(),
+  price: z.number().min(0).optional(),
+  imageFileId: z.string().optional(),
+  isAvailable: z.boolean().default(true),
+  sortOrder: z.number().int().min(0).default(0),
+  tags: z.array(z.string().trim().min(1).max(40)).optional(),
+});
+
+const menuSectionInputSchema = z.object({
+  name: z.string().trim().min(1).max(200),
+  description: z.string().trim().max(2000).optional(),
+  sortOrder: z.number().int().min(0).default(0),
+  items: z.array(menuItemInputSchema).default([]),
+});
+
+const menuInputSchema = z.object({
+  name: z.string().trim().min(1).max(200),
+  description: z.string().trim().max(2000).optional(),
+  isActive: z.boolean().default(true),
+  sortOrder: z.number().int().min(0).default(0),
+  sections: z.array(menuSectionInputSchema).default([]),
+});
+
+const upsertDiningMenuSchema = z.object({
+  menus: z.array(menuInputSchema).min(1),
+});
+
+const packagePriceTierInputSchema = z.object({
+  name: z.string().trim().min(1).max(120),
+  minGroupSize: z.number().int().min(1).optional(),
+  maxGroupSize: z.number().int().min(1).optional(),
+  price: z.number().min(0),
+  sortOrder: z.number().int().min(0).default(0),
+});
+
+const createActivityPackageSchema = z.object({
+  name: z.string().trim().min(1).max(200),
+  description: z.string().trim().max(2000).optional(),
+  price: z.number().min(0).optional(),
+  durationMinutes: z.number().int().min(1).optional(),
+  minParticipants: z.number().int().min(1).optional(),
+  maxParticipants: z.number().int().min(1).optional(),
+  isActive: z.boolean().default(true),
+  sortOrder: z.number().int().min(0).default(0),
+  mediaFileIds: z.array(z.string()).max(30).optional(),
+  priceTiers: z.array(packagePriceTierInputSchema).optional(),
+});
+
+const updateActivityPackageSchema = createActivityPackageSchema.partial();
 
 const inferImageMimeType = (url: string): string => {
   const clean = url.split("?")[0].toLowerCase();
@@ -178,12 +315,12 @@ const getQuantile = (sortedValues: number[], quantile: number) => {
 const resolveAutomaticPriceLevel = async ({
   nightlyPrice,
   districtId,
-  categoryId,
+  kind,
   excludePlaceId,
 }: {
   nightlyPrice?: number | null;
   districtId?: string | null;
-  categoryId?: string | null;
+  kind?: string | null;
   excludePlaceId?: string;
 }): Promise<"budget" | "moderate" | "expensive" | "luxury" | null> => {
   if (
@@ -194,7 +331,7 @@ const resolveAutomaticPriceLevel = async ({
     return null;
   }
 
-  if (!districtId || !categoryId) {
+  if (!districtId || !kind) {
     return resolvePriceLevelFromThresholds(
       nightlyPrice,
       DEFAULT_PRICE_LEVEL_THRESHOLDS,
@@ -203,7 +340,7 @@ const resolveAutomaticPriceLevel = async ({
 
   const conditions = [
     eq(place.districtId, districtId),
-    eq(place.categoryId, categoryId),
+    eq(place.kind, kind as any),
     sql`${place.nightlyPrice} IS NOT NULL`,
   ];
 
@@ -299,71 +436,120 @@ async function getOwnerBusinessDocument(userId: string, businessDocumentFileId: 
   };
 }
 
-async function resolveCategoryId(input: {
+async function resolvePlaceKindInput(input: {
+  kind?: string;
   categoryId?: string;
   category?: string;
   type?: string;
-  fallbackCategoryId?: string | null;
-}): Promise<{ id: string | null; slug: string | null; name: string | null }> {
-  const categoryId = normalizeOptionalId(input.categoryId) ?? input.fallbackCategoryId ?? null;
-  if (categoryId) {
-    const [categoryRow] = await db
-      .select({ id: placeCategory.id, slug: placeCategory.slug, name: placeCategory.name })
-      .from(placeCategory)
-      .where(eq(placeCategory.id, categoryId))
+  fallbackKind?: string | null;
+  fallbackKindId?: string | null;
+}): Promise<{
+  kind: string | null;
+  id: string | null;
+  slug: string | null;
+  name: string | null;
+}> {
+  const kindInput = normalizeOptionalId(input.kind);
+  if (kindInput) {
+    const [kindRow] = await db
+      .select({ id: placeKind.id, slug: placeKind.slug, name: placeKind.name })
+      .from(placeKind)
+      .where(eq(placeKind.id, kindInput))
       .limit(1);
 
-    if (categoryRow) {
-      return { id: categoryRow.id, slug: categoryRow.slug, name: categoryRow.name };
+    if (kindRow) {
+      return {
+        kind: kindRow.id,
+        id: kindRow.id,
+        slug: kindRow.slug,
+        name: kindRow.name,
+      };
+    }
+  }
+
+  const categoryId =
+    normalizeOptionalId(input.categoryId) ?? input.fallbackKindId ?? null;
+  if (categoryId) {
+    const [kindRow] = await db
+      .select({ id: placeKind.id, slug: placeKind.slug, name: placeKind.name })
+      .from(placeKind)
+      .where(eq(placeKind.id, categoryId))
+      .limit(1);
+
+    if (kindRow) {
+      return {
+        kind: kindRow.id,
+        id: kindRow.id,
+        slug: kindRow.slug,
+        name: kindRow.name,
+      };
     }
   }
 
   const categoryText = input.category?.trim();
   if (!categoryText) {
-    return { id: categoryId, slug: null, name: null };
+    const fallbackKind = input.fallbackKind ?? null;
+    return {
+      kind: fallbackKind,
+      id: categoryId,
+      slug: null,
+      name: null,
+    };
   }
 
   const [match] = await db
-    .select({ id: placeCategory.id, slug: placeCategory.slug, name: placeCategory.name })
-    .from(placeCategory)
+    .select({ id: placeKind.id, slug: placeKind.slug, name: placeKind.name })
+    .from(placeKind)
     .where(
-      sql`LOWER(${placeCategory.slug}) = LOWER(${categoryText}) OR LOWER(${placeCategory.name}) = LOWER(${categoryText})`,
+      sql`LOWER(${placeKind.slug}) = LOWER(${categoryText}) OR LOWER(${placeKind.name}) = LOWER(${categoryText})`,
     )
     .limit(1);
 
   if (!match) {
-    const fallbackSlugs = resolveCategorySlugsForType(input.type);
-    const fallbackSlug = fallbackSlugs[0];
-    if (!fallbackSlug) {
-      return { id: categoryId, slug: null, name: null };
+    const fallbackCandidates = [
+      ...(input.fallbackKind ? [input.fallbackKind] : []),
+      ...resolvePlaceKindIdsForType(input.type),
+    ];
+    for (const candidate of fallbackCandidates) {
+      const [fallback] = await db
+        .select({ id: placeKind.id, slug: placeKind.slug, name: placeKind.name })
+        .from(placeKind)
+        .where(eq(placeKind.id, candidate))
+        .limit(1);
+      if (fallback) {
+        return {
+          kind: fallback.id,
+          id: fallback.id,
+          slug: fallback.slug,
+          name: fallback.name,
+        };
+      }
     }
 
-    const [fallback] = await db
-      .select({ id: placeCategory.id, slug: placeCategory.slug, name: placeCategory.name })
-      .from(placeCategory)
-      .where(eq(placeCategory.slug, fallbackSlug))
-      .limit(1);
-
-    if (!fallback) {
-      return { id: categoryId, slug: null, name: null };
-    }
-
-    return fallback;
+    return {
+      kind: input.fallbackKind ?? null,
+      id: categoryId,
+      slug: null,
+      name: null,
+    };
   }
 
-  return { id: match.id, slug: match.slug, name: match.name };
+  return { kind: match.id, id: match.id, slug: match.slug, name: match.name };
 }
 
 function toLegacyPlace<T extends {
-  categorySlug: string | null;
-  categoryName: string | null;
+  kind: string;
+  kindSlug: string | null;
+  kindName: string | null;
   cityName: string | null;
   districtName: string | null;
 }>(placeRow: T) {
   return {
     ...placeRow,
-    type: derivePlaceTypeFromCategorySlug(placeRow.categorySlug),
-    category: placeRow.categoryName ?? "",
+    type: derivePlaceTypeFromCategorySlug(placeRow.kindSlug),
+    category: placeRow.kindName ?? "",
+    categoryId: placeRow.kind,
+    categorySlug: placeRow.kindSlug,
     city: placeRow.cityName ?? "",
     district: placeRow.districtName ?? "",
   };
@@ -375,7 +561,8 @@ async function fetchOwnerPlaceById(placeId: string, ownerId: string) {
       id: place.id,
       slug: place.slug,
       name: place.name,
-      categoryId: place.categoryId,
+      kind: place.kind,
+      categoryId: place.kind,
       description: place.description,
       shortDescription: place.shortDescription,
       address: place.address,
@@ -399,13 +586,15 @@ async function fetchOwnerPlaceById(placeId: string, ownerId: string) {
       checkOutInfo: place.checkOutInfo,
       createdAt: place.createdAt,
       updatedAt: place.updatedAt,
-      categoryName: placeCategory.name,
-      categorySlug: placeCategory.slug,
+      kindName: placeKind.name,
+      kindSlug: placeKind.slug,
+      categoryName: placeKind.name,
+      categorySlug: placeKind.slug,
       cityName: province.name,
       districtName: district.name,
     })
     .from(place)
-    .leftJoin(placeCategory, eq(place.categoryId, placeCategory.id))
+    .leftJoin(placeKind, eq(place.kind, placeKind.id as any))
     .leftJoin(province, eq(place.cityId, province.id))
     .leftJoin(district, eq(place.districtId, district.id))
     .where(and(eq(place.id, placeId), eq(place.ownerId, ownerId)))
@@ -428,40 +617,352 @@ async function fetchOwnerPlaceById(placeId: string, ownerId: string) {
 
 async function checkPlaceLimit(
   userId: string,
-): Promise<{ allowed: boolean; current: number; max: number }> {
-  const [subscriptionData] = await db
+  kind: string,
+): Promise<{
+  allowed: boolean;
+  current: number;
+  max: number | null;
+  isUnlimited: boolean;
+}> {
+  const activeSubscription = await getActiveSubscriptionForUser(userId);
+  if (!activeSubscription) {
+    return { allowed: false, current: 0, max: 0, isUnlimited: false };
+  }
+
+  const now = new Date();
+  const endDate = new Date(activeSubscription.endDate);
+  if (endDate < now) {
+    return { allowed: false, current: 0, max: 0, isUnlimited: false };
+  }
+
+  const [usageByResource, entitlements] = await Promise.all([
+    getCurrentUsageByResource(userId),
+    getEntitlementsForPlan(activeSubscription.planId),
+  ]);
+
+  const resourceKey = resolveResourceKeyForPlaceKind(kind);
+  return evaluateEntitlementLimit({
+    resourceKey,
+    entitlements,
+    usageByResource,
+  });
+}
+
+type OwnerPlaceContext = {
+  id: string;
+  kind: string;
+  name: string;
+};
+
+async function getOwnedPlaceContext(
+  placeId: string,
+  userId: string,
+): Promise<OwnerPlaceContext | null> {
+  const [row] = await db
     .select({
-      maxPlaces: subscriptionPlan.maxPlaces,
-      endDate: subscription.endDate,
-      status: subscription.status,
+      id: place.id,
+      kind: place.kind,
+      name: place.name,
     })
-    .from(subscription)
-    .innerJoin(subscriptionPlan, eq(subscription.planId, subscriptionPlan.id))
-    .where(eq(subscription.userId, userId))
+    .from(place)
+    .where(and(eq(place.id, placeId), eq(place.ownerId, userId)))
     .limit(1);
 
-  if (!subscriptionData) {
-    return { allowed: false, current: 0, max: 0 };
+  return row ?? null;
+}
+
+async function ensureOwnedFiles(fileIds: string[], userId: string): Promise<boolean> {
+  if (fileIds.length === 0) return true;
+
+  const rows = await db
+    .select({ id: file.id })
+    .from(file)
+    .where(and(eq(file.uploadedById, userId), inArray(file.id, fileIds)));
+
+  return rows.length === fileIds.length;
+}
+
+const normalizeIdList = (values: string[] | undefined): string[] =>
+  Array.from(
+    new Set((values ?? []).map((item) => item.trim()).filter((item) => item.length > 0)),
+  );
+
+const normalizeOptionalSlug = (value: string | undefined, fallbackName: string): string =>
+  normalizeSlugBase(value && value.trim().length > 0 ? value : fallbackName).slice(0, 200);
+
+async function loadRoomsForPlace(placeId: string) {
+  const rooms = await db
+    .select({
+      id: hotelRoom.id,
+      placeId: hotelRoom.placeId,
+      slug: hotelRoom.slug,
+      name: hotelRoom.name,
+      description: hotelRoom.description,
+      maxAdults: hotelRoom.maxAdults,
+      maxChildren: hotelRoom.maxChildren,
+      bedCount: hotelRoom.bedCount,
+      bathroomCount: hotelRoom.bathroomCount,
+      areaSqm: hotelRoom.areaSqm,
+      baseNightlyPrice: hotelRoom.baseNightlyPrice,
+      status: hotelRoom.status,
+      createdAt: hotelRoom.createdAt,
+      updatedAt: hotelRoom.updatedAt,
+    })
+    .from(hotelRoom)
+    .where(eq(hotelRoom.placeId, placeId))
+    .orderBy(asc(hotelRoom.createdAt));
+
+  if (rooms.length === 0) return [];
+
+  const roomIds = rooms.map((room) => room.id);
+  const [featureRows, mediaRows, rateRows] = await Promise.all([
+    db
+      .select({
+        roomId: hotelRoomFeature.roomId,
+        key: hotelRoomFeature.key,
+        value: hotelRoomFeature.value,
+        sortOrder: hotelRoomFeature.sortOrder,
+      })
+      .from(hotelRoomFeature)
+      .where(inArray(hotelRoomFeature.roomId, roomIds))
+      .orderBy(asc(hotelRoomFeature.roomId), asc(hotelRoomFeature.sortOrder)),
+    db
+      .select({
+        roomId: hotelRoomMedia.roomId,
+        fileId: hotelRoomMedia.fileId,
+        url: file.url,
+        sortOrder: hotelRoomMedia.sortOrder,
+      })
+      .from(hotelRoomMedia)
+      .innerJoin(file, eq(hotelRoomMedia.fileId, file.id))
+      .where(inArray(hotelRoomMedia.roomId, roomIds))
+      .orderBy(asc(hotelRoomMedia.roomId), asc(hotelRoomMedia.sortOrder)),
+    db
+      .select({
+        id: hotelRoomRate.id,
+        roomId: hotelRoomRate.roomId,
+        startsOn: hotelRoomRate.startsOn,
+        endsOn: hotelRoomRate.endsOn,
+        nightlyPrice: hotelRoomRate.nightlyPrice,
+        minStayNights: hotelRoomRate.minStayNights,
+        maxStayNights: hotelRoomRate.maxStayNights,
+        isRefundable: hotelRoomRate.isRefundable,
+      })
+      .from(hotelRoomRate)
+      .where(inArray(hotelRoomRate.roomId, roomIds))
+      .orderBy(asc(hotelRoomRate.roomId), asc(hotelRoomRate.startsOn)),
+  ]);
+
+  const featureMap = new Map<string, typeof featureRows>();
+  for (const row of featureRows) {
+    const current = featureMap.get(row.roomId) ?? [];
+    current.push(row);
+    featureMap.set(row.roomId, current);
   }
 
-  const endDate = new Date(subscriptionData.endDate);
-  const now = new Date();
-  if (endDate < now || subscriptionData.status !== "active") {
-    return { allowed: false, current: 0, max: 0 };
+  const mediaMap = new Map<string, typeof mediaRows>();
+  for (const row of mediaRows) {
+    const current = mediaMap.get(row.roomId) ?? [];
+    current.push(row);
+    mediaMap.set(row.roomId, current);
   }
 
-  const [placeCount] = await db
-    .select({ count: sql<number>`COUNT(*)::int` })
-    .from(place)
-    .where(eq(place.ownerId, userId));
+  const rateMap = new Map<string, typeof rateRows>();
+  for (const row of rateRows) {
+    const current = rateMap.get(row.roomId) ?? [];
+    current.push(row);
+    rateMap.set(row.roomId, current);
+  }
 
-  const currentCount = placeCount.count ?? 0;
-  const maxPlaces = subscriptionData.maxPlaces || 0;
-  return {
-    allowed: currentCount < maxPlaces,
-    current: currentCount,
-    max: maxPlaces,
-  };
+  return rooms.map((room) => ({
+    ...room,
+    features: featureMap.get(room.id) ?? [],
+    media:
+      mediaMap.get(room.id)?.map((item) => ({
+        fileId: item.fileId,
+        url: resolvePublicFileUrl(item.url),
+        sortOrder: item.sortOrder,
+      })) ?? [],
+    rates: rateMap.get(room.id) ?? [],
+  }));
+}
+
+async function loadDiningMenusForPlace(placeId: string) {
+  const menus = await db
+    .select({
+      id: diningMenu.id,
+      placeId: diningMenu.placeId,
+      name: diningMenu.name,
+      description: diningMenu.description,
+      isActive: diningMenu.isActive,
+      sortOrder: diningMenu.sortOrder,
+      createdAt: diningMenu.createdAt,
+      updatedAt: diningMenu.updatedAt,
+    })
+    .from(diningMenu)
+    .where(eq(diningMenu.placeId, placeId))
+    .orderBy(asc(diningMenu.sortOrder), asc(diningMenu.createdAt));
+
+  if (menus.length === 0) return [];
+
+  const menuIds = menus.map((item) => item.id);
+  const sections = await db
+    .select({
+      id: diningMenuSection.id,
+      menuId: diningMenuSection.menuId,
+      name: diningMenuSection.name,
+      description: diningMenuSection.description,
+      sortOrder: diningMenuSection.sortOrder,
+      createdAt: diningMenuSection.createdAt,
+    })
+    .from(diningMenuSection)
+    .where(inArray(diningMenuSection.menuId, menuIds))
+    .orderBy(asc(diningMenuSection.menuId), asc(diningMenuSection.sortOrder));
+
+  if (sections.length === 0) {
+    return menus.map((menu) => ({ ...menu, sections: [] }));
+  }
+
+  const sectionIds = sections.map((item) => item.id);
+  const items = await db
+    .select({
+      id: diningMenuItem.id,
+      sectionId: diningMenuItem.sectionId,
+      name: diningMenuItem.name,
+      description: diningMenuItem.description,
+      price: diningMenuItem.price,
+      imageFileId: diningMenuItem.imageFileId,
+      imageUrl: file.url,
+      isAvailable: diningMenuItem.isAvailable,
+      sortOrder: diningMenuItem.sortOrder,
+      createdAt: diningMenuItem.createdAt,
+      updatedAt: diningMenuItem.updatedAt,
+    })
+    .from(diningMenuItem)
+    .leftJoin(file, eq(diningMenuItem.imageFileId, file.id))
+    .where(inArray(diningMenuItem.sectionId, sectionIds))
+    .orderBy(asc(diningMenuItem.sectionId), asc(diningMenuItem.sortOrder));
+
+  const itemIds = items.map((item) => item.id);
+  const tags =
+    itemIds.length > 0
+      ? await db
+          .select({
+            itemId: diningMenuItemTag.itemId,
+            tag: diningMenuItemTag.tag,
+          })
+          .from(diningMenuItemTag)
+          .where(inArray(diningMenuItemTag.itemId, itemIds))
+      : [];
+
+  const tagsMap = new Map<string, string[]>();
+  for (const row of tags) {
+    const current = tagsMap.get(row.itemId) ?? [];
+    current.push(row.tag);
+    tagsMap.set(row.itemId, current);
+  }
+
+  const itemMap = new Map<string, Array<(typeof items)[number] & { tags: string[] }>>();
+  for (const item of items) {
+    const current = itemMap.get(item.sectionId) ?? [];
+    current.push({
+      ...item,
+      imageUrl: item.imageUrl ? resolvePublicFileUrl(item.imageUrl) : null,
+      tags: tagsMap.get(item.id) ?? [],
+    });
+    itemMap.set(item.sectionId, current);
+  }
+
+  const sectionMap = new Map<string, Array<(typeof sections)[number] & { items: unknown[] }>>();
+  for (const section of sections) {
+    const current = sectionMap.get(section.menuId) ?? [];
+    current.push({
+      ...section,
+      items: itemMap.get(section.id) ?? [],
+    });
+    sectionMap.set(section.menuId, current);
+  }
+
+  return menus.map((menu) => ({
+    ...menu,
+    sections: sectionMap.get(menu.id) ?? [],
+  }));
+}
+
+async function loadActivityPackagesForPlace(placeId: string) {
+  const packages = await db
+    .select({
+      id: activityPackage.id,
+      placeId: activityPackage.placeId,
+      name: activityPackage.name,
+      description: activityPackage.description,
+      price: activityPackage.price,
+      durationMinutes: activityPackage.durationMinutes,
+      minParticipants: activityPackage.minParticipants,
+      maxParticipants: activityPackage.maxParticipants,
+      isActive: activityPackage.isActive,
+      sortOrder: activityPackage.sortOrder,
+      createdAt: activityPackage.createdAt,
+      updatedAt: activityPackage.updatedAt,
+    })
+    .from(activityPackage)
+    .where(eq(activityPackage.placeId, placeId))
+    .orderBy(asc(activityPackage.sortOrder), asc(activityPackage.createdAt));
+
+  if (packages.length === 0) return [];
+
+  const packageIds = packages.map((item) => item.id);
+  const [mediaRows, tierRows] = await Promise.all([
+    db
+      .select({
+        packageId: activityPackageMedia.packageId,
+        fileId: activityPackageMedia.fileId,
+        url: file.url,
+        sortOrder: activityPackageMedia.sortOrder,
+      })
+      .from(activityPackageMedia)
+      .innerJoin(file, eq(activityPackageMedia.fileId, file.id))
+      .where(inArray(activityPackageMedia.packageId, packageIds))
+      .orderBy(asc(activityPackageMedia.packageId), asc(activityPackageMedia.sortOrder)),
+    db
+      .select({
+        id: activityPackagePriceTier.id,
+        packageId: activityPackagePriceTier.packageId,
+        name: activityPackagePriceTier.name,
+        minGroupSize: activityPackagePriceTier.minGroupSize,
+        maxGroupSize: activityPackagePriceTier.maxGroupSize,
+        price: activityPackagePriceTier.price,
+        sortOrder: activityPackagePriceTier.sortOrder,
+      })
+      .from(activityPackagePriceTier)
+      .where(inArray(activityPackagePriceTier.packageId, packageIds))
+      .orderBy(asc(activityPackagePriceTier.packageId), asc(activityPackagePriceTier.sortOrder)),
+  ]);
+
+  const mediaMap = new Map<string, typeof mediaRows>();
+  for (const row of mediaRows) {
+    const current = mediaMap.get(row.packageId) ?? [];
+    current.push(row);
+    mediaMap.set(row.packageId, current);
+  }
+
+  const tierMap = new Map<string, typeof tierRows>();
+  for (const row of tierRows) {
+    const current = tierMap.get(row.packageId) ?? [];
+    current.push(row);
+    tierMap.set(row.packageId, current);
+  }
+
+  return packages.map((item) => ({
+    ...item,
+    media:
+      mediaMap.get(item.id)?.map((media) => ({
+        fileId: media.fileId,
+        url: resolvePublicFileUrl(media.url),
+        sortOrder: media.sortOrder,
+      })) ?? [],
+    priceTiers: tierMap.get(item.id) ?? [],
+  }));
 }
 
 app.get("/", async (c) => {
@@ -491,7 +992,8 @@ app.get("/", async (c) => {
         id: place.id,
         slug: place.slug,
         name: place.name,
-        categoryId: place.categoryId,
+        kind: place.kind,
+        categoryId: place.kind,
         description: place.description,
         shortDescription: place.shortDescription,
         address: place.address,
@@ -514,13 +1016,15 @@ app.get("/", async (c) => {
         checkOutInfo: place.checkOutInfo,
         createdAt: place.createdAt,
         updatedAt: place.updatedAt,
-        categoryName: placeCategory.name,
-        categorySlug: placeCategory.slug,
+        kindName: placeKind.name,
+        kindSlug: placeKind.slug,
+        categoryName: placeKind.name,
+        categorySlug: placeKind.slug,
         cityName: province.name,
         districtName: district.name,
       })
       .from(place)
-      .leftJoin(placeCategory, eq(place.categoryId, placeCategory.id))
+      .leftJoin(placeKind, eq(place.kind, placeKind.id as any))
       .leftJoin(province, eq(place.cityId, province.id))
       .leftJoin(district, eq(place.districtId, district.id))
       .where(and(...whereConditions))
@@ -545,6 +1049,36 @@ app.get("/", async (c) => {
   }
 });
 
+app.get("/kinds", async (c) => {
+  try {
+    const session = await getSessionFromRequest(c);
+    if (!session?.user?.id) {
+      return c.json({ error: "Unauthorized" }, 401);
+    }
+
+    const kinds = await db
+      .select({
+        id: placeKind.id,
+        name: placeKind.name,
+        slug: placeKind.slug,
+        icon: placeKind.icon,
+        description: placeKind.description,
+        monetized: placeKind.monetized,
+        supportsRooms: placeKind.supportsRooms,
+        supportsMenu: placeKind.supportsMenu,
+        supportsPackages: placeKind.supportsPackages,
+      })
+      .from(placeKind)
+      .where(eq(placeKind.active, true))
+      .orderBy(asc(placeKind.sortOrder), asc(placeKind.name));
+
+    return c.json({ kinds, categories: kinds });
+  } catch (error) {
+    console.error("Get owner kinds error:", error);
+    return c.json({ error: "Internal server error" }, 500);
+  }
+});
+
 app.get("/categories", async (c) => {
   try {
     const session = await getSessionFromRequest(c);
@@ -552,17 +1086,23 @@ app.get("/categories", async (c) => {
       return c.json({ error: "Unauthorized" }, 401);
     }
 
-    const categories = await db
+    const kinds = await db
       .select({
-        id: placeCategory.id,
-        name: placeCategory.name,
-        slug: placeCategory.slug,
-        icon: placeCategory.icon,
+        id: placeKind.id,
+        name: placeKind.name,
+        slug: placeKind.slug,
+        icon: placeKind.icon,
+        description: placeKind.description,
+        monetized: placeKind.monetized,
+        supportsRooms: placeKind.supportsRooms,
+        supportsMenu: placeKind.supportsMenu,
+        supportsPackages: placeKind.supportsPackages,
       })
-      .from(placeCategory)
-      .orderBy(asc(placeCategory.name));
+      .from(placeKind)
+      .where(eq(placeKind.active, true))
+      .orderBy(asc(placeKind.sortOrder), asc(placeKind.name));
 
-    return c.json({ categories });
+    return c.json({ categories: kinds, kinds });
   } catch (error) {
     console.error("Get owner categories error:", error);
     return c.json({ error: "Internal server error" }, 500);
@@ -652,26 +1192,41 @@ app.post("/", zValidator("json", createPlaceSchema), async (c) => {
     const data = c.req.valid("json");
     const { nanoid } = await import("nanoid");
 
-    const limitCheck = await checkPlaceLimit(userId);
-    if (!limitCheck.allowed) {
-      return c.json(
-        {
-          error: "Plan limit reached",
-          message: `Mekan limitinize ulaştınız (${limitCheck.current}/${limitCheck.max}). Lütfen abonelik planınızı yükseltin.`,
-          current: limitCheck.current,
-          max: limitCheck.max,
-        },
-        403,
-      );
-    }
-
     const slug = await resolveUniquePlaceSlug(data.name);
 
-    const resolvedCategory = await resolveCategoryId({
+    const resolvedKind = await resolvePlaceKindInput({
+      kind: data.kind,
       categoryId: data.categoryId,
       category: data.category,
       type: data.type,
     });
+
+    if (!resolvedKind.kind) {
+      return c.json(
+        {
+          error: "Validation failed",
+          message: "Geçerli bir yer türü seçimi zorunludur",
+        },
+        400,
+      );
+    }
+
+    const limitCheck = await checkPlaceLimit(userId, resolvedKind.kind);
+    if (!limitCheck.allowed) {
+      const limitText = limitCheck.isUnlimited
+        ? "∞"
+        : `${limitCheck.current}/${limitCheck.max ?? 0}`;
+      return c.json(
+        {
+          error: "Plan limit reached",
+          message: `Bu tür için mekan limitinize ulaştınız (${limitText}). Lütfen abonelik planınızı yükseltin.`,
+          current: limitCheck.current,
+          max: limitCheck.max,
+          kind: resolvedKind.kind,
+        },
+        403,
+      );
+    }
 
     const resolvedLocation = await resolveProvinceDistrictIds({
       cityId: data.cityId,
@@ -679,16 +1234,6 @@ app.post("/", zValidator("json", createPlaceSchema), async (c) => {
       city: data.city,
       district: data.district,
     });
-
-    if (!resolvedCategory.id) {
-      return c.json(
-        {
-          error: "Validation failed",
-          message: "Geçerli bir kategori seçimi zorunludur",
-        },
-        400,
-      );
-    }
 
     if (!resolvedLocation.cityId || !resolvedLocation.districtId) {
       return c.json(
@@ -721,7 +1266,7 @@ app.post("/", zValidator("json", createPlaceSchema), async (c) => {
     const automaticPriceLevel = await resolveAutomaticPriceLevel({
       nightlyPrice: data.nightlyPrice,
       districtId: resolvedLocation.districtId,
-      categoryId: resolvedCategory.id,
+      kind: resolvedKind.kind,
     });
 
     const placeId = nanoid();
@@ -731,7 +1276,8 @@ app.post("/", zValidator("json", createPlaceSchema), async (c) => {
       slug,
       ownerId: userId,
       name: data.name,
-      categoryId: resolvedCategory.id,
+      kind: resolvedKind.kind as any,
+      categoryId: resolvedKind.id,
       description: data.description,
       shortDescription: data.shortDescription,
       address: data.address,
@@ -810,6 +1356,901 @@ app.post("/", zValidator("json", createPlaceSchema), async (c) => {
   }
 });
 
+const resolveUniqueRoomSlug = async ({
+  placeId,
+  slugOrName,
+  excludeRoomId,
+}: {
+  placeId: string;
+  slugOrName: string;
+  excludeRoomId?: string;
+}) => {
+  const baseSlug = normalizeSlugBase(slugOrName).slice(0, 200) || "room";
+  const likePattern = `${escapeLikePattern(baseSlug)}%`;
+
+  const rows = await db
+    .select({
+      id: hotelRoom.id,
+      slug: hotelRoom.slug,
+    })
+    .from(hotelRoom)
+    .where(
+      and(
+        eq(hotelRoom.placeId, placeId),
+        sql`${hotelRoom.slug} LIKE ${likePattern} ESCAPE '\\'`,
+      ),
+    );
+
+  const existing = new Set(
+    rows.filter((row) => row.id !== excludeRoomId).map((row) => row.slug),
+  );
+  if (!existing.has(baseSlug)) return baseSlug;
+
+  let suffix = 2;
+  while (existing.has(`${baseSlug}-${suffix}`)) {
+    suffix += 1;
+  }
+
+  return `${baseSlug}-${suffix}`;
+};
+
+async function getOwnedRoomContext({
+  placeId,
+  roomId,
+  userId,
+}: {
+  placeId: string;
+  roomId: string;
+  userId: string;
+}) {
+  const [row] = await db
+    .select({
+      id: hotelRoom.id,
+      placeId: hotelRoom.placeId,
+      slug: hotelRoom.slug,
+    })
+    .from(hotelRoom)
+    .innerJoin(place, eq(hotelRoom.placeId, place.id))
+    .where(
+      and(
+        eq(hotelRoom.id, roomId),
+        eq(hotelRoom.placeId, placeId),
+        eq(place.ownerId, userId),
+      ),
+    )
+    .limit(1);
+
+  return row ?? null;
+}
+
+async function getOwnedPackageContext({
+  placeId,
+  packageId,
+  userId,
+}: {
+  placeId: string;
+  packageId: string;
+  userId: string;
+}) {
+  const [row] = await db
+    .select({
+      id: activityPackage.id,
+      placeId: activityPackage.placeId,
+    })
+    .from(activityPackage)
+    .innerJoin(place, eq(activityPackage.placeId, place.id))
+    .where(
+      and(
+        eq(activityPackage.id, packageId),
+        eq(activityPackage.placeId, placeId),
+        eq(place.ownerId, userId),
+      ),
+    )
+    .limit(1);
+
+  return row ?? null;
+}
+
+app.get("/:id/rooms", async (c) => {
+  try {
+    const session = await getSessionFromRequest(c);
+    if (!session?.user?.id) return c.json({ error: "Unauthorized" }, 401);
+
+    const userId = session.user.id;
+    const placeId = c.req.param("id");
+    const placeCtx = await getOwnedPlaceContext(placeId, userId);
+    if (!placeCtx) return c.json({ error: "Place not found" }, 404);
+
+    if (!supportsRoomsForKind(placeCtx.kind)) {
+      return c.json(
+        {
+          error: "Not supported",
+          message: "Bu mekan türü oda yönetimini desteklemiyor",
+        },
+        400,
+      );
+    }
+
+    const rooms = await loadRoomsForPlace(placeId);
+    return c.json({ rooms });
+  } catch (error) {
+    console.error("Get owner rooms error:", error);
+    return c.json({ error: "Internal server error" }, 500);
+  }
+});
+
+app.post("/:id/rooms", zValidator("json", createRoomSchema), async (c) => {
+  try {
+    const session = await getSessionFromRequest(c);
+    if (!session?.user?.id) return c.json({ error: "Unauthorized" }, 401);
+
+    const userId = session.user.id;
+    const placeId = c.req.param("id");
+    const data = c.req.valid("json");
+
+    const placeCtx = await getOwnedPlaceContext(placeId, userId);
+    if (!placeCtx) return c.json({ error: "Place not found" }, 404);
+    if (!supportsRoomsForKind(placeCtx.kind)) {
+      return c.json(
+        {
+          error: "Not supported",
+          message: "Bu mekan türü oda yönetimini desteklemiyor",
+        },
+        400,
+      );
+    }
+
+    const mediaFileIds = normalizeIdList(data.mediaFileIds);
+    if (!(await ensureOwnedFiles(mediaFileIds, userId))) {
+      return c.json(
+        {
+          error: "Validation failed",
+          message: "Oda görsellerinde size ait olmayan dosya var",
+        },
+        400,
+      );
+    }
+
+    const slug = await resolveUniqueRoomSlug({
+      placeId,
+      slugOrName: normalizeOptionalSlug(data.slug, data.name),
+    });
+
+    const roomId = crypto.randomUUID();
+    await db.insert(hotelRoom).values({
+      id: roomId,
+      placeId,
+      slug,
+      name: data.name,
+      description: data.description,
+      maxAdults: data.maxAdults,
+      maxChildren: data.maxChildren,
+      bedCount: data.bedCount,
+      bathroomCount: data.bathroomCount,
+      areaSqm: data.areaSqm !== undefined ? data.areaSqm.toString() : null,
+      baseNightlyPrice:
+        data.baseNightlyPrice !== undefined ? data.baseNightlyPrice.toString() : null,
+      status: data.status,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    if (data.features && data.features.length > 0) {
+      await db.insert(hotelRoomFeature).values(
+        data.features.map((feature, index) => ({
+          roomId,
+          key: feature.key,
+          value: feature.value ?? null,
+          sortOrder: feature.sortOrder ?? index,
+        })),
+      );
+    }
+
+    if (mediaFileIds.length > 0) {
+      await db.insert(hotelRoomMedia).values(
+        mediaFileIds.map((fileId, index) => ({
+          roomId,
+          fileId,
+          sortOrder: index,
+        })),
+      );
+    }
+
+    const rooms = await loadRoomsForPlace(placeId);
+    const room = rooms.find((item) => item.id === roomId) ?? null;
+    return c.json({ success: true, room }, 201);
+  } catch (error) {
+    console.error("Create owner room error:", error);
+    return c.json({ error: "Internal server error" }, 500);
+  }
+});
+
+app.put("/:id/rooms/:roomId", zValidator("json", updateRoomSchema), async (c) => {
+  try {
+    const session = await getSessionFromRequest(c);
+    if (!session?.user?.id) return c.json({ error: "Unauthorized" }, 401);
+
+    const userId = session.user.id;
+    const placeId = c.req.param("id");
+    const roomId = c.req.param("roomId");
+    const data = c.req.valid("json");
+
+    const placeCtx = await getOwnedPlaceContext(placeId, userId);
+    if (!placeCtx) return c.json({ error: "Place not found" }, 404);
+    if (!supportsRoomsForKind(placeCtx.kind)) {
+      return c.json(
+        {
+          error: "Not supported",
+          message: "Bu mekan türü oda yönetimini desteklemiyor",
+        },
+        400,
+      );
+    }
+
+    const roomCtx = await getOwnedRoomContext({ placeId, roomId, userId });
+    if (!roomCtx) return c.json({ error: "Room not found" }, 404);
+
+    const mediaFileIds =
+      data.mediaFileIds !== undefined ? normalizeIdList(data.mediaFileIds) : undefined;
+    if (mediaFileIds && !(await ensureOwnedFiles(mediaFileIds, userId))) {
+      return c.json(
+        {
+          error: "Validation failed",
+          message: "Oda görsellerinde size ait olmayan dosya var",
+        },
+        400,
+      );
+    }
+
+    const updatePayload: Partial<typeof hotelRoom.$inferInsert> = {
+      updatedAt: new Date(),
+    };
+    if (data.name !== undefined) updatePayload.name = data.name;
+    if (data.slug !== undefined || data.name !== undefined) {
+      updatePayload.slug = await resolveUniqueRoomSlug({
+        placeId,
+        slugOrName: normalizeOptionalSlug(data.slug, data.name ?? roomCtx.slug),
+        excludeRoomId: roomId,
+      });
+    }
+    if (data.description !== undefined) updatePayload.description = data.description;
+    if (data.maxAdults !== undefined) updatePayload.maxAdults = data.maxAdults;
+    if (data.maxChildren !== undefined) updatePayload.maxChildren = data.maxChildren;
+    if (data.bedCount !== undefined) updatePayload.bedCount = data.bedCount;
+    if (data.bathroomCount !== undefined) updatePayload.bathroomCount = data.bathroomCount;
+    if (data.areaSqm !== undefined)
+      updatePayload.areaSqm = data.areaSqm !== undefined ? data.areaSqm.toString() : null;
+    if (data.baseNightlyPrice !== undefined)
+      updatePayload.baseNightlyPrice =
+        data.baseNightlyPrice !== undefined ? data.baseNightlyPrice.toString() : null;
+    if (data.status !== undefined) updatePayload.status = data.status;
+
+    await db.update(hotelRoom).set(updatePayload).where(eq(hotelRoom.id, roomId));
+
+    if (data.features !== undefined) {
+      await db.delete(hotelRoomFeature).where(eq(hotelRoomFeature.roomId, roomId));
+      if (data.features.length > 0) {
+        await db.insert(hotelRoomFeature).values(
+          data.features.map((feature, index) => ({
+            roomId,
+            key: feature.key,
+            value: feature.value ?? null,
+            sortOrder: feature.sortOrder ?? index,
+          })),
+        );
+      }
+    }
+
+    if (mediaFileIds !== undefined) {
+      await db.delete(hotelRoomMedia).where(eq(hotelRoomMedia.roomId, roomId));
+      if (mediaFileIds.length > 0) {
+        await db.insert(hotelRoomMedia).values(
+          mediaFileIds.map((fileId, index) => ({
+            roomId,
+            fileId,
+            sortOrder: index,
+          })),
+        );
+      }
+    }
+
+    const rooms = await loadRoomsForPlace(placeId);
+    const room = rooms.find((item) => item.id === roomId) ?? null;
+    return c.json({ success: true, room });
+  } catch (error) {
+    console.error("Update owner room error:", error);
+    return c.json({ error: "Internal server error" }, 500);
+  }
+});
+
+app.delete("/:id/rooms/:roomId", async (c) => {
+  try {
+    const session = await getSessionFromRequest(c);
+    if (!session?.user?.id) return c.json({ error: "Unauthorized" }, 401);
+
+    const userId = session.user.id;
+    const placeId = c.req.param("id");
+    const roomId = c.req.param("roomId");
+
+    const placeCtx = await getOwnedPlaceContext(placeId, userId);
+    if (!placeCtx) return c.json({ error: "Place not found" }, 404);
+    if (!supportsRoomsForKind(placeCtx.kind)) {
+      return c.json(
+        {
+          error: "Not supported",
+          message: "Bu mekan türü oda yönetimini desteklemiyor",
+        },
+        400,
+      );
+    }
+
+    const roomCtx = await getOwnedRoomContext({ placeId, roomId, userId });
+    if (!roomCtx) return c.json({ error: "Room not found" }, 404);
+
+    await db.delete(hotelRoom).where(eq(hotelRoom.id, roomId));
+    return c.json({ success: true });
+  } catch (error) {
+    console.error("Delete owner room error:", error);
+    return c.json({ error: "Internal server error" }, 500);
+  }
+});
+
+app.get("/:id/rooms/:roomId/rates", async (c) => {
+  try {
+    const session = await getSessionFromRequest(c);
+    if (!session?.user?.id) return c.json({ error: "Unauthorized" }, 401);
+
+    const userId = session.user.id;
+    const placeId = c.req.param("id");
+    const roomId = c.req.param("roomId");
+
+    const roomCtx = await getOwnedRoomContext({ placeId, roomId, userId });
+    if (!roomCtx) return c.json({ error: "Room not found" }, 404);
+
+    const rates = await db
+      .select()
+      .from(hotelRoomRate)
+      .where(eq(hotelRoomRate.roomId, roomId))
+      .orderBy(asc(hotelRoomRate.startsOn));
+
+    return c.json({ rates });
+  } catch (error) {
+    console.error("Get owner room rates error:", error);
+    return c.json({ error: "Internal server error" }, 500);
+  }
+});
+
+app.post(
+  "/:id/rooms/:roomId/rates",
+  zValidator("json", createRoomRateSchema),
+  async (c) => {
+    try {
+      const session = await getSessionFromRequest(c);
+      if (!session?.user?.id) return c.json({ error: "Unauthorized" }, 401);
+
+      const userId = session.user.id;
+      const placeId = c.req.param("id");
+      const roomId = c.req.param("roomId");
+      const data = c.req.valid("json");
+
+      const roomCtx = await getOwnedRoomContext({ placeId, roomId, userId });
+      if (!roomCtx) return c.json({ error: "Room not found" }, 404);
+      if (data.startsOn > data.endsOn) {
+        return c.json(
+          { error: "Validation failed", message: "Başlangıç tarihi bitişten sonra olamaz" },
+          400,
+        );
+      }
+
+      const rateId = crypto.randomUUID();
+      await db.insert(hotelRoomRate).values({
+        id: rateId,
+        roomId,
+        startsOn: data.startsOn,
+        endsOn: data.endsOn,
+        nightlyPrice: data.nightlyPrice.toString(),
+        minStayNights: data.minStayNights,
+        maxStayNights: data.maxStayNights,
+        isRefundable: data.isRefundable,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      const [rate] = await db
+        .select()
+        .from(hotelRoomRate)
+        .where(eq(hotelRoomRate.id, rateId))
+        .limit(1);
+
+      return c.json({ success: true, rate }, 201);
+    } catch (error) {
+      console.error("Create owner room rate error:", error);
+      return c.json({ error: "Internal server error" }, 500);
+    }
+  },
+);
+
+app.put(
+  "/:id/rooms/:roomId/rates/:rateId",
+  zValidator("json", updateRoomRateSchema),
+  async (c) => {
+    try {
+      const session = await getSessionFromRequest(c);
+      if (!session?.user?.id) return c.json({ error: "Unauthorized" }, 401);
+
+      const userId = session.user.id;
+      const placeId = c.req.param("id");
+      const roomId = c.req.param("roomId");
+      const rateId = c.req.param("rateId");
+      const data = c.req.valid("json");
+
+      const roomCtx = await getOwnedRoomContext({ placeId, roomId, userId });
+      if (!roomCtx) return c.json({ error: "Room not found" }, 404);
+
+      const [existingRate] = await db
+        .select()
+        .from(hotelRoomRate)
+        .where(and(eq(hotelRoomRate.id, rateId), eq(hotelRoomRate.roomId, roomId)))
+        .limit(1);
+      if (!existingRate) return c.json({ error: "Rate not found" }, 404);
+
+      const startsOn = data.startsOn ?? existingRate.startsOn;
+      const endsOn = data.endsOn ?? existingRate.endsOn;
+      if (startsOn > endsOn) {
+        return c.json(
+          { error: "Validation failed", message: "Başlangıç tarihi bitişten sonra olamaz" },
+          400,
+        );
+      }
+
+      const updatePayload: Partial<typeof hotelRoomRate.$inferInsert> = {
+        updatedAt: new Date(),
+      };
+      if (data.startsOn !== undefined) updatePayload.startsOn = data.startsOn;
+      if (data.endsOn !== undefined) updatePayload.endsOn = data.endsOn;
+      if (data.nightlyPrice !== undefined)
+        updatePayload.nightlyPrice = data.nightlyPrice.toString();
+      if (data.minStayNights !== undefined)
+        updatePayload.minStayNights = data.minStayNights;
+      if (data.maxStayNights !== undefined)
+        updatePayload.maxStayNights = data.maxStayNights;
+      if (data.isRefundable !== undefined)
+        updatePayload.isRefundable = data.isRefundable;
+
+      await db.update(hotelRoomRate).set(updatePayload).where(eq(hotelRoomRate.id, rateId));
+
+      const [rate] = await db
+        .select()
+        .from(hotelRoomRate)
+        .where(eq(hotelRoomRate.id, rateId))
+        .limit(1);
+
+      return c.json({ success: true, rate });
+    } catch (error) {
+      console.error("Update owner room rate error:", error);
+      return c.json({ error: "Internal server error" }, 500);
+    }
+  },
+);
+
+app.delete("/:id/rooms/:roomId/rates/:rateId", async (c) => {
+  try {
+    const session = await getSessionFromRequest(c);
+    if (!session?.user?.id) return c.json({ error: "Unauthorized" }, 401);
+
+    const userId = session.user.id;
+    const placeId = c.req.param("id");
+    const roomId = c.req.param("roomId");
+    const rateId = c.req.param("rateId");
+
+    const roomCtx = await getOwnedRoomContext({ placeId, roomId, userId });
+    if (!roomCtx) return c.json({ error: "Room not found" }, 404);
+
+    const [deleted] = await db
+      .delete(hotelRoomRate)
+      .where(and(eq(hotelRoomRate.id, rateId), eq(hotelRoomRate.roomId, roomId)))
+      .returning({ id: hotelRoomRate.id });
+
+    if (!deleted) return c.json({ error: "Rate not found" }, 404);
+    return c.json({ success: true });
+  } catch (error) {
+    console.error("Delete owner room rate error:", error);
+    return c.json({ error: "Internal server error" }, 500);
+  }
+});
+
+const upsertDiningMenus = async ({
+  placeId,
+  menus,
+}: {
+  placeId: string;
+  menus: z.infer<typeof menuInputSchema>[];
+}) => {
+  await db.delete(diningMenu).where(eq(diningMenu.placeId, placeId));
+
+  for (const [menuIndex, menuData] of menus.entries()) {
+    const menuId = crypto.randomUUID();
+    await db.insert(diningMenu).values({
+      id: menuId,
+      placeId,
+      name: menuData.name,
+      description: menuData.description,
+      isActive: menuData.isActive,
+      sortOrder: menuData.sortOrder ?? menuIndex,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    for (const [sectionIndex, sectionData] of menuData.sections.entries()) {
+      const sectionId = crypto.randomUUID();
+      await db.insert(diningMenuSection).values({
+        id: sectionId,
+        menuId,
+        name: sectionData.name,
+        description: sectionData.description,
+        sortOrder: sectionData.sortOrder ?? sectionIndex,
+        createdAt: new Date(),
+      });
+
+      for (const [itemIndex, itemData] of sectionData.items.entries()) {
+        const itemId = crypto.randomUUID();
+        await db.insert(diningMenuItem).values({
+          id: itemId,
+          sectionId,
+          name: itemData.name,
+          description: itemData.description,
+          price: itemData.price !== undefined ? itemData.price.toString() : null,
+          imageFileId: normalizeOptionalId(itemData.imageFileId),
+          isAvailable: itemData.isAvailable,
+          sortOrder: itemData.sortOrder ?? itemIndex,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+
+        const tags = Array.from(new Set((itemData.tags ?? []).map((tag) => tag.trim()))).filter(
+          Boolean,
+        );
+        if (tags.length > 0) {
+          await db.insert(diningMenuItemTag).values(
+            tags.map((tag) => ({
+              itemId,
+              tag,
+            })),
+          );
+        }
+      }
+    }
+  }
+};
+
+app.get("/:id/menu", async (c) => {
+  try {
+    const session = await getSessionFromRequest(c);
+    if (!session?.user?.id) return c.json({ error: "Unauthorized" }, 401);
+
+    const userId = session.user.id;
+    const placeId = c.req.param("id");
+    const placeCtx = await getOwnedPlaceContext(placeId, userId);
+    if (!placeCtx) return c.json({ error: "Place not found" }, 404);
+    if (!supportsMenuForKind(placeCtx.kind)) {
+      return c.json(
+        {
+          error: "Not supported",
+          message: "Bu mekan türü menü yönetimini desteklemiyor",
+        },
+        400,
+      );
+    }
+
+    const menus = await loadDiningMenusForPlace(placeId);
+    return c.json({ menus });
+  } catch (error) {
+    console.error("Get owner menus error:", error);
+    return c.json({ error: "Internal server error" }, 500);
+  }
+});
+
+app.put("/:id/menu", zValidator("json", upsertDiningMenuSchema), async (c) => {
+  try {
+    const session = await getSessionFromRequest(c);
+    if (!session?.user?.id) return c.json({ error: "Unauthorized" }, 401);
+
+    const userId = session.user.id;
+    const placeId = c.req.param("id");
+    const data = c.req.valid("json");
+
+    const placeCtx = await getOwnedPlaceContext(placeId, userId);
+    if (!placeCtx) return c.json({ error: "Place not found" }, 404);
+    if (!supportsMenuForKind(placeCtx.kind)) {
+      return c.json(
+        {
+          error: "Not supported",
+          message: "Bu mekan türü menü yönetimini desteklemiyor",
+        },
+        400,
+      );
+    }
+
+    const imageFileIds = normalizeIdList(
+      data.menus.flatMap((menu) =>
+        menu.sections.flatMap((section) =>
+          section.items.map((item) => item.imageFileId ?? ""),
+        ),
+      ),
+    );
+    if (!(await ensureOwnedFiles(imageFileIds, userId))) {
+      return c.json(
+        {
+          error: "Validation failed",
+          message: "Menüde size ait olmayan görsel dosyası var",
+        },
+        400,
+      );
+    }
+
+    await upsertDiningMenus({ placeId, menus: data.menus });
+    const menus = await loadDiningMenusForPlace(placeId);
+    return c.json({ success: true, menus });
+  } catch (error) {
+    console.error("Upsert owner menus error:", error);
+    return c.json({ error: "Internal server error" }, 500);
+  }
+});
+
+app.get("/:id/packages", async (c) => {
+  try {
+    const session = await getSessionFromRequest(c);
+    if (!session?.user?.id) return c.json({ error: "Unauthorized" }, 401);
+
+    const userId = session.user.id;
+    const placeId = c.req.param("id");
+    const placeCtx = await getOwnedPlaceContext(placeId, userId);
+    if (!placeCtx) return c.json({ error: "Place not found" }, 404);
+    if (!supportsPackagesForKind(placeCtx.kind)) {
+      return c.json(
+        {
+          error: "Not supported",
+          message: "Bu mekan türü paket yönetimini desteklemiyor",
+        },
+        400,
+      );
+    }
+
+    const packages = await loadActivityPackagesForPlace(placeId);
+    return c.json({ packages });
+  } catch (error) {
+    console.error("Get owner activity packages error:", error);
+    return c.json({ error: "Internal server error" }, 500);
+  }
+});
+
+app.post("/:id/packages", zValidator("json", createActivityPackageSchema), async (c) => {
+  try {
+    const session = await getSessionFromRequest(c);
+    if (!session?.user?.id) return c.json({ error: "Unauthorized" }, 401);
+
+    const userId = session.user.id;
+    const placeId = c.req.param("id");
+    const data = c.req.valid("json");
+
+    const placeCtx = await getOwnedPlaceContext(placeId, userId);
+    if (!placeCtx) return c.json({ error: "Place not found" }, 404);
+    if (!supportsPackagesForKind(placeCtx.kind)) {
+      return c.json(
+        {
+          error: "Not supported",
+          message: "Bu mekan türü paket yönetimini desteklemiyor",
+        },
+        400,
+      );
+    }
+
+    const mediaFileIds = normalizeIdList(data.mediaFileIds);
+    if (!(await ensureOwnedFiles(mediaFileIds, userId))) {
+      return c.json(
+        {
+          error: "Validation failed",
+          message: "Paket medyasında size ait olmayan dosya var",
+        },
+        400,
+      );
+    }
+
+    const packageId = crypto.randomUUID();
+    await db.insert(activityPackage).values({
+      id: packageId,
+      placeId,
+      name: data.name,
+      description: data.description,
+      price: data.price !== undefined ? data.price.toString() : null,
+      durationMinutes: data.durationMinutes,
+      minParticipants: data.minParticipants,
+      maxParticipants: data.maxParticipants,
+      isActive: data.isActive,
+      sortOrder: data.sortOrder,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    if (mediaFileIds.length > 0) {
+      await db.insert(activityPackageMedia).values(
+        mediaFileIds.map((fileId, index) => ({
+          packageId,
+          fileId,
+          sortOrder: index,
+        })),
+      );
+    }
+
+    if (data.priceTiers && data.priceTiers.length > 0) {
+      await db.insert(activityPackagePriceTier).values(
+        data.priceTiers.map((tier, index) => ({
+          id: crypto.randomUUID(),
+          packageId,
+          name: tier.name,
+          minGroupSize: tier.minGroupSize,
+          maxGroupSize: tier.maxGroupSize,
+          price: tier.price.toString(),
+          sortOrder: tier.sortOrder ?? index,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })),
+      );
+    }
+
+    const packages = await loadActivityPackagesForPlace(placeId);
+    const activity = packages.find((item) => item.id === packageId) ?? null;
+    return c.json({ success: true, package: activity }, 201);
+  } catch (error) {
+    console.error("Create owner activity package error:", error);
+    return c.json({ error: "Internal server error" }, 500);
+  }
+});
+
+app.put(
+  "/:id/packages/:packageId",
+  zValidator("json", updateActivityPackageSchema),
+  async (c) => {
+    try {
+      const session = await getSessionFromRequest(c);
+      if (!session?.user?.id) return c.json({ error: "Unauthorized" }, 401);
+
+      const userId = session.user.id;
+      const placeId = c.req.param("id");
+      const packageId = c.req.param("packageId");
+      const data = c.req.valid("json");
+
+      const placeCtx = await getOwnedPlaceContext(placeId, userId);
+      if (!placeCtx) return c.json({ error: "Place not found" }, 404);
+      if (!supportsPackagesForKind(placeCtx.kind)) {
+        return c.json(
+          {
+            error: "Not supported",
+            message: "Bu mekan türü paket yönetimini desteklemiyor",
+          },
+          400,
+        );
+      }
+
+      const packageCtx = await getOwnedPackageContext({
+        placeId,
+        packageId,
+        userId,
+      });
+      if (!packageCtx) return c.json({ error: "Package not found" }, 404);
+
+      const mediaFileIds =
+        data.mediaFileIds !== undefined ? normalizeIdList(data.mediaFileIds) : undefined;
+      if (mediaFileIds && !(await ensureOwnedFiles(mediaFileIds, userId))) {
+        return c.json(
+          {
+            error: "Validation failed",
+            message: "Paket medyasında size ait olmayan dosya var",
+          },
+          400,
+        );
+      }
+
+      const updatePayload: Partial<typeof activityPackage.$inferInsert> = {
+        updatedAt: new Date(),
+      };
+      if (data.name !== undefined) updatePayload.name = data.name;
+      if (data.description !== undefined) updatePayload.description = data.description;
+      if (data.price !== undefined)
+        updatePayload.price = data.price !== undefined ? data.price.toString() : null;
+      if (data.durationMinutes !== undefined)
+        updatePayload.durationMinutes = data.durationMinutes;
+      if (data.minParticipants !== undefined)
+        updatePayload.minParticipants = data.minParticipants;
+      if (data.maxParticipants !== undefined)
+        updatePayload.maxParticipants = data.maxParticipants;
+      if (data.isActive !== undefined) updatePayload.isActive = data.isActive;
+      if (data.sortOrder !== undefined) updatePayload.sortOrder = data.sortOrder;
+
+      await db.update(activityPackage).set(updatePayload).where(eq(activityPackage.id, packageId));
+
+      if (mediaFileIds !== undefined) {
+        await db
+          .delete(activityPackageMedia)
+          .where(eq(activityPackageMedia.packageId, packageId));
+        if (mediaFileIds.length > 0) {
+          await db.insert(activityPackageMedia).values(
+            mediaFileIds.map((fileId, index) => ({
+              packageId,
+              fileId,
+              sortOrder: index,
+            })),
+          );
+        }
+      }
+
+      if (data.priceTiers !== undefined) {
+        await db
+          .delete(activityPackagePriceTier)
+          .where(eq(activityPackagePriceTier.packageId, packageId));
+        if (data.priceTiers.length > 0) {
+          await db.insert(activityPackagePriceTier).values(
+            data.priceTiers.map((tier, index) => ({
+              id: crypto.randomUUID(),
+              packageId,
+              name: tier.name,
+              minGroupSize: tier.minGroupSize,
+              maxGroupSize: tier.maxGroupSize,
+              price: tier.price.toString(),
+              sortOrder: tier.sortOrder ?? index,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            })),
+          );
+        }
+      }
+
+      const packages = await loadActivityPackagesForPlace(placeId);
+      const activity = packages.find((item) => item.id === packageId) ?? null;
+      return c.json({ success: true, package: activity });
+    } catch (error) {
+      console.error("Update owner activity package error:", error);
+      return c.json({ error: "Internal server error" }, 500);
+    }
+  },
+);
+
+app.delete("/:id/packages/:packageId", async (c) => {
+  try {
+    const session = await getSessionFromRequest(c);
+    if (!session?.user?.id) return c.json({ error: "Unauthorized" }, 401);
+
+    const userId = session.user.id;
+    const placeId = c.req.param("id");
+    const packageId = c.req.param("packageId");
+
+    const placeCtx = await getOwnedPlaceContext(placeId, userId);
+    if (!placeCtx) return c.json({ error: "Place not found" }, 404);
+    if (!supportsPackagesForKind(placeCtx.kind)) {
+      return c.json(
+        {
+          error: "Not supported",
+          message: "Bu mekan türü paket yönetimini desteklemiyor",
+        },
+        400,
+      );
+    }
+
+    const packageCtx = await getOwnedPackageContext({
+      placeId,
+      packageId,
+      userId,
+    });
+    if (!packageCtx) return c.json({ error: "Package not found" }, 404);
+
+    await db.delete(activityPackage).where(eq(activityPackage.id, packageId));
+    return c.json({ success: true });
+  } catch (error) {
+    console.error("Delete owner activity package error:", error);
+    return c.json({ error: "Internal server error" }, 500);
+  }
+});
+
 app.get("/:id", async (c) => {
   try {
     const session = await getSessionFromRequest(c);
@@ -848,7 +2289,8 @@ app.put("/:id", zValidator("json", updatePlaceSchema), async (c) => {
       .select({
         id: place.id,
         name: place.name,
-        categoryId: place.categoryId,
+        kind: place.kind,
+        categoryId: place.kind,
         description: place.description,
         shortDescription: place.shortDescription,
         address: place.address,
@@ -872,12 +2314,43 @@ app.put("/:id", zValidator("json", updatePlaceSchema), async (c) => {
       return c.json({ error: "Place not found" }, 404);
     }
 
-    const resolvedCategory = await resolveCategoryId({
+    const resolvedKind = await resolvePlaceKindInput({
+      kind: data.kind,
       categoryId: data.categoryId,
       category: data.category,
       type: data.type,
-      fallbackCategoryId: existingPlace.categoryId,
+      fallbackKind: existingPlace.kind,
+      fallbackKindId: existingPlace.kind,
     });
+
+    if (!resolvedKind.kind) {
+      return c.json(
+        {
+          error: "Validation failed",
+          message: "Geçerli bir yer türü seçimi zorunludur",
+        },
+        400,
+      );
+    }
+
+    if (resolvedKind.kind !== existingPlace.kind) {
+      const kindLimitCheck = await checkPlaceLimit(userId, resolvedKind.kind);
+      if (!kindLimitCheck.allowed) {
+        const limitText = kindLimitCheck.isUnlimited
+          ? "∞"
+          : `${kindLimitCheck.current}/${kindLimitCheck.max ?? 0}`;
+        return c.json(
+          {
+            error: "Plan limit reached",
+            message: `Bu tür için mekan limitinize ulaştınız (${limitText}).`,
+            current: kindLimitCheck.current,
+            max: kindLimitCheck.max,
+            kind: resolvedKind.kind,
+          },
+          403,
+        );
+      }
+    }
 
     const resolvedLocation = await resolveProvinceDistrictIds({
       cityId: data.cityId ?? existingPlace.cityId,
@@ -914,7 +2387,7 @@ app.put("/:id", zValidator("json", updatePlaceSchema), async (c) => {
     const automaticPriceLevel = await resolveAutomaticPriceLevel({
       nightlyPrice: resolvedNightlyPrice,
       districtId: resolvedLocation.districtId,
-      categoryId: resolvedCategory.id,
+      kind: resolvedKind.kind,
       excludePlaceId: id,
     });
 
@@ -922,7 +2395,8 @@ app.put("/:id", zValidator("json", updatePlaceSchema), async (c) => {
       .update(place)
       .set({
         name: data.name ?? existingPlace.name,
-        categoryId: resolvedCategory.id,
+        kind: resolvedKind.kind as any,
+        categoryId: resolvedKind.id,
         description: data.description ?? existingPlace.description,
         shortDescription: data.shortDescription ?? existingPlace.shortDescription,
         address: data.address ?? existingPlace.address,

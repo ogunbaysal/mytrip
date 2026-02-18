@@ -1,36 +1,42 @@
 import type { Metadata } from "next";
+import type { ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
-  Star,
-  Share,
-  Heart,
-  Grid3X3,
-  Home,
-  Sparkles,
-  DoorOpen,
   Calendar,
   ChevronRight,
-  Shield,
-  Clock,
-  Ban,
-  Dog,
-  PartyPopper,
-  AlertTriangle,
   Flag,
+  Heart,
+  Mail,
+  MapPin,
+  Navigation,
+  Phone,
+  Share,
+  Shield,
+  Sparkles,
+  Star,
+  Ticket,
 } from "lucide-react";
 
 import { CollectionCard } from "@/components/collections/collection-card";
 import { PlaceCard } from "@/components/places/place-card";
 import { PlacesMap } from "@/components/places/places-map";
-import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
+import {
+  getPlaceKindLabel,
+  getPlacePriceUnitLabel,
+  isDiningPlaceKind,
+  isMonetizedPlaceKind,
+  isStayPlaceKind,
+  normalizePlaceKind,
+} from "@/lib/place-kind";
 import { PlaceDetailBookingCard } from "./components/booking-card";
-import { PlaceDetailGalleryModal } from "./components/gallery-modal";
+import { PlaceDetailAmenitiesSection } from "./components/amenities-section";
 import { PlaceDetailDatePicker } from "./components/date-picker";
+import { PlaceDetailGalleryModal } from "./components/gallery-modal";
 
 const priceFormatter = new Intl.NumberFormat("tr-TR", {
   style: "currency",
@@ -43,7 +49,7 @@ const escapeHtml = (value: string) =>
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
+    .replace(/\"/g, "&quot;")
     .replace(/'/g, "&#39;");
 
 const sanitizeHtml = (value: string) =>
@@ -66,6 +72,266 @@ const renderDescriptionHtml = (value: string | null | undefined) => {
     .join("<br />");
 };
 
+const toNumber = (value: unknown): number | undefined => {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string" && value.trim().length > 0) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return undefined;
+};
+
+const toBoolean = (value: unknown): boolean | undefined => {
+  if (typeof value === "boolean") {
+    return value;
+  }
+  if (value === "true") return true;
+  if (value === "false") return false;
+  return undefined;
+};
+
+const toStringValue = (value: unknown): string | undefined => {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : undefined;
+};
+
+type DetailFact = { label: string; value: string };
+
+type KindSection = {
+  title: string;
+  facts: DetailFact[];
+  tags: string[];
+  notes: string[];
+  sidebarCtaLabel: string;
+};
+
+function buildKindSection(
+  normalizedKind: string,
+  typeProfile: Record<string, unknown> | null | undefined,
+  nightlyPrice: number,
+  checkInInfo?: string,
+  checkOutInfo?: string,
+): KindSection {
+  const profile = typeProfile ?? {};
+  const facts: DetailFact[] = [];
+  const tags: string[] = [];
+  const notes: string[] = [];
+
+  if (isStayPlaceKind(normalizedKind)) {
+    const starRating = toNumber(profile.starRating);
+    const minimumStay = toNumber(profile.minimumStayNights);
+    const poolAvailable = toBoolean(profile.poolAvailable);
+    const cleaningFee = toNumber(profile.cleaningFee);
+
+    if (starRating) facts.push({ label: "Yıldız", value: `${starRating}` });
+    if (minimumStay) {
+      facts.push({ label: "Minimum konaklama", value: `${minimumStay} gece` });
+    }
+    if (poolAvailable !== undefined) {
+      tags.push(poolAvailable ? "Havuz mevcut" : "Havuz yok");
+    }
+    if (cleaningFee && cleaningFee > 0) {
+      facts.push({
+        label: "Temizlik ücreti",
+        value: priceFormatter.format(cleaningFee),
+      });
+    }
+    if (checkInInfo) facts.push({ label: "Giriş", value: checkInInfo });
+    if (checkOutInfo) facts.push({ label: "Çıkış", value: checkOutInfo });
+
+    return {
+      title: "Konaklama detayları",
+      facts,
+      tags,
+      notes,
+      sidebarCtaLabel: "Rezervasyon yap",
+    };
+  }
+
+  if (isDiningPlaceKind(normalizedKind)) {
+    const averagePrice =
+      toNumber(profile.averagePricePerPerson) ?? (nightlyPrice > 0 ? nightlyPrice : undefined);
+    const reservationRequired = toBoolean(profile.reservationRequired);
+    const servesAlcohol = toBoolean(profile.servesAlcohol);
+    const dressCode = toStringValue(profile.dressCode);
+
+    if (averagePrice) {
+      facts.push({
+        label: "Ortalama kişi başı",
+        value: priceFormatter.format(averagePrice),
+      });
+    }
+    if (reservationRequired !== undefined) {
+      tags.push(reservationRequired ? "Rezervasyon gerekli" : "Rezervasyon opsiyonel");
+    }
+    if (servesAlcohol !== undefined) {
+      tags.push(servesAlcohol ? "Alkol servisi var" : "Alkol servisi yok");
+    }
+    if (dressCode) {
+      facts.push({ label: "Dress code", value: dressCode });
+    }
+
+    return {
+      title: "Servis bilgileri",
+      facts,
+      tags,
+      notes,
+      sidebarCtaLabel: "Menüyü incele",
+    };
+  }
+
+  if (normalizedKind === "beach") {
+    const entranceFee =
+      toNumber(profile.entranceFee) ?? (nightlyPrice > 0 ? nightlyPrice : undefined);
+    const hasSunbedRental = toBoolean(profile.hasSunbedRental);
+    const hasShower = toBoolean(profile.hasShower);
+    const hasLifeguard = toBoolean(profile.hasLifeguard);
+
+    if (entranceFee) {
+      facts.push({ label: "Giriş ücreti", value: priceFormatter.format(entranceFee) });
+    }
+    if (hasSunbedRental !== undefined) {
+      tags.push(hasSunbedRental ? "Şezlong kiralama var" : "Şezlong kiralama yok");
+    }
+    if (hasShower !== undefined) {
+      tags.push(hasShower ? "Duş alanı mevcut" : "Duş alanı yok");
+    }
+    if (hasLifeguard !== undefined) {
+      tags.push(hasLifeguard ? "Cankurtaran mevcut" : "Cankurtaran bulunmuyor");
+    }
+
+    return {
+      title: "Plaj bilgileri",
+      facts,
+      tags,
+      notes,
+      sidebarCtaLabel: "Giriş bilgilerini gör",
+    };
+  }
+
+  if (normalizedKind === "natural_location") {
+    const entryFee =
+      toNumber(profile.entryFee) ?? (nightlyPrice > 0 ? nightlyPrice : undefined);
+    const difficultyLevel = toStringValue(profile.difficultyLevel);
+    const recommendedDurationMinutes = toNumber(profile.recommendedDurationMinutes);
+
+    if (entryFee) {
+      facts.push({ label: "Giriş ücreti", value: priceFormatter.format(entryFee) });
+    }
+    if (difficultyLevel) {
+      facts.push({ label: "Zorluk seviyesi", value: difficultyLevel });
+    }
+    if (recommendedDurationMinutes) {
+      facts.push({
+        label: "Önerilen süre",
+        value: `${recommendedDurationMinutes} dakika`,
+      });
+    }
+
+    return {
+      title: "Doğal rota bilgileri",
+      facts,
+      tags,
+      notes,
+      sidebarCtaLabel: "Rota detaylarını gör",
+    };
+  }
+
+  if (normalizedKind === "activity_location") {
+    const startingPrice =
+      toNumber(profile.startingPrice) ?? (nightlyPrice > 0 ? nightlyPrice : undefined);
+    const averageDurationMinutes = toNumber(profile.averageDurationMinutes);
+    const requiresReservation = toBoolean(profile.requiresReservation);
+    const safetyRequirements = toStringValue(profile.safetyRequirements);
+
+    if (startingPrice) {
+      facts.push({ label: "Başlangıç fiyatı", value: priceFormatter.format(startingPrice) });
+    }
+    if (averageDurationMinutes) {
+      facts.push({
+        label: "Ortalama süre",
+        value: `${averageDurationMinutes} dakika`,
+      });
+    }
+    if (requiresReservation !== undefined) {
+      tags.push(requiresReservation ? "Rezervasyon gerekli" : "Anlık katılım mümkün");
+    }
+    if (safetyRequirements) {
+      notes.push(safetyRequirements);
+    }
+
+    return {
+      title: "Aktivite bilgileri",
+      facts,
+      tags,
+      notes,
+      sidebarCtaLabel: "Paketleri incele",
+    };
+  }
+
+  if (normalizedKind === "visit_location") {
+    const ticketPrice =
+      toNumber(profile.ticketPrice) ?? (nightlyPrice > 0 ? nightlyPrice : undefined);
+    const recommendedDurationMinutes = toNumber(profile.recommendedDurationMinutes);
+    const requiresGuide = toBoolean(profile.requiresGuide);
+
+    if (ticketPrice) {
+      facts.push({ label: "Bilet", value: priceFormatter.format(ticketPrice) });
+    }
+    if (recommendedDurationMinutes) {
+      facts.push({
+        label: "Önerilen gezi süresi",
+        value: `${recommendedDurationMinutes} dakika`,
+      });
+    }
+    if (requiresGuide !== undefined) {
+      tags.push(requiresGuide ? "Rehber eşliğinde" : "Bireysel geziye uygun");
+    }
+
+    return {
+      title: "Ziyaret bilgileri",
+      facts,
+      tags,
+      notes,
+      sidebarCtaLabel: "Ziyaret planını gör",
+    };
+  }
+
+  if (normalizedKind === "other_monetized") {
+    const startingPrice =
+      toNumber(profile.startingPrice) ?? (nightlyPrice > 0 ? nightlyPrice : undefined);
+    const notesText = toStringValue(profile.notes);
+
+    if (startingPrice) {
+      facts.push({ label: "Başlangıç fiyatı", value: priceFormatter.format(startingPrice) });
+    }
+    if (notesText) {
+      notes.push(notesText);
+    }
+
+    return {
+      title: "Fiyatlandırma bilgileri",
+      facts,
+      tags,
+      notes,
+      sidebarCtaLabel: "Detayları incele",
+    };
+  }
+
+  return {
+    title: "Öne çıkan özellikler",
+    facts,
+    tags,
+    notes,
+    sidebarCtaLabel: "Detayları incele",
+  };
+}
+
 export async function generateMetadata({
   params,
 }: {
@@ -79,7 +345,7 @@ export async function generateMetadata({
   }
 
   return {
-    title: `${detail.name} | TatilDesen`,
+    title: detail.name,
     description: detail.shortDescription,
   };
 }
@@ -96,108 +362,120 @@ export default async function PlaceDetailPage({
     notFound();
   }
 
-  // Mock data for fields not yet in API
-  const host = detail.host ?? {
-    id: detail.id,
-    name: "Ev Sahibi",
-    avatar: "/images/placeholders/image-error.svg",
-    isSuperhost: false,
-    joinedDate: "Yakın zamanda katıldı",
-    reviewCount: detail.reviewCount ?? 0,
-    isVerified: false,
-  };
-
-  const ratings = detail.ratings ?? {
-    overall: detail.rating,
-    cleanliness: 5.0,
-    accuracy: 5.0,
-    communication: 5.0,
-    location: 4.9,
-    checkIn: 5.0,
-    value: 4.7,
-  };
-
-  const reviews = detail.reviews ?? [
-    {
-      id: "r1",
-      author: { name: "Mehmet", avatar: "/images/avatars/user-1.jpg" },
-      date: "Aralık 2024",
-      comment: "Harika bir konaklama deneyimi yaşadık.",
-      rating: 5,
-    },
-    {
-      id: "r2",
-      author: { name: "Ayşe", avatar: "/images/avatars/user-2.jpg" },
-      date: "Kasım 2024",
-      comment: "Konum mükemmeldi, ev sahibi çok ilgiliydi.",
-      rating: 5,
-    },
-  ];
-
-  const rules = detail.rules ?? {
-    checkInTime: "14:00",
-    checkOutTime: "11:00",
-    selfCheckIn: true,
-    maxGuests: detail.maxGuests ?? 4,
-    smokingAllowed: false,
-    petsAllowed: false,
-    partiesAllowed: false,
-  };
-
-  const safety = detail.safety ?? {
-    hasSmokAlarm: true,
-    hasCarbonMonoxideAlarm: true,
-    hasSecurityCamera: false,
-  };
-
-  const maxGuests = detail.maxGuests ?? 2;
-  const bedrooms = detail.bedrooms ?? 1;
-  const beds = detail.beds ?? 1;
-  const bathrooms = detail.bathrooms ?? 1;
-  const cancellationPolicy =
-    detail.cancellationPolicy ?? "Ücretsiz iptal: 14 gün öncesine kadar";
   const descriptionHtml = renderDescriptionHtml(detail.description);
+  const kindSource = detail.kind || detail.kindSlug || detail.kindName || detail.type;
+  const normalizedKind = normalizePlaceKind(kindSource);
+  const kindLabel = getPlaceKindLabel(kindSource, detail.type);
+  const isStayKind = isStayPlaceKind(normalizedKind);
+  const isDiningKind = isDiningPlaceKind(normalizedKind);
+  const hasBookablePrice =
+    detail.nightlyPrice > 0 && isMonetizedPlaceKind(normalizedKind);
+  const bookingPriceUnitLabel = getPlacePriceUnitLabel(normalizedKind);
+  const kindSection = buildKindSection(
+    normalizedKind,
+    detail.typeProfile,
+    detail.nightlyPrice,
+    detail.checkInInfo,
+    detail.checkOutInfo,
+  );
+  const highlightChips = detail.shortHighlights.filter((item) => item.trim().length > 0);
 
-  // Get first 5 images for the gallery grid
-  const galleryImages = [detail.heroImage, ...detail.gallery].slice(0, 5);
+  const galleryImages = Array.from(
+    new Set([detail.heroImage, ...detail.gallery].filter(Boolean)),
+  );
+  const hasGalleryGrid = galleryImages.length > 1;
+  const locationLabel = [detail.district, detail.city].filter(Boolean).join(", ");
+  const locationHeading = locationLabel || "Konum bilgisi";
+  const locationDescription =
+    detail.locationDescription ||
+    (locationLabel
+      ? `${kindLabel} ${locationLabel} bölgesinde konumlanır.`
+      : `${kindLabel} merkezi bir konumda yer alır.`);
+  const directionsUrl = `https://www.google.com/maps/search/?api=1&query=${detail.coordinates.lat},${detail.coordinates.lng}`;
+
+  const primaryImage = galleryImages[0] || detail.imageUrl;
+  const contactInfo = detail.contactInfo ?? null;
+  const contactRows = [
+    contactInfo?.phone
+      ? {
+          icon: <Phone className="h-4 w-4" />,
+          label: "Telefon",
+          value: (
+            <a href={`tel:${contactInfo.phone}`} className="underline">
+              {contactInfo.phone}
+            </a>
+          ),
+        }
+      : null,
+    contactInfo?.email
+      ? {
+          icon: <Mail className="h-4 w-4" />,
+          label: "E-posta",
+          value: (
+            <a href={`mailto:${contactInfo.email}`} className="underline">
+              {contactInfo.email}
+            </a>
+          ),
+        }
+      : null,
+    contactInfo?.website
+      ? {
+          icon: <ChevronRight className="h-4 w-4" />,
+          label: "Web sitesi",
+          value: (
+            <a
+              href={
+                contactInfo.website.startsWith("http")
+                  ? contactInfo.website
+                  : `https://${contactInfo.website}`
+              }
+              target="_blank"
+              rel="noreferrer"
+              className="underline"
+            >
+              {contactInfo.website}
+            </a>
+          ),
+        }
+      : null,
+  ].filter(Boolean) as Array<{ icon: ReactNode; label: string; value: ReactNode }>;
+
+  const showDatePicker = isStayKind;
+  const showStayBookingCard = isStayKind && hasBookablePrice;
+  const showMobileBookingBar = showStayBookingCard;
 
   return (
     <div className="pb-24">
-      {/* Header Section */}
       <section className="mx-auto max-w-7xl px-4 pt-6 md:px-6">
-        {/* Title */}
-        <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">
-          {detail.name}
-        </h1>
+        <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">{detail.name}</h1>
 
-        {/* Details Row */}
-        <div className="mt-2 flex flex-wrap items-center justify-between gap-4">
-          {/* Left - Rating, Reviews, Location */}
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-4">
           <div className="flex flex-wrap items-center gap-2 text-sm">
-            <div className="flex items-center gap-1">
-              <Star className="h-4 w-4 fill-current" />
-              <span className="font-medium">{detail.rating.toFixed(1)}</span>
-            </div>
-            <span className="text-muted-foreground">·</span>
-            <span className="underline">
-              {detail.reviewCount} değerlendirme
+            <span className="rounded-full bg-primary/10 px-3 py-1 font-medium text-primary">
+              {kindLabel}
             </span>
-            {host.isSuperhost && (
+            {(detail.rating > 0 || detail.reviewCount > 0) && (
               <>
                 <span className="text-muted-foreground">·</span>
-                <div className="flex items-center gap-1 text-muted-foreground">
-                  <Shield className="h-4 w-4" />
-                  <span>Süper Ev Sahibi</span>
+                <div className="flex items-center gap-1">
+                  <Star className="h-4 w-4 fill-current" />
+                  <span className="font-medium">{detail.rating.toFixed(1)}</span>
                 </div>
+                {detail.reviewCount > 0 ? (
+                  <span className="underline">{detail.reviewCount} değerlendirme</span>
+                ) : null}
               </>
             )}
-            <span className="text-muted-foreground">·</span>
-            <span className="underline text-muted-foreground">
-              {detail.district}, {detail.city}
-            </span>
+            {(detail.district || detail.city) && (
+              <>
+                <span className="text-muted-foreground">·</span>
+                <span className="text-muted-foreground underline">
+                  {[detail.district, detail.city].filter(Boolean).join(", ")}
+                </span>
+              </>
+            )}
           </div>
 
-          {/* Right - Share & Save */}
           <div className="flex items-center gap-4">
             <button className="flex items-center gap-2 text-sm font-medium underline hover:text-muted-foreground">
               <Share className="h-4 w-4" />
@@ -211,13 +489,23 @@ export default async function PlaceDetailPage({
         </div>
       </section>
 
-      {/* Image Grid */}
       <section className="mx-auto mt-6 max-w-7xl px-4 md:px-6">
-        <div className="relative grid grid-cols-1 gap-2 overflow-hidden rounded-xl md:grid-cols-4 md:grid-rows-2">
-          {/* Main Large Image */}
-          <div className="relative aspect-[4/3] md:col-span-2 md:row-span-2 md:aspect-auto">
+        <div
+          className={
+            hasGalleryGrid
+              ? "relative grid grid-cols-1 gap-2 overflow-hidden rounded-xl md:grid-cols-4 md:grid-rows-2"
+              : "relative overflow-hidden rounded-xl"
+          }
+        >
+          <div
+            className={
+              hasGalleryGrid
+                ? "relative aspect-[4/3] md:col-span-2 md:row-span-2 md:aspect-auto md:min-h-[360px]"
+                : "relative aspect-[4/3] md:aspect-[16/7]"
+            }
+          >
             <Image
-              src={galleryImages[0] || "/images/placeholder.jpg"}
+              src={primaryImage}
               alt={detail.name}
               fill
               priority
@@ -226,10 +514,10 @@ export default async function PlaceDetailPage({
             />
           </div>
 
-          {/* Small Images */}
-          {galleryImages.slice(1, 5).map((image, index) => (
+          {hasGalleryGrid
+            ? galleryImages.slice(1, 5).map((image, index) => (
             <div
-              key={index}
+              key={image + index}
               className={`relative hidden aspect-square md:block ${
                 index === 1 ? "rounded-tr-xl" : ""
               } ${index === 3 ? "rounded-br-xl" : ""}`}
@@ -242,173 +530,180 @@ export default async function PlaceDetailPage({
                 sizes="25vw"
               />
             </div>
-          ))}
+          ))
+            : null}
 
-          {/* Show All Photos Button */}
-          <PlaceDetailGalleryModal
-            images={[detail.heroImage, ...detail.gallery]}
-            placeName={detail.name}
-          />
+          <PlaceDetailGalleryModal images={galleryImages} placeName={detail.name} />
         </div>
       </section>
 
-      {/* Main Content */}
       <section className="mx-auto mt-8 max-w-7xl px-4 md:px-6">
         <div className="grid gap-12 lg:grid-cols-[1fr_370px]">
-          {/* Left Column */}
           <div className="space-y-8">
-            {/* Host & Property Info */}
             <div className="flex items-start justify-between gap-6">
-              <div className="space-y-1">
-                <h2 className="text-xl font-semibold md:text-2xl">
-                  {detail.type === "stay"
-                    ? "Tümü kiralık"
-                    : detail.type === "experience"
-                      ? "Deneyim"
-                      : "Restoran"}{" "}
-                  · Ev sahibi: {host.name}
-                </h2>
-                <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                  <span>{maxGuests} misafir</span>
-                  <span>·</span>
-                  <span>{bedrooms} yatak odası</span>
-                  <span>·</span>
-                  <span>{beds} yatak</span>
-                  <span>·</span>
-                  <span>{bathrooms} banyo</span>
-                </div>
-              </div>
-              <div className="relative shrink-0">
-                <Avatar className="h-14 w-14">
-                  <AvatarImage src={host.avatar} alt={host.name} />
-                  <AvatarFallback>{host.name[0]}</AvatarFallback>
-                </Avatar>
-                {host.isSuperhost && (
-                  <div className="absolute -bottom-1 -right-1 rounded-full bg-rose-500 p-1">
-                    <Shield className="h-3 w-3 text-white" />
+              <div className="space-y-2">
+                <h2 className="text-xl font-semibold md:text-2xl">{kindSection.title}</h2>
+                {highlightChips.length > 0 ? (
+                  <div className="flex flex-wrap items-center gap-2 text-sm">
+                    {highlightChips.map((item) => (
+                      <span
+                        key={item}
+                        className="rounded-full border border-primary/20 bg-primary/5 px-3 py-1 font-medium text-foreground/80"
+                      >
+                        {item}
+                      </span>
+                    ))}
                   </div>
-                )}
+                ) : null}
               </div>
-            </div>
 
-            <Separator />
-
-            {/* Property Highlights */}
-            <div className="space-y-6">
-              <div className="flex gap-6">
-                <Home className="h-8 w-8 shrink-0 text-muted-foreground" />
-                <div>
-                  <h3 className="font-medium">Tüm ev</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Daireyi kendinize ait olarak kullanacaksınız
-                  </p>
-                </div>
-              </div>
-              <div className="flex gap-6">
-                <Sparkles className="h-8 w-8 shrink-0 text-muted-foreground" />
-                <div>
-                  <h3 className="font-medium">Gelişmiş Temizlik</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Bu ev sahibi 5 adımlı gelişmiş temizlik sürecine bağlı kaldı
-                  </p>
-                </div>
-              </div>
-              <div className="flex gap-6">
-                <DoorOpen className="h-8 w-8 shrink-0 text-muted-foreground" />
-                <div>
-                  <h3 className="font-medium">Kendi kendine giriş</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Tuş takımı ile kendiniz giriş yapın
-                  </p>
-                </div>
-              </div>
-              {cancellationPolicy && (
-                <div className="flex gap-6">
-                  <Calendar className="h-8 w-8 shrink-0 text-muted-foreground" />
-                  <div>
-                    <h3 className="font-medium">{cancellationPolicy}</h3>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <Separator />
-
-            {/* Description */}
-            <div className="space-y-4">
-              <div
-                className="prose prose-sm max-w-none text-muted-foreground [&_*]:text-inherit"
-                dangerouslySetInnerHTML={{ __html: descriptionHtml }}
-              />
-              <button className="flex items-center gap-1 font-medium underline">
-                Daha fazla göster
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            </div>
-
-            <Separator />
-
-            {/* Where You'll Sleep */}
-            <div className="space-y-6">
-              <h2 className="text-xl font-semibold md:text-2xl">
-                Nerede uyuyacaksınız
-              </h2>
-              <div className="max-w-xs rounded-xl border p-6">
-                <div className="mb-4 aspect-[4/3] overflow-hidden rounded-lg bg-muted">
-                  {detail.gallery[0] && (
-                    <Image
-                      src={detail.gallery[0]}
-                      alt="Yatak odası"
-                      width={320}
-                      height={240}
-                      className="h-full w-full object-cover"
-                    />
+              {isStayKind && detail.host ? (
+                <div className="relative shrink-0">
+                  <Avatar className="h-14 w-14">
+                    <AvatarImage src={detail.host.avatar} alt={detail.host.name} />
+                    <AvatarFallback>{detail.host.name[0]}</AvatarFallback>
+                  </Avatar>
+                  {detail.host.isSuperhost && (
+                    <div className="absolute -bottom-1 -right-1 rounded-full bg-rose-500 p-1">
+                      <Shield className="h-3 w-3 text-white" />
+                    </div>
                   )}
                 </div>
-                <h3 className="font-medium">Yatak odası</h3>
-                <p className="text-sm text-muted-foreground">
-                  {beds} çift kişilik yatak
-                </p>
-              </div>
+              ) : null}
             </div>
 
-            <Separator />
+            {descriptionHtml ? (
+              <div className="space-y-3 border-t pt-8">
+                <h3 className="text-lg font-semibold">Açıklama</h3>
+                <div
+                  className="prose prose-sm max-w-none text-muted-foreground [&_*]:text-inherit"
+                  dangerouslySetInnerHTML={{ __html: descriptionHtml }}
+                />
+              </div>
+            ) : null}
 
-            {/* Amenities */}
-            <div className="space-y-6">
-              <h2 className="text-xl font-semibold md:text-2xl">
-                Bu mekanın sunduğu olanaklar
-              </h2>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                {detail.amenities.slice(0, 10).map((amenity) => (
-                  <div key={amenity.label} className="flex items-center gap-4">
-                    <span className="text-2xl">{amenity.icon}</span>
-                    <span>{amenity.label}</span>
+            {(kindSection.facts.length > 0 || kindSection.tags.length > 0 || kindSection.notes.length > 0) ? (
+              <div id="kind-details" className="space-y-5 border-t pt-8">
+                <h3 className="text-lg font-semibold">{kindSection.title}</h3>
+
+                {kindSection.facts.length > 0 ? (
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    {kindSection.facts.map((fact) => (
+                      <div key={fact.label} className="rounded-xl border p-4">
+                        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                          {fact.label}
+                        </p>
+                        <p className="mt-1 text-base font-semibold">{fact.value}</p>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                ) : null}
+
+                {kindSection.tags.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {kindSection.tags.map((tag) => (
+                      <span
+                        key={tag}
+                        className="rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+
+                {kindSection.notes.length > 0 ? (
+                  <div className="space-y-2">
+                    {kindSection.notes.map((note) => (
+                      <p key={note} className="text-sm text-muted-foreground">
+                        {note}
+                      </p>
+                    ))}
+                  </div>
+                ) : null}
               </div>
-              {detail.amenities.length > 10 && (
-                <Button variant="outline" className="mt-4">
-                  Tüm {detail.amenities.length} olanağı göster
-                </Button>
-              )}
-            </div>
+            ) : null}
 
-            <Separator />
+            <PlaceDetailAmenitiesSection amenities={detail.amenities} />
 
-            {/* Date Picker */}
-            <PlaceDetailDatePicker />
+            {showDatePicker ? (
+              <div className="border-t pt-8">
+                <PlaceDetailDatePicker city={detail.city} />
+              </div>
+            ) : null}
+
+            {(detail.reviews?.length ?? 0) > 0 ? (
+              <div className="space-y-6 border-t pt-8">
+                <div className="flex items-center gap-2">
+                  <Star className="h-5 w-5 fill-current" />
+                  <span className="text-lg font-semibold">{detail.rating.toFixed(1)}</span>
+                  {detail.reviewCount > 0 ? (
+                    <span className="text-muted-foreground">· {detail.reviewCount} değerlendirme</span>
+                  ) : null}
+                </div>
+
+                <div className="grid gap-8 sm:grid-cols-2">
+                  {detail.reviews?.map((review) => (
+                    <div key={review.id} className="space-y-4">
+                      <div className="flex items-center gap-4">
+                        <Avatar>
+                          <AvatarImage src={review.author.avatar} alt={review.author.name} />
+                          <AvatarFallback>{review.author.name[0]}</AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <p className="font-medium">{review.author.name}</p>
+                          <p className="text-sm text-muted-foreground">{review.date}</p>
+                        </div>
+                      </div>
+                      <p className="text-muted-foreground">{review.comment}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
           </div>
 
-          {/* Right Column - Booking Card (Sticky) */}
           <div className="hidden lg:block">
-            <div className="sticky top-24">
-              <PlaceDetailBookingCard
-                nightlyPrice={detail.nightlyPrice}
-                rating={detail.rating}
-                reviewCount={detail.reviewCount}
-              />
-              <div className="mt-4 flex items-center justify-center gap-2 text-sm text-muted-foreground">
+            <div className="sticky top-24 space-y-4">
+              {showStayBookingCard ? (
+                <PlaceDetailBookingCard
+                  nightlyPrice={detail.nightlyPrice}
+                  rating={detail.rating}
+                  reviewCount={detail.reviewCount}
+                  maxGuests={toNumber(detail.typeProfile?.maxGuests) ?? 4}
+                />
+              ) : hasBookablePrice ? (
+                <div className="rounded-2xl border bg-card p-6 shadow-sm">
+                  <p className="text-xl font-semibold">
+                    {priceFormatter.format(detail.nightlyPrice)}
+                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Fiyat tipi: {bookingPriceUnitLabel}
+                  </p>
+                  <Button className="mt-4 w-full" asChild>
+                    <a href="#kind-details">{kindSection.sidebarCtaLabel}</a>
+                  </Button>
+                </div>
+              ) : null}
+
+              {contactRows.length > 0 ? (
+                <div className="rounded-2xl border bg-card p-6 shadow-sm">
+                  <p className="text-base font-semibold">İletişim</p>
+                  <div className="mt-4 space-y-3 text-sm">
+                    {contactRows.map((row) => (
+                      <div key={row.label} className="flex items-start gap-2">
+                        <span className="mt-0.5 text-muted-foreground">{row.icon}</span>
+                        <div>
+                          <p className="text-xs uppercase text-muted-foreground">{row.label}</p>
+                          <div className="font-medium">{row.value}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
                 <Flag className="h-4 w-4" />
                 <button className="underline">Bu ilanı bildir</button>
               </div>
@@ -417,283 +712,109 @@ export default async function PlaceDetailPage({
         </div>
       </section>
 
-      {/* Reviews Section */}
       <section className="mx-auto mt-12 max-w-7xl border-t px-4 pt-12 md:px-6">
-        <div className="space-y-8">
-          {/* Rating Summary */}
-          <div className="flex items-center gap-2">
-            <Star className="h-6 w-6 fill-current" />
-            <span className="text-xl font-semibold">
-              {ratings.overall.toFixed(1)}
-            </span>
-            <span className="text-muted-foreground">·</span>
-            <span className="text-xl font-semibold">
-              {detail.reviewCount} değerlendirme
-            </span>
-          </div>
+        <div className="space-y-6">
+          <h2 className="text-xl font-semibold md:text-2xl">Konum</h2>
+          <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+            <div className="overflow-hidden rounded-2xl border border-border/70 bg-card shadow-sm">
+              <div className="h-[340px] md:h-[400px]">
+                <PlacesMap
+                  places={[detail]}
+                  markerMode="pin"
+                  showSearchAsMoveToggle={false}
+                  initialZoom={13}
+                />
+              </div>
+            </div>
 
-          {/* Rating Categories */}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {[
-              { label: "Temizlik", value: ratings.cleanliness },
-              { label: "Doğruluk", value: ratings.accuracy },
-              { label: "İletişim", value: ratings.communication },
-              { label: "Konum", value: ratings.location },
-              { label: "Giriş", value: ratings.checkIn },
-              { label: "Değer", value: ratings.value },
-            ].map((category) => (
-              <div
-                key={category.label}
-                className="flex items-center justify-between gap-4"
-              >
-                <span className="text-sm">{category.label}</span>
+            <aside className="flex h-full flex-col rounded-2xl border border-border/70 bg-card p-5 shadow-sm">
+              <h3 className="text-base font-semibold">Bölge bilgisi</h3>
+              <div className="mt-4 flex items-start gap-2">
+                <MapPin className="mt-0.5 h-4 w-4 text-primary" />
+                <p className="font-medium">{locationHeading}</p>
+              </div>
+              <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+                {locationDescription}
+              </p>
+              <Button asChild variant="outline" className="mt-5 w-full">
+                <a href={directionsUrl} target="_blank" rel="noreferrer">
+                  <Navigation className="mr-2 h-4 w-4" />
+                  Yol tarifi al
+                </a>
+              </Button>
+            </aside>
+          </div>
+        </div>
+      </section>
+
+      {isStayKind && detail.host ? (
+        <section className="mx-auto mt-12 max-w-7xl border-t px-4 pt-12 md:px-6">
+          <div className="space-y-6">
+            <div className="flex items-start gap-6">
+              <div className="relative">
+                <Avatar className="h-16 w-16">
+                  <AvatarImage src={detail.host.avatar} alt={detail.host.name} />
+                  <AvatarFallback>{detail.host.name[0]}</AvatarFallback>
+                </Avatar>
+                {detail.host.isSuperhost ? (
+                  <div className="absolute -bottom-1 -right-1 rounded-full bg-rose-500 p-1.5">
+                    <Shield className="h-3 w-3 text-white" />
+                  </div>
+                ) : null}
+              </div>
+              <div className="space-y-1">
+                <h2 className="text-xl font-semibold md:text-2xl">İşletme: {detail.host.name}</h2>
+                {detail.host.joinedDate ? (
+                  <p className="text-sm text-muted-foreground">
+                    {detail.host.joinedDate} tarihinde katıldı
+                  </p>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-6 text-sm">
+              {detail.host.reviewCount > 0 ? (
                 <div className="flex items-center gap-2">
-                  <div className="h-1 w-24 overflow-hidden rounded-full bg-muted">
-                    <div
-                      className="h-full bg-foreground"
-                      style={{ width: `${(category.value / 5) * 100}%` }}
-                    />
-                  </div>
-                  <span className="text-xs">{category.value.toFixed(1)}</span>
+                  <Star className="h-4 w-4" />
+                  <span>{detail.host.reviewCount} değerlendirme</span>
                 </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Reviews Grid */}
-          <div className="grid gap-8 sm:grid-cols-2">
-            {reviews.map((review) => (
-              <div key={review.id} className="space-y-4">
-                <div className="flex items-center gap-4">
-                  <Avatar>
-                    <AvatarImage
-                      src={review.author.avatar}
-                      alt={review.author.name}
-                    />
-                    <AvatarFallback>{review.author.name[0]}</AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <p className="font-medium">{review.author.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {review.date}
-                    </p>
-                  </div>
+              ) : null}
+              {detail.host.isVerified ? (
+                <div className="flex items-center gap-2">
+                  <Shield className="h-4 w-4" />
+                  <span>Kimlik doğrulandı</span>
                 </div>
-                <p className="text-muted-foreground">{review.comment}</p>
-              </div>
-            ))}
-          </div>
+              ) : null}
+              {detail.host.isSuperhost ? (
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4" />
+                  <span>Süper ev sahibi</span>
+                </div>
+              ) : null}
+            </div>
 
-          {detail.reviewCount > 2 && (
-            <Button variant="outline">
-              Tüm {detail.reviewCount} değerlendirmeyi göster
+            {detail.host.responseRate ? (
+              <p className="text-sm text-muted-foreground">Yanıt oranı: %{detail.host.responseRate}</p>
+            ) : null}
+            {detail.host.responseTime ? (
+              <p className="text-sm text-muted-foreground">Yanıt süresi: {detail.host.responseTime}</p>
+            ) : null}
+
+            <Button variant="outline" size="lg">
+              İşletmeyle iletişime geç
             </Button>
-          )}
-        </div>
-      </section>
 
-      {/* Map Section */}
-      <section className="mx-auto mt-12 max-w-7xl border-t px-4 pt-12 md:px-6">
-        <div className="space-y-6">
-          <h2 className="text-xl font-semibold md:text-2xl">
-            Nerede olacaksınız
-          </h2>
-          <div className="h-[400px] overflow-hidden rounded-xl">
-            <PlacesMap places={[detail]} />
-          </div>
-          <div className="space-y-4">
-            <h3 className="font-semibold">
-              {detail.district}, {detail.city}
-            </h3>
-            <p className="text-muted-foreground">
-              {detail.locationDescription ?? detail.shortDescription}
-            </p>
-            <button className="flex items-center gap-1 font-medium underline">
-              Daha fazla göster
-              <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-      </section>
-
-      {/* Host Section */}
-      <section className="mx-auto mt-12 max-w-7xl border-t px-4 pt-12 md:px-6">
-        <div className="space-y-6">
-          <div className="flex items-start gap-6">
-            <div className="relative">
-              <Avatar className="h-16 w-16">
-                <AvatarImage src={host.avatar} alt={host.name} />
-                <AvatarFallback>{host.name[0]}</AvatarFallback>
-              </Avatar>
-              {host.isSuperhost && (
-                <div className="absolute -bottom-1 -right-1 rounded-full bg-rose-500 p-1.5">
-                  <Shield className="h-3 w-3 text-white" />
-                </div>
-              )}
-            </div>
-            <div className="space-y-1">
-              <h2 className="text-xl font-semibold md:text-2xl">
-                Ev sahibi: {host.name}
-              </h2>
-              <p className="text-sm text-muted-foreground">
-                {host.joinedDate} tarihinde katıldı
+            <div className="flex items-start gap-4 rounded-lg bg-muted/50 p-4 text-xs text-muted-foreground">
+              <Shield className="h-5 w-5 shrink-0" />
+              <p>
+                Ödemenizi korumak için TatilDesen dışındaki yönlendirmelerle ödeme yapmayın.
               </p>
             </div>
           </div>
+        </section>
+      ) : null}
 
-          <div className="flex flex-wrap gap-6 text-sm">
-            <div className="flex items-center gap-2">
-              <Star className="h-4 w-4" />
-              <span>{host.reviewCount} Değerlendirme</span>
-            </div>
-            {host.isVerified && (
-              <div className="flex items-center gap-2">
-                <Shield className="h-4 w-4" />
-                <span>Kimlik doğrulandı</span>
-              </div>
-            )}
-            {host.isSuperhost && (
-              <div className="flex items-center gap-2">
-                <Shield className="h-4 w-4" />
-                <span>Süper Ev Sahibi</span>
-              </div>
-            )}
-          </div>
-
-          {host.isSuperhost && (
-            <div className="space-y-2">
-              <p className="font-medium">{host.name} bir Süper Ev Sahibidir</p>
-              <p className="text-sm text-muted-foreground">
-                Süper Ev Sahipleri, misafirlere harika konaklamalar sunmaya
-                kendini adamış deneyimli, yüksek puanlı ev sahipleridir.
-              </p>
-            </div>
-          )}
-
-          {host.responseRate && (
-            <p className="text-sm text-muted-foreground">
-              Yanıt oranı: %{host.responseRate}
-            </p>
-          )}
-          {host.responseTime && (
-            <p className="text-sm text-muted-foreground">
-              Yanıt süresi: {host.responseTime}
-            </p>
-          )}
-
-          <Button variant="outline" size="lg">
-            Ev sahibiyle iletişime geç
-          </Button>
-
-          <div className="flex items-start gap-4 rounded-lg bg-muted/50 p-4 text-xs text-muted-foreground">
-            <Shield className="h-5 w-5 shrink-0" />
-            <p>
-              Ödemenizi korumak için hiçbir zaman TatilDesen web sitesi veya
-              uygulaması dışında para transferi yapmayın veya iletişim kurmayın.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* Things to Know */}
-      <section className="mx-auto mt-12 max-w-7xl border-t px-4 pt-12 md:px-6">
-        <div className="space-y-6">
-          <h2 className="text-xl font-semibold md:text-2xl">
-            Bilmeniz gerekenler
-          </h2>
-
-          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
-            {/* House Rules */}
-            <div className="space-y-4">
-              <h3 className="font-medium">Ev kuralları</h3>
-              <ul className="space-y-3 text-sm text-muted-foreground">
-                <li className="flex items-center gap-3">
-                  <Clock className="h-5 w-5 shrink-0" />
-                  Giriş: {rules.checkInTime} sonrası
-                </li>
-                <li className="flex items-center gap-3">
-                  <Clock className="h-5 w-5 shrink-0" />
-                  Çıkış: {rules.checkOutTime}
-                </li>
-                {rules.selfCheckIn && (
-                  <li className="flex items-center gap-3">
-                    <DoorOpen className="h-5 w-5 shrink-0" />
-                    Kilit kutusuyla kendi kendine giriş
-                  </li>
-                )}
-                {rules.maxGuests && (
-                  <li className="flex items-center gap-3">
-                    <Home className="h-5 w-5 shrink-0" />
-                    Maksimum {rules.maxGuests} misafir
-                  </li>
-                )}
-                {!rules.smokingAllowed && (
-                  <li className="flex items-center gap-3">
-                    <Ban className="h-5 w-5 shrink-0" />
-                    Sigara içilmez
-                  </li>
-                )}
-                {!rules.petsAllowed && (
-                  <li className="flex items-center gap-3">
-                    <Dog className="h-5 w-5 shrink-0" />
-                    Evcil hayvan yok
-                  </li>
-                )}
-                {!rules.partiesAllowed && (
-                  <li className="flex items-center gap-3">
-                    <PartyPopper className="h-5 w-5 shrink-0" />
-                    Parti veya etkinlik yok
-                  </li>
-                )}
-              </ul>
-            </div>
-
-            {/* Safety */}
-            <div className="space-y-4">
-              <h3 className="font-medium">Sağlık ve güvenlik</h3>
-              <ul className="space-y-3 text-sm text-muted-foreground">
-                {safety.hasCarbonMonoxideAlarm && (
-                  <li className="flex items-center gap-3">
-                    <AlertTriangle className="h-5 w-5 shrink-0" />
-                    Karbon monoksit alarmı
-                  </li>
-                )}
-                {safety.hasSmokAlarm && (
-                  <li className="flex items-center gap-3">
-                    <AlertTriangle className="h-5 w-5 shrink-0" />
-                    Duman alarmı
-                  </li>
-                )}
-                {safety.hasSecurityCamera && (
-                  <li className="flex items-center gap-3">
-                    <Shield className="h-5 w-5 shrink-0" />
-                    Mülkte güvenlik kamerası
-                  </li>
-                )}
-              </ul>
-              <button className="flex items-center gap-1 text-sm font-medium underline">
-                Daha fazla göster
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            </div>
-
-            {/* Cancellation Policy */}
-            <div className="space-y-4">
-              <h3 className="font-medium">İptal politikası</h3>
-              <p className="text-sm text-muted-foreground">
-                {cancellationPolicy}
-              </p>
-              <button className="flex items-center gap-1 text-sm font-medium underline">
-                Daha fazla göster
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Related Collections */}
-      {detail.featuredCollections && detail.featuredCollections.length > 0 && (
+      {detail.featuredCollections && detail.featuredCollections.length > 0 ? (
         <section className="mx-auto mt-12 max-w-7xl border-t px-4 pt-12 md:px-6">
           <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
             <h2 className="text-xl font-semibold">Önerilen koleksiyonlar</h2>
@@ -710,18 +831,17 @@ export default async function PlaceDetailPage({
             ))}
           </div>
         </section>
-      )}
+      ) : null}
 
-      {/* Nearby Places */}
-      {detail.nearbyPlaces && detail.nearbyPlaces.length > 0 && (
+      {detail.nearbyPlaces && detail.nearbyPlaces.length > 0 ? (
         <section className="mx-auto mt-12 max-w-7xl border-t px-4 pt-12 md:px-6">
           <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
             <h2 className="text-xl font-semibold">Yakındaki öneriler</h2>
             <Link
-              href="/places"
+              href={isDiningKind ? "/places?type=restaurant" : "/places"}
               className="text-sm font-semibold text-primary hover:text-primary/80"
             >
-              Tüm konaklamaları gör
+              Tüm mekanları gör
             </Link>
           </div>
           <div className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -730,29 +850,48 @@ export default async function PlaceDetailPage({
             ))}
           </div>
         </section>
-      )}
+      ) : null}
 
-      {/* Mobile Booking Bar */}
-      <div className="fixed bottom-0 left-0 right-0 border-t bg-background p-4 lg:hidden">
-        <div className="flex items-center justify-between">
-          <div>
-            <span className="text-lg font-semibold">
-              {priceFormatter.format(detail.nightlyPrice)}
-            </span>
-            <span className="text-sm text-muted-foreground"> gece</span>
-            <div className="flex items-center gap-1 text-sm">
-              <Star className="h-3 w-3 fill-current" />
-              <span>{detail.rating.toFixed(1)}</span>
-              <span className="text-muted-foreground">
-                · {detail.reviewCount} değerlendirme
+      {showMobileBookingBar ? (
+        <div className="fixed bottom-0 left-0 right-0 border-t bg-background p-4 lg:hidden">
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="text-lg font-semibold">
+                {priceFormatter.format(detail.nightlyPrice)}
               </span>
+              <span className="text-sm text-muted-foreground"> gece</span>
+              <div className="flex items-center gap-1 text-sm">
+                <Star className="h-3 w-3 fill-current" />
+                <span>{detail.rating.toFixed(1)}</span>
+                {detail.reviewCount > 0 ? (
+                  <span className="text-muted-foreground">· {detail.reviewCount} değerlendirme</span>
+                ) : null}
+              </div>
             </div>
+            <Button className="bg-rose-500 hover:bg-rose-600">
+              <Calendar className="mr-2 h-4 w-4" />
+              Rezervasyon yap
+            </Button>
           </div>
-          <Button className="bg-rose-500 hover:bg-rose-600">
-            Rezervasyon yap
-          </Button>
         </div>
-      </div>
+      ) : hasBookablePrice ? (
+        <div className="fixed bottom-0 left-0 right-0 border-t bg-background p-4 lg:hidden">
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="text-lg font-semibold">
+                {priceFormatter.format(detail.nightlyPrice)}
+              </span>
+              <span className="text-sm text-muted-foreground"> {bookingPriceUnitLabel}</span>
+            </div>
+            <Button asChild>
+              <a href="#kind-details">
+                <Ticket className="mr-2 h-4 w-4" />
+                {kindSection.sidebarCtaLabel}
+              </a>
+            </Button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

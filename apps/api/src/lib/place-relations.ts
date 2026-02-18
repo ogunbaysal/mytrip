@@ -16,17 +16,38 @@ export const resolvePublicFileUrl = (value: string | null | undefined): string =
   return toPublicUploadUrl(value);
 };
 
-const PLACE_TYPE_TO_CATEGORY_SLUGS: Record<string, readonly string[]> = {
-  hotel: ["hotels", "villas", "guesthouses", "apart-hotels"],
-  restaurant: ["restaurants"],
-  cafe: ["cafes", "bars", "beach-clubs"],
-  activity: ["activities", "attractions", "nature-beaches", "spa-wellness"],
-  attraction: ["attractions", "nature-beaches"],
+const PLACE_TYPE_TO_KIND_IDS: Record<string, readonly string[]> = {
+  hotel: ["hotel", "villa"],
+  restaurant: ["restaurant"],
+  cafe: ["cafe", "bar_club"],
+  activity: [
+    "activity_location",
+    "beach",
+    "natural_location",
+    "visit_location",
+    "other_monetized",
+  ],
+  attraction: ["visit_location", "natural_location", "beach"],
   transport: [],
 };
 
-const CATEGORY_SLUG_TO_PLACE_TYPE: Record<string, string> = Object.entries(
-  PLACE_TYPE_TO_CATEGORY_SLUGS,
+const PLACE_TYPE_TO_KIND_SLUGS: Record<string, readonly string[]> = {
+  hotel: ["hotel", "villa"],
+  restaurant: ["restaurant"],
+  cafe: ["cafe", "bar-club"],
+  activity: [
+    "activity-location",
+    "beach",
+    "natural-location",
+    "visit-location",
+    "other-monetized",
+  ],
+  attraction: ["visit-location", "natural-location", "beach"],
+  transport: [],
+};
+
+const KIND_SLUG_TO_PLACE_TYPE: Record<string, string> = Object.entries(
+  PLACE_TYPE_TO_KIND_SLUGS,
 ).reduce<Record<string, string>>((acc, [type, slugs]) => {
   for (const slug of slugs) acc[slug] = type;
   return acc;
@@ -266,11 +287,17 @@ export function derivePlaceTypeFromCategorySlug(
   categorySlug?: string | null,
 ): string {
   if (!categorySlug) return "activity";
-  return CATEGORY_SLUG_TO_PLACE_TYPE[categorySlug] ?? "activity";
+  return KIND_SLUG_TO_PLACE_TYPE[categorySlug] ?? "activity";
 }
 
 export function resolveCategorySlugsForType(type?: string | null): string[] {
   if (!type) return [];
   const normalized = type.trim().toLowerCase();
-  return [...(PLACE_TYPE_TO_CATEGORY_SLUGS[normalized] ?? [])];
+  return [...(PLACE_TYPE_TO_KIND_SLUGS[normalized] ?? [])];
+}
+
+export function resolvePlaceKindIdsForType(type?: string | null): string[] {
+  if (!type) return [];
+  const normalized = type.trim().toLowerCase();
+  return [...(PLACE_TYPE_TO_KIND_IDS[normalized] ?? [])];
 }

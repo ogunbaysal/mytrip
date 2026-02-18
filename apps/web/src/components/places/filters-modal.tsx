@@ -13,6 +13,11 @@ import {
 import { Slider } from "@/components/ui/slider";
 import { useAmenities } from "@/hooks/use-amenities";
 import { usePlaceTypes } from "@/hooks/use-place-types";
+import {
+  normalizeAmenityFilterKey,
+  normalizeAmenityFilterList,
+  normalizePlaceTypeFilter,
+} from "@/lib/place-filters";
 import { cn } from "@/lib/utils";
 
 // Place type definitions with Turkish labels
@@ -106,13 +111,15 @@ export function FiltersModal({
   onApply,
 }: FiltersModalProps) {
   // Local state for editing filters before applying
-  const [localType, setLocalType] = useState(selectedType);
+  const [localType, setLocalType] = useState(
+    normalizePlaceTypeFilter(selectedType),
+  );
   const [localPriceRange, setLocalPriceRange] = useState<[number, number]>([
     minPrice ?? PRICE_RANGE.min,
     maxPrice ?? PRICE_RANGE.max,
   ]);
   const [localAmenities, setLocalAmenities] = useState<string[]>(
-    selectedAmenities || [],
+    normalizeAmenityFilterList(selectedAmenities || []),
   );
   const [localFeatured, setLocalFeatured] = useState(featuredOnly ?? false);
   const [localVerified, setLocalVerified] = useState(verifiedOnly ?? false);
@@ -120,12 +127,12 @@ export function FiltersModal({
   // Sync local state when modal opens
   const handleOpenChange = (newOpen: boolean) => {
     if (newOpen) {
-      setLocalType(selectedType);
+      setLocalType(normalizePlaceTypeFilter(selectedType));
       setLocalPriceRange([
         minPrice ?? PRICE_RANGE.min,
         maxPrice ?? PRICE_RANGE.max,
       ]);
-      setLocalAmenities(selectedAmenities || []);
+      setLocalAmenities(normalizeAmenityFilterList(selectedAmenities || []));
       setLocalFeatured(featuredOnly ?? false);
       setLocalVerified(verifiedOnly ?? false);
     }
@@ -134,26 +141,50 @@ export function FiltersModal({
 
   const { data: apiAmenities = [] } = useAmenities();
   const { data: placeTypeOptions = [] } = usePlaceTypes();
-  const resolvedPlaceTypes =
-    placeTypeOptions.length > 0
-      ? placeTypeOptions.map((item) => ({
-          value: item.type,
+  const resolvedPlaceTypes = useMemo(() => {
+    if (placeTypeOptions.length === 0) return PLACE_TYPES;
+
+    const deduped = new Map<string, { value: string; label: string }>();
+    for (const item of placeTypeOptions) {
+      const normalizedType = normalizePlaceTypeFilter(item.type);
+      if (!normalizedType) continue;
+      if (!deduped.has(normalizedType)) {
+        deduped.set(normalizedType, {
+          value: normalizedType,
           label: item.name,
-        }))
-      : PLACE_TYPES;
+        });
+      }
+    }
+
+    return deduped.size > 0 ? Array.from(deduped.values()) : PLACE_TYPES;
+  }, [placeTypeOptions]);
 
   // Build amenity map from API data
   const amenityMap = useMemo(() => {
-    const map: Record<string, { label: string; count: number }> = {};
+    const map: Record<string, { key: string; label: string; count: number }> =
+      {};
     for (const amenity of apiAmenities) {
-      map[amenity.key] = { label: amenity.label, count: amenity.count };
+      const normalizedKey = normalizeAmenityFilterKey(amenity.key);
+      if (!normalizedKey) continue;
+
+      const existing = map[normalizedKey];
+      if (!existing || amenity.count > existing.count) {
+        map[normalizedKey] = {
+          key: normalizedKey,
+          label: amenity.label,
+          count: amenity.count,
+        };
+      }
     }
     return map;
   }, [apiAmenities]);
 
   const toggleAmenity = (key: string) => {
+    const normalizedKey = normalizeAmenityFilterKey(key);
     setLocalAmenities((prev) =>
-      prev.includes(key) ? prev.filter((a) => a !== key) : [...prev, key],
+      prev.includes(normalizedKey)
+        ? prev.filter((a) => a !== normalizedKey)
+        : [...prev, normalizedKey],
     );
   };
 
@@ -166,13 +197,16 @@ export function FiltersModal({
   };
 
   const handleApply = () => {
+    const normalizedType = normalizePlaceTypeFilter(localType);
+    const normalizedAmenities = normalizeAmenityFilterList(localAmenities);
+
     onApply({
-      type: localType,
+      type: normalizedType,
       minPrice:
         localPriceRange[0] > PRICE_RANGE.min ? localPriceRange[0] : undefined,
       maxPrice:
         localPriceRange[1] < PRICE_RANGE.max ? localPriceRange[1] : undefined,
-      amenities: localAmenities,
+      amenities: normalizedAmenities,
       featuredOnly: localFeatured || undefined,
       verifiedOnly: localVerified || undefined,
     });
@@ -186,7 +220,7 @@ export function FiltersModal({
     localPriceRange[1] < PRICE_RANGE.max
       ? 1
       : 0) +
-    localAmenities.length +
+    normalizeAmenityFilterList(localAmenities).length +
     (localFeatured ? 1 : 0) +
     (localVerified ? 1 : 0);
 
@@ -343,9 +377,9 @@ export function FiltersModal({
 
             {Object.entries(AMENITY_GROUPS).map(([groupKey, group]) => {
               // Filter to only show amenities that exist in API data
-              const availableAmenities = group.keys.filter(
-                (key) => amenityMap[key],
-              );
+              const availableAmenities = group.keys
+                .map((key) => normalizeAmenityFilterKey(key))
+                .filter((key) => amenityMap[key]);
               if (availableAmenities.length === 0) return null;
 
               return (
@@ -402,9 +436,10 @@ export function FiltersModal({
             {(() => {
               const categorizedKeys: string[] = Object.values(
                 AMENITY_GROUPS,
-              ).flatMap((g) => [...g.keys] as string[]);
-              const uncategorized = apiAmenities.filter(
-                (a) => !categorizedKeys.includes(a.key),
+              ).flatMap((g) => g.keys.map((key) => normalizeAmenityFilterKey(key)));
+              const categorizedSet = new Set(categorizedKeys);
+              const uncategorized = Object.values(amenityMap).filter(
+                (a) => !categorizedSet.has(a.key),
               );
               if (uncategorized.length === 0) return null;
 

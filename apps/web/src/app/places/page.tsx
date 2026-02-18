@@ -11,6 +11,10 @@ import { PlacesMap } from "@/components/places/places-map";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { usePlaces, type PlaceFilters } from "@/hooks/use-places";
+import {
+  normalizeAmenityFilterList,
+  normalizePlaceTypeFilter,
+} from "@/lib/place-filters";
 
 const DEFAULT_PAGE = 1;
 const DEFAULT_LIMIT = 12;
@@ -19,6 +23,13 @@ const parsePositiveInt = (value: string | null, fallback: number): number => {
   if (!value) return fallback;
   const parsed = Number.parseInt(value, 10);
   if (Number.isNaN(parsed) || parsed <= 0) return fallback;
+  return parsed;
+};
+
+const parseOptionalInt = (value: string | null): number | undefined => {
+  if (!value) return undefined;
+  const parsed = Number.parseInt(value, 10);
+  if (Number.isNaN(parsed)) return undefined;
   return parsed;
 };
 
@@ -50,23 +61,17 @@ function PlacesContent() {
       search: searchParams.get("search") || undefined,
       city: searchParams.get("city") || undefined,
       district: searchParams.get("district") || undefined,
-      type: searchParams.get("type") || undefined,
+      type: normalizePlaceTypeFilter(searchParams.get("type")),
       category: searchParams.get("category") || undefined,
       season: searchParams.get("season") || undefined,
-      guests: searchParams.get("guests")
-        ? parseInt(searchParams.get("guests") || "0")
-        : undefined,
+      guests: parseOptionalInt(searchParams.get("guests")),
       checkIn: searchParams.get("checkIn") || undefined,
       checkOut: searchParams.get("checkOut") || undefined,
-      priceMin: searchParams.get("priceMin")
-        ? parseInt(searchParams.get("priceMin") || "0")
-        : undefined,
-      priceMax: searchParams.get("priceMax")
-        ? parseInt(searchParams.get("priceMax") || "0")
-        : undefined,
+      priceMin: parseOptionalInt(searchParams.get("priceMin")),
+      priceMax: parseOptionalInt(searchParams.get("priceMax")),
       sort: searchParams.get("sort") || "recommended",
       amenities: searchParams.get("amenities")
-        ? searchParams.get("amenities")!.split(",")
+        ? normalizeAmenityFilterList(searchParams.get("amenities")!.split(","))
         : undefined,
       featured: searchParams.get("featured") === "true" || undefined,
       verified: searchParams.get("verified") === "true" || undefined,
@@ -129,6 +134,7 @@ function PlacesContent() {
 
         if (
           value === undefined ||
+          value === false ||
           value === "" ||
           (Array.isArray(value) && value.length === 0)
         ) {
@@ -146,9 +152,10 @@ function PlacesContent() {
   );
 
   const handleTypeChange = (type: string | undefined) => {
-    const newFilters = { ...filters, type, page: DEFAULT_PAGE };
+    const normalizedType = normalizePlaceTypeFilter(type);
+    const newFilters = { ...filters, type: normalizedType, page: DEFAULT_PAGE };
     setFilters(newFilters);
-    updateUrl({ type, page: DEFAULT_PAGE });
+    updateUrl({ type: normalizedType, page: DEFAULT_PAGE });
   };
 
   const handlePriceChange = (
@@ -161,14 +168,15 @@ function PlacesContent() {
   };
 
   const handleAmenitiesChange = (amenities: string[]) => {
+    const normalizedAmenities = normalizeAmenityFilterList(amenities);
     const newFilters = {
       ...filters,
-      amenities: amenities.length > 0 ? amenities : undefined,
+      amenities: normalizedAmenities.length > 0 ? normalizedAmenities : undefined,
       page: DEFAULT_PAGE,
     };
     setFilters(newFilters);
     updateUrl({
-      amenities: amenities.length > 0 ? amenities : undefined,
+      amenities: normalizedAmenities.length > 0 ? normalizedAmenities : undefined,
       page: DEFAULT_PAGE,
     });
   };
@@ -190,24 +198,24 @@ function PlacesContent() {
     featuredOnly?: boolean;
     verifiedOnly?: boolean;
   }) => {
+    const normalizedType = normalizePlaceTypeFilter(modalFilters.type);
+    const normalizedAmenities = normalizeAmenityFilterList(modalFilters.amenities);
     const newFilters: PlaceFilters = {
       ...filters,
-      type: modalFilters.type,
+      type: normalizedType,
       priceMin: modalFilters.minPrice,
       priceMax: modalFilters.maxPrice,
-      amenities:
-        modalFilters.amenities.length > 0 ? modalFilters.amenities : undefined,
+      amenities: normalizedAmenities.length > 0 ? normalizedAmenities : undefined,
       featured: modalFilters.featuredOnly,
       verified: modalFilters.verifiedOnly,
       page: DEFAULT_PAGE,
     };
     setFilters(newFilters);
     updateUrl({
-      type: modalFilters.type,
+      type: normalizedType,
       priceMin: modalFilters.minPrice,
       priceMax: modalFilters.maxPrice,
-      amenities:
-        modalFilters.amenities.length > 0 ? modalFilters.amenities : undefined,
+      amenities: normalizedAmenities.length > 0 ? normalizedAmenities : undefined,
       featured: modalFilters.featuredOnly,
       verified: modalFilters.verifiedOnly,
       page: DEFAULT_PAGE,

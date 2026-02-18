@@ -17,6 +17,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { PlanEntitlement } from "@/types/subscriptions"
+import {
+  formatLimit,
+  getBlogUsageSummary,
+  getMonetizedPlaceUsageSummary,
+  getVisitLocationUsageSummary,
+} from "@/lib/subscription-entitlements"
 
 interface PlanOption {
   id: string
@@ -24,6 +31,7 @@ interface PlanOption {
   price: string | number
   maxPlaces: number
   maxBlogs: number
+  entitlements?: PlanEntitlement[]
 }
 
 interface SubscriptionDetail {
@@ -114,6 +122,15 @@ export default function SubscriptionEditPage() {
     () => plans.find((item) => item.id === formData.planId),
     [formData.planId, plans],
   )
+  const selectedPlanMonetized = getMonetizedPlaceUsageSummary(
+    selectedPlan?.entitlements,
+    {},
+  )
+  const selectedPlanVisit = getVisitLocationUsageSummary(
+    selectedPlan?.entitlements,
+    {},
+  )
+  const selectedPlanBlog = getBlogUsageSummary(selectedPlan?.entitlements, {})
 
   const handleSave = async () => {
     if (!formData.planId || !formData.status || !formData.startDate || !formData.endDate) {
@@ -291,7 +308,19 @@ export default function SubscriptionEditPage() {
                   }).format(Number(selectedPlan.price))}
                 </p>
                 <p className="text-muted-foreground">
-                  Limit: {selectedPlan.maxPlaces} mekan / {selectedPlan.maxBlogs} blog
+                  Ücretli Mekanlar:{" "}
+                  {formatLimit(
+                    selectedPlanMonetized.max,
+                    selectedPlanMonetized.isUnlimited,
+                  )}
+                </p>
+                <p className="text-muted-foreground">
+                  Gezi Lokasyonları:{" "}
+                  {formatLimit(selectedPlanVisit.max, selectedPlanVisit.isUnlimited)}
+                </p>
+                <p className="text-muted-foreground">
+                  Blog Yazıları:{" "}
+                  {formatLimit(selectedPlanBlog.max, selectedPlanBlog.isUnlimited)}
                 </p>
               </CardContent>
             </Card>

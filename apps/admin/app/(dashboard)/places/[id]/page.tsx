@@ -1,12 +1,10 @@
 "use client"
 
-import { usePlace, useTogglePlaceFeature, useTogglePlaceVerify, useUpdatePlaceStatus, Place } from "@/hooks/use-places"
+import { usePlace, useTogglePlaceFeature, useTogglePlaceVerify, useUpdatePlaceStatus } from "@/hooks/use-places"
 import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { CalendarDays, MapPin, MoreHorizontal, CheckCircle2, Star, EyeIcon, BookOpen, User, FileText, Download, ExternalLink } from "lucide-react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { MapPin, MoreHorizontal, CheckCircle2, Star, EyeIcon, BookOpen, User, FileText, Download, ExternalLink } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,6 +18,7 @@ import Link from "next/link"
 import { formatDistanceToNow } from "date-fns"
 import { tr } from "date-fns/locale"
 import { toast } from "sonner"
+import { getPlaceKindLabel, resolvePlaceKindFromPlace } from "@/components/places/place-kind"
 
 const statusLabels: Record<string, string> = {
   active: "Aktif",
@@ -285,12 +284,13 @@ export default function PlaceDetailPage() {
                 <CardContent>
                     <div className="grid grid-cols-2 gap-2">
                         <div className="flex flex-col">
-                            <span className="text-xs text-muted-foreground">Tip</span>
-                            <span className="font-medium capitalize">{place.type}</span>
-                        </div>
-                        <div className="flex flex-col">
-                             <span className="text-xs text-muted-foreground">Kategori</span>
-                             <span className="font-medium capitalize">{place.category}</span>
+                            <span className="text-xs text-muted-foreground">Tür</span>
+                            <span className="font-medium">
+                              {getPlaceKindLabel(
+                                resolvePlaceKindFromPlace(place),
+                                place.kindName || place.category,
+                              )}
+                            </span>
                         </div>
                         <div className="flex flex-col">
                              <span className="text-xs text-muted-foreground">Fiyat Seviyesi</span>

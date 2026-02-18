@@ -42,6 +42,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Checkbox } from "@/components/ui/checkbox"
 import { Progress } from "@/components/ui/progress"
 import { Subscription } from "@/types/subscriptions"
+import {
+  formatLimit,
+  getBlogUsageSummary,
+  getMonetizedPlaceUsageSummary,
+  getVisitLocationUsageSummary,
+} from "@/lib/subscription-entitlements"
 
 interface SubscriptionsTableProps {
   initialData: Subscription[];
@@ -167,8 +173,8 @@ export function SubscriptionsTable({ initialData }: SubscriptionsTableProps) {
     }
   }
 
-  const getUsagePercentage = (current: number, max: number) => {
-    if (max === -1) return 0 // unlimited
+  const getUsagePercentage = (current: number, max: number | null, isUnlimited: boolean) => {
+    if (isUnlimited || max === null || max <= 0) return 0
     return Math.min((current / max) * 100, 100)
   }
 
@@ -303,42 +309,42 @@ export function SubscriptionsTable({ initialData }: SubscriptionsTableProps) {
       header: "Kullanım",
       cell: ({ row }) => {
         const subscription = row.original
-        const { usage, limits } = subscription
+        const entitlements = subscription.entitlements
+        const usageByResource = subscription.usage.resources
+        const monetized = getMonetizedPlaceUsageSummary(entitlements, usageByResource)
+        const visit = getVisitLocationUsageSummary(entitlements, usageByResource)
+        const blog = getBlogUsageSummary(entitlements, usageByResource)
+
+        const renderUsageBlock = (
+          label: string,
+          summary: { current: number; max: number | null; isUnlimited: boolean },
+        ) => {
+          const percentage = getUsagePercentage(
+            summary.current,
+            summary.max,
+            summary.isUnlimited,
+          )
+
+          return (
+            <div className="space-y-1">
+              <div className="flex justify-between text-xs">
+                <span>{label}</span>
+                <span className={getUsageColor(percentage)}>
+                  {summary.current} / {formatLimit(summary.max, summary.isUnlimited)}
+                </span>
+              </div>
+              {!summary.isUnlimited && summary.max !== null && summary.max > 0 ? (
+                <Progress value={percentage} className="h-1" />
+              ) : null}
+            </div>
+          )
+        }
 
         return (
           <div className="space-y-2 min-w-[200px]">
-            {/* Places Usage */}
-            <div className="space-y-1">
-              <div className="flex justify-between text-xs">
-                <span>Mekanlar</span>
-                <span className={getUsageColor(getUsagePercentage(usage.currentPlaces, limits.maxPlaces))}>
-                  {usage.currentPlaces} / {limits.maxPlaces === -1 ? "∞" : limits.maxPlaces}
-                </span>
-              </div>
-              {limits.maxPlaces !== -1 && (
-                <Progress
-                  value={getUsagePercentage(usage.currentPlaces, limits.maxPlaces)}
-                  className="h-1"
-                />
-              )}
-            </div>
-
-            {/* Blogs Usage */}
-            <div className="space-y-1">
-              <div className="flex justify-between text-xs">
-                <span>Blog Yazıları</span>
-                <span className={getUsageColor(getUsagePercentage(usage.currentBlogs, limits.maxBlogs))}>
-                  {usage.currentBlogs} / {limits.maxBlogs === -1 ? "∞" : limits.maxBlogs}
-                </span>
-              </div>
-              {limits.maxBlogs !== -1 && (
-                <Progress
-                  value={getUsagePercentage(usage.currentBlogs, limits.maxBlogs)}
-                  className="h-1"
-                />
-              )}
-            </div>
-
+            {renderUsageBlock("Ücretli Mekanlar", monetized)}
+            {renderUsageBlock("Gezi Lokasyonları", visit)}
+            {renderUsageBlock("Blog Yazıları", blog)}
           </div>
         )
       },

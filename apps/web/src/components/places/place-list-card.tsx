@@ -5,40 +5,14 @@ import Image from "next/image";
 import Link from "next/link";
 import type { Route } from "next";
 
+import {
+  getPlaceKindLabel,
+  getPlacePriceUnitLabel,
+} from "@/lib/place-kind";
+import { getPlaceFeatureLabel } from "@/lib/place-feature";
 import { useLocalizedFormatting } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import type { PlaceSummary } from "@/types";
-
-const PLACE_TYPE_LABELS: Record<string, string> = {
-  stay: "Konaklama",
-  hotel: "Otel",
-  experience: "Deneyim",
-  restaurant: "Restoran",
-  cafe: "Kafe",
-  activity: "Aktivite",
-  attraction: "Gezi Yeri",
-};
-
-const AMENITY_LABELS: Record<string, string> = {
-  wifi: "Wifi",
-  parking: "Otopark",
-  free_parking: "Ücretsiz Otopark",
-  pool: "Havuz",
-  kitchen: "Mutfak",
-  air_conditioning: "Klima",
-  washer: "Çamaşır Makinesi",
-  dryer: "Kurutma Makinesi",
-  tv: "TV",
-  breakfast: "Kahvaltı",
-  spa: "Spa",
-  gym: "Spor Salonu",
-  sea_view: "Deniz Manzarası",
-  beach_access: "Plaj Erişimi",
-  balcony: "Balkon",
-  terrace: "Teras",
-  garden: "Bahçe",
-  pet_friendly: "Evcil Hayvan Dostu",
-};
 
 type PlaceListCardProps = {
   place: PlaceSummary;
@@ -57,14 +31,13 @@ export function PlaceListCard({
 }: PlaceListCardProps) {
   const { formatPrice } = useLocalizedFormatting();
 
-  const typeLabel = PLACE_TYPE_LABELS[place.type] ?? place.type;
+  const kindLabel = getPlaceKindLabel(place.kindName || place.kindSlug || place.kind, place.type);
+  const hasPrice = Number(place.nightlyPrice) > 0;
+  const priceUnitLabel = getPlacePriceUnitLabel(place.kind);
   const displayedAmenities = (place.features ?? [])
     .slice(0, 3)
-    .map(
-      (f) =>
-        AMENITY_LABELS[f] ||
-        f.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase()),
-    );
+    .map((feature) => getPlaceFeatureLabel(feature))
+    .filter(Boolean);
 
   return (
     <Link
@@ -110,7 +83,7 @@ export function PlaceListCard({
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1 space-y-1">
               <p className="text-sm text-gray-500">
-                {typeLabel} - {place.city}
+                {kindLabel} - {place.city}
               </p>
               <h3 className="text-lg font-medium text-gray-800 group-hover:text-gray-900 lg:text-xl">
                 {place.name}
@@ -151,12 +124,16 @@ export function PlaceListCard({
           </div>
 
           {/* Price */}
-          <div className="flex items-baseline gap-1">
-            <span className="text-lg font-medium text-gray-800">
-              {formatPrice(place.nightlyPrice)}
-            </span>
-            <span className="text-sm text-gray-500">/gece</span>
-          </div>
+          {hasPrice ? (
+            <div className="flex items-baseline gap-1">
+              <span className="text-lg font-medium text-gray-800">
+                {formatPrice(place.nightlyPrice)}
+              </span>
+              <span className="text-sm text-gray-500">{priceUnitLabel}</span>
+            </div>
+          ) : (
+            <span className="text-sm text-gray-500">Fiyat belirtilmedi</span>
+          )}
         </div>
       </div>
     </Link>

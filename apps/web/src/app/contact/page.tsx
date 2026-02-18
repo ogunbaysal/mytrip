@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 export const metadata: Metadata = {
-  title: "İletişim | TatilDesen",
+  title: "İletişim",
   description:
     "TatilDesen ekibiyle iletişime geçin, iş birlikleri ve destek taleplerinizi iletin.",
 };

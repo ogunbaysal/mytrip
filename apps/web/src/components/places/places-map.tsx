@@ -24,6 +24,9 @@ type PlacesMapProps = {
   onPlaceHover?: (placeId: string | null) => void;
   searchAsMove?: boolean;
   onSearchAsMoveChange?: (enabled: boolean) => void;
+  markerMode?: "price" | "pin";
+  showSearchAsMoveToggle?: boolean;
+  initialZoom?: number;
   onBoundsChange?: (bounds: {
     minLat: number;
     minLng: number;

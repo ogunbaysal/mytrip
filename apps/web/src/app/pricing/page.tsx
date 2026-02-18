@@ -17,8 +17,22 @@ interface Plan {
   currency: string;
   billingCycle: "yearly";
   features: string[];
-  maxPlaces: number;
-  maxBlogs: number;
+  entitlements: {
+    resourceKey:
+      | "place.hotel"
+      | "place.villa"
+      | "place.restaurant"
+      | "place.cafe"
+      | "place.bar_club"
+      | "place.beach"
+      | "place.natural_location"
+      | "place.activity_location"
+      | "place.visit_location"
+      | "place.other_monetized"
+      | "blog.post";
+    limitCount: number | null;
+    isUnlimited: boolean;
+  }[];
   limits?: {
     maxPlaces: number;
     maxBlogs: number;
@@ -26,6 +40,35 @@ interface Plan {
   active: boolean;
   sortOrder: number;
 }
+
+const PLACE_ENTITLEMENT_ORDER: Array<
+  Exclude<Plan["entitlements"][number]["resourceKey"], "blog.post">
+> = [
+  "place.hotel",
+  "place.villa",
+  "place.restaurant",
+  "place.cafe",
+  "place.bar_club",
+  "place.beach",
+  "place.natural_location",
+  "place.activity_location",
+  "place.visit_location",
+  "place.other_monetized",
+];
+
+const RESOURCE_LABELS: Record<Plan["entitlements"][number]["resourceKey"], string> = {
+  "place.hotel": "Oteller",
+  "place.villa": "Villalar",
+  "place.restaurant": "Restoranlar",
+  "place.cafe": "Kafeler",
+  "place.bar_club": "Barlar / Kulüpler",
+  "place.beach": "Plajlar",
+  "place.natural_location": "Doğal Lokasyonlar",
+  "place.activity_location": "Aktivite Lokasyonları",
+  "place.visit_location": "Gezi Lokasyonları",
+  "place.other_monetized": "Diğer Ücretli Lokasyonlar",
+  "blog.post": "Blog Yazıları",
+};
 
 export default function PricingPage() {
   const router = useRouter();
@@ -63,6 +106,19 @@ export default function PricingPage() {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });
+  };
+
+  const getEntitlement = (
+    plan: Plan,
+    resourceKey: Plan["entitlements"][number]["resourceKey"],
+  ) => plan.entitlements?.find((item) => item.resourceKey === resourceKey);
+
+  const formatEntitlementLimit = (
+    entitlement: Plan["entitlements"][number] | undefined,
+  ) => {
+    if (!entitlement) return "0";
+    if (entitlement.isUnlimited || entitlement.limitCount === null) return "∞";
+    return String(entitlement.limitCount);
   };
 
   return (
@@ -123,20 +179,38 @@ export default function PricingPage() {
                     </div>
 
                     <div className="space-y-2 text-sm">
-                      <div className="flex items-start gap-3">
-                        <span className="font-semibold">
-                          {plan.maxPlaces}
-                        </span>
-                        <span className="text-muted-foreground">mekan</span>
-                      </div>
-                      <div className="flex items-start gap-3">
-                        <span className="font-semibold">
-                          {plan.maxBlogs}
-                        </span>
+                      {PLACE_ENTITLEMENT_ORDER.map((resourceKey) => {
+                        const entitlement = getEntitlement(plan, resourceKey);
+                        const isVisitResource = resourceKey === "place.visit_location";
+
+                        return (
+                          <div
+                            key={resourceKey}
+                            className="flex items-start justify-between gap-3"
+                          >
+                            <span className="text-muted-foreground">
+                              {RESOURCE_LABELS[resourceKey]}
+                            </span>
+                            <span
+                              className={`font-semibold ${isVisitResource ? "text-emerald-600" : ""}`}
+                            >
+                              {formatEntitlementLimit(entitlement)}
+                            </span>
+                          </div>
+                        );
+                      })}
+                      <div className="flex items-start justify-between gap-3 border-t pt-2">
                         <span className="text-muted-foreground">
-                          blog yazısı
+                          {RESOURCE_LABELS["blog.post"]}
+                        </span>
+                        <span className="font-semibold">
+                          {formatEntitlementLimit(getEntitlement(plan, "blog.post"))}
                         </span>
                       </div>
+
+                      <p className="pt-1 text-xs text-emerald-700">
+                        Gezi lokasyonları tüm planlarda sınırsızdır.
+                      </p>
                     </div>
                   </div>
 
@@ -162,7 +236,17 @@ export default function PricingPage() {
                     >
                       {isSessionLoading
                         ? "Kontrol ediliyor..."
-                        : plan.maxPlaces === 0
+                        : plan.entitlements
+                              .filter(
+                                (item) =>
+                                  item.resourceKey.startsWith("place.") &&
+                                  item.resourceKey !== "place.visit_location",
+                              )
+                              .every(
+                                (item) =>
+                                  !item.isUnlimited &&
+                                  (item.limitCount === null || item.limitCount <= 0),
+                              )
                           ? "İletişime Geç"
                           : "Planı Seç"}
                       <ArrowRight className="ml-2 size-4" />

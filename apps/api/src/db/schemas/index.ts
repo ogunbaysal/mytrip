@@ -15,6 +15,10 @@ export * from "./locations.ts";
 // ============================================================================
 
 export * from "./places.ts";
+export * from "./place-profiles.ts";
+export * from "./place-hotel.ts";
+export * from "./place-dining.ts";
+export * from "./place-activity.ts";
 export * from "./bookings.ts";
 export * from "./collections.ts";
 export * from "./blog.ts";
@@ -23,7 +27,9 @@ export {
   billingCycleEnum,
   couponDiscountTypeEnum,
   couponScopeEnum,
+  planResourceKeyEnum,
   subscriptionPlan,
+  subscriptionPlanEntitlement,
   subscriptionPlanFeature,
   subscription,
   payment,
@@ -34,6 +40,8 @@ export {
   businessProfile,
   type SubscriptionPlan,
   type NewSubscriptionPlan,
+  type SubscriptionPlanEntitlement,
+  type NewSubscriptionPlanEntitlement,
   type SubscriptionPlanFeature,
   type NewSubscriptionPlanFeature,
   type Subscription,

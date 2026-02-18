@@ -16,6 +16,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { PlanEntitlement } from "@/types/subscriptions"
+import {
+  formatLimit,
+  getBlogUsageSummary,
+  getMonetizedPlaceUsageSummary,
+  getVisitLocationUsageSummary,
+} from "@/lib/subscription-entitlements"
 
 interface UserOption {
   id: string
@@ -30,6 +37,7 @@ interface PlanOption {
   currency: "TRY" | "USD" | "EUR"
   maxPlaces: number
   maxBlogs: number
+  entitlements: PlanEntitlement[]
 }
 
 export default function CreateSubscriptionPage() {
@@ -81,6 +89,7 @@ export default function CreateSubscriptionPage() {
               currency: "TRY" | "USD" | "EUR"
               maxPlaces: number
               maxBlogs: number
+              entitlements?: PlanEntitlement[]
             }) => ({
               id: item.id,
               name: item.name,
@@ -88,6 +97,7 @@ export default function CreateSubscriptionPage() {
               currency: item.currency,
               maxPlaces: item.maxPlaces,
               maxBlogs: item.maxBlogs,
+              entitlements: item.entitlements ?? [],
             }),
           ),
         )
@@ -110,6 +120,15 @@ export default function CreateSubscriptionPage() {
     () => plans.find((item) => item.id === formData.planId),
     [formData.planId, plans],
   )
+  const selectedPlanMonetized = getMonetizedPlaceUsageSummary(
+    selectedPlan?.entitlements,
+    {},
+  )
+  const selectedPlanVisit = getVisitLocationUsageSummary(
+    selectedPlan?.entitlements,
+    {},
+  )
+  const selectedPlanBlog = getBlogUsageSummary(selectedPlan?.entitlements, {})
 
   const handleSubmit = async () => {
     if (!formData.userId || !formData.planId) {
@@ -240,8 +259,19 @@ export default function CreateSubscriptionPage() {
                       <span className="text-muted-foreground">Plan:</span> {selectedPlan.name}
                     </p>
                     <p>
-                      <span className="text-muted-foreground">Limitler:</span>{" "}
-                      {selectedPlan.maxPlaces} mekan / {selectedPlan.maxBlogs} blog
+                      <span className="text-muted-foreground">Ücretli Mekanlar:</span>{" "}
+                      {formatLimit(
+                        selectedPlanMonetized.max,
+                        selectedPlanMonetized.isUnlimited,
+                      )}
+                    </p>
+                    <p>
+                      <span className="text-muted-foreground">Gezi Lokasyonları:</span>{" "}
+                      {formatLimit(selectedPlanVisit.max, selectedPlanVisit.isUnlimited)}
+                    </p>
+                    <p>
+                      <span className="text-muted-foreground">Blog Yazıları:</span>{" "}
+                      {formatLimit(selectedPlanBlog.max, selectedPlanBlog.isUnlimited)}
                     </p>
                   </>
                 )}

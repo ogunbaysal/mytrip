@@ -5,8 +5,22 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1770425250109,
-      "tag": "0000_lowly_the_renegades",
+      "when": 1771191671128,
+      "tag": "0000_lowly_spacker_dave",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1771196022744,
+      "tag": "0001_petite_shocker",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1771196138624,
+      "tag": "0002_ambiguous_tinkerer",
       "breakpoints": true
     }
   ]

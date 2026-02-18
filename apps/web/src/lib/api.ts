@@ -4,11 +4,17 @@ import type {
   PlaceTypeSummary,
   PlaceDetail,
   PlaceAmenity,
+  PlaceReview,
   BlogComment,
   BlogPost,
   BlogPostDetail,
   CollectionDetail,
 } from "@/types";
+import {
+  getPlaceFeatureIcon,
+  getPlaceFeatureLabel,
+  getUniquePlaceFeatureLabels,
+} from "@/lib/place-feature";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL || "https://api.tatildesen.com";
@@ -189,8 +195,13 @@ type APIPlace = {
   id: string;
   slug: string;
   name: string;
+  kind?: string | null;
+  kindSlug?: string | null;
+  kindName?: string | null;
   type: string;
   category: string | null;
+  categorySlug?: string | null;
+  categoryName?: string | null;
   description: string | null;
   shortDescription: string | null;
   address: string | null;
@@ -217,6 +228,83 @@ type APIPlace = {
   ownerCreatedAt?: string | Date | null;
 };
 
+type RecordLike = Record<string, unknown>;
+
+type OwnerPlaceKind = {
+  id: string;
+  name: string;
+  slug: string;
+  icon?: string | null;
+  description?: string | null;
+  monetized?: boolean;
+  supportsRooms?: boolean;
+  supportsMenu?: boolean;
+  supportsPackages?: boolean;
+};
+
+type OwnerPlaceBusinessDocument = {
+  id: string;
+  filename: string;
+  mimeType: string;
+  size: number;
+  url: string;
+  uploadedById: string;
+  usage: string;
+  createdAt: string | Date;
+};
+
+type OwnerPlace = {
+  id: string;
+  slug: string;
+  name: string;
+  kind: string;
+  kindSlug: string | null;
+  kindName: string | null;
+  type: string;
+  category: string;
+  categoryId: string;
+  categorySlug: string | null;
+  categoryName: string | null;
+  description: string | null;
+  shortDescription: string | null;
+  address: string | null;
+  cityId: string | null;
+  districtId: string | null;
+  city: string;
+  district: string;
+  location: string | object | null;
+  contactInfo: string | object | null;
+  rating: string | null;
+  reviewCount: number;
+  priceLevel: string | null;
+  nightlyPrice: string | null;
+  status: string;
+  verified: boolean;
+  featured: boolean;
+  ownerId: string;
+  views: number;
+  bookingCount: number;
+  openingHours: string | object | null;
+  checkInInfo: string | object | null;
+  checkOutInfo: string | object | null;
+  createdAt: string | Date;
+  updatedAt: string | Date;
+  images: string[];
+  features: string[];
+  businessDocumentFileId?: string | null;
+  businessDocument?: OwnerPlaceBusinessDocument | null;
+};
+
+type OwnerPlaceListResponse = {
+  places: OwnerPlace[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+};
+
 function safelyParseJSON<T>(
   input: string | object | null | undefined,
   fallback: T,
@@ -225,33 +313,15 @@ function safelyParseJSON<T>(
   if (typeof input === "object") return input as T;
   try {
     return JSON.parse(input) as T;
-  } catch (e) {
+  } catch {
     return fallback;
   }
 }
 
 function mapFeaturesToAmenities(features: string[]): PlaceAmenity[] {
-  const commonAmenities: Record<string, string> = {
-    wifi: "📶",
-    parking: "🅿️",
-    pool: "🏊",
-    spa: "🧖",
-    gym: "🏋️",
-    restaurant: "🍽️",
-    bar: "🍸",
-    room_service: "🛎️",
-    air_conditioning: "❄️",
-    heating: "🔥",
-    sea_view: "🌊",
-    beach_access: "🏖️",
-    pet_friendly: "🐾",
-    wheelchair_accessible: "♿",
-    family_friendly: "👨‍👩‍👧‍👦",
-  };
-
   return features.map((f) => ({
-    icon: commonAmenities[f] || "✨",
-    label: f.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase()),
+    icon: getPlaceFeatureIcon(f),
+    label: getPlaceFeatureLabel(f),
   }));
 }
 
@@ -300,11 +370,11 @@ function toNullableNumber(value: unknown): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function formatHostJoinedDate(value: APIPlace["ownerCreatedAt"]): string {
-  if (!value) return "Yakın zamanda katıldı";
+function formatHostJoinedDate(value: APIPlace["ownerCreatedAt"]): string | undefined {
+  if (!value) return undefined;
 
   const date = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(date.getTime())) return "Yakın zamanda katıldı";
+  if (Number.isNaN(date.getTime())) return undefined;
 
   return new Intl.DateTimeFormat("tr-TR", {
     month: "long",
@@ -316,14 +386,30 @@ function mapBackendPlaceToSummary(place: APIPlace): PlaceSummary {
   const images = safelyParseJSON<string[]>(place.images, []);
   const location = parseCoordinates(place.location);
   const features = safelyParseJSON<string[]>(place.features, []);
+  const normalizedKindSource =
+    place.kind || place.kindSlug || place.categorySlug || place.category || place.type || "";
+  const normalizedKind = normalizedKindSource.toLowerCase().replace(/-/g, "_");
 
-  let type: PlaceSummary["type"] = "stay";
-  const pType = place.type.toLowerCase();
-  if (["hotel", "stay"].includes(pType)) type = "stay";
-  else if (["restaurant", "cafe"].includes(pType)) type = "restaurant";
-  else type = "experience";
+  const type: PlaceSummary["type"] = [
+    "hotel",
+    "villa",
+  ].includes(normalizedKind)
+    ? "stay"
+    : ["restaurant", "cafe", "bar_club"].includes(normalizedKind)
+      ? "restaurant"
+      : "experience";
 
-  const category: any = place.category?.toLowerCase() || "wellness";
+  const category: PlaceSummary["category"] = ["beach"].includes(normalizedKind)
+    ? "beachfront"
+    : ["hotel", "villa"].includes(normalizedKind)
+      ? "family"
+      : ["restaurant", "cafe", "bar_club"].includes(normalizedKind)
+        ? "gastronomy"
+        : ["activity_location"].includes(normalizedKind)
+          ? "sailing"
+          : ["natural_location", "visit_location"].includes(normalizedKind)
+            ? "design"
+            : "wellness";
 
   return {
     id: place.id,
@@ -337,6 +423,9 @@ function mapBackendPlaceToSummary(place: APIPlace): PlaceSummary {
     city: place.city || "",
     district: place.district || "",
     type,
+    kind: normalizedKind,
+    kindSlug: place.kindSlug || normalizedKind.replace(/_/g, "-"),
+    kindName: place.kindName || place.categoryName || place.category || null,
     category,
     coordinates: location,
     features,
@@ -346,15 +435,27 @@ function mapBackendPlaceToSummary(place: APIPlace): PlaceSummary {
 function mapBackendPlaceToDetail(
   place: APIPlace,
   nearbyPlaces: APIPlace[] = [],
+  recentReviews: PlaceReview[] = [],
 ): PlaceDetail {
   const summary = mapBackendPlaceToSummary(place);
   const images = safelyParseJSON<string[]>(place.images, []);
   const features = safelyParseJSON<string[]>(place.features, []);
+  const openingHours = safelyParseJSON<Record<string, unknown> | null>(
+    place.openingHours,
+    null,
+  );
+  const typeProfile =
+    openingHours && typeof openingHours.typeProfile === "object"
+      ? (openingHours.typeProfile as Record<string, unknown>)
+      : null;
+  const contactInfo = safelyParseJSON<Record<string, unknown> | null>(
+    place.contactInfo,
+    null,
+  );
 
-  const shortHighlights = features.slice(0, 3).map((f) => f.replace(/_/g, " "));
+  const shortHighlights = getUniquePlaceFeatureLabels(features, 4);
   const hostName = place.ownerName?.trim();
-  const hostAvatar =
-    place.ownerAvatar?.trim() || "/images/placeholders/image-error.svg";
+  const hostAvatar = place.ownerAvatar?.trim() || "";
 
   return {
     ...summary,
@@ -363,8 +464,33 @@ function mapBackendPlaceToDetail(
     shortHighlights,
     description: place.description || "",
     amenities: mapFeaturesToAmenities(features),
-    checkInInfo: safelyParseJSON<any>(place.checkInInfo, null)?.checkIn,
-    checkOutInfo: safelyParseJSON<any>(place.checkOutInfo, null)?.checkOut,
+    contactInfo: contactInfo
+      ? {
+          phone:
+            typeof contactInfo.phone === "string"
+              ? contactInfo.phone
+              : undefined,
+          email:
+            typeof contactInfo.email === "string"
+              ? contactInfo.email
+              : undefined,
+          website:
+            typeof contactInfo.website === "string"
+              ? contactInfo.website
+              : undefined,
+        }
+      : null,
+    typeProfile,
+    checkInInfo:
+      safelyParseJSON<Record<string, string | undefined> | null>(
+        place.checkInInfo,
+        null,
+      )?.checkIn,
+    checkOutInfo:
+      safelyParseJSON<Record<string, string | undefined> | null>(
+        place.checkOutInfo,
+        null,
+      )?.checkOut,
     host: hostName
       ? {
           id: place.ownerId || place.id,
@@ -376,6 +502,7 @@ function mapBackendPlaceToDetail(
           isSuperhost: false,
         }
       : undefined,
+    reviews: recentReviews,
     featuredCollections: [],
     nearbyPlaces: nearbyPlaces.map(mapBackendPlaceToSummary),
   };
@@ -612,23 +739,26 @@ export const api = {
         if (params?.page) queryParams.set("page", params.page.toString());
         if (params?.limit) queryParams.set("limit", params.limit.toString());
         if (params?.status) queryParams.set("status", params.status);
-        return await request<{ places: any[]; pagination: any }>(
+        return await request<OwnerPlaceListResponse>(
           `/api/owner/places?${queryParams.toString()}`,
         );
       },
       async getById(id: string) {
-        return await request<{ place: any }>(`/api/owner/places/${id}`);
+        return await request<{ place: OwnerPlace }>(`/api/owner/places/${id}`);
       },
-      async create(data: any) {
+      async create(data: RecordLike) {
         return await request<{
           success: boolean;
-          placeId: string;
           message: string;
-          place: any;
+          place: OwnerPlace | null;
         }>("/api/owner/places", { method: "POST", body: JSON.stringify(data) });
       },
-      async update(id: string, data: any) {
-        return await request<{ success: boolean; message: string; place: any }>(
+      async update(id: string, data: RecordLike) {
+        return await request<{
+          success: boolean;
+          message: string;
+          place: OwnerPlace | null;
+        }>(
           `/api/owner/places/${id}`,
           { method: "PUT", body: JSON.stringify(data) },
         );
@@ -647,13 +777,14 @@ export const api = {
       },
       async categories() {
         return await request<{
-          categories: {
-            id: string;
-            name: string;
-            slug: string;
-            icon?: string | null;
-          }[];
+          categories: OwnerPlaceKind[];
+          kinds?: OwnerPlaceKind[];
         }>("/api/owner/places/categories");
+      },
+      async kinds() {
+        return await request<{
+          kinds: OwnerPlaceKind[];
+        }>("/api/owner/places/kinds");
       },
       async cities() {
         return await request<{
@@ -665,6 +796,91 @@ export const api = {
           city: { id: string; name: string } | null;
           districts: { id: string; name: string; slug: string }[];
         }>(`/api/owner/places/districts/${cityId}`);
+      },
+      async listRooms(placeId: string) {
+        return await request<{ rooms: RecordLike[] }>(
+          `/api/owner/places/${placeId}/rooms`,
+        );
+      },
+      async createRoom(placeId: string, data: RecordLike) {
+        return await request<{ success: boolean; room: RecordLike }>(
+          `/api/owner/places/${placeId}/rooms`,
+          { method: "POST", body: JSON.stringify(data) },
+        );
+      },
+      async updateRoom(placeId: string, roomId: string, data: RecordLike) {
+        return await request<{ success: boolean; room: RecordLike }>(
+          `/api/owner/places/${placeId}/rooms/${roomId}`,
+          { method: "PUT", body: JSON.stringify(data) },
+        );
+      },
+      async deleteRoom(placeId: string, roomId: string) {
+        return await request<{ success: boolean }>(
+          `/api/owner/places/${placeId}/rooms/${roomId}`,
+          { method: "DELETE" },
+        );
+      },
+      async listRoomRates(placeId: string, roomId: string) {
+        return await request<{ rates: RecordLike[] }>(
+          `/api/owner/places/${placeId}/rooms/${roomId}/rates`,
+        );
+      },
+      async createRoomRate(placeId: string, roomId: string, data: RecordLike) {
+        return await request<{ success: boolean; rate: RecordLike }>(
+          `/api/owner/places/${placeId}/rooms/${roomId}/rates`,
+          { method: "POST", body: JSON.stringify(data) },
+        );
+      },
+      async updateRoomRate(
+        placeId: string,
+        roomId: string,
+        rateId: string,
+        data: RecordLike,
+      ) {
+        return await request<{ success: boolean; rate: RecordLike }>(
+          `/api/owner/places/${placeId}/rooms/${roomId}/rates/${rateId}`,
+          { method: "PUT", body: JSON.stringify(data) },
+        );
+      },
+      async deleteRoomRate(placeId: string, roomId: string, rateId: string) {
+        return await request<{ success: boolean }>(
+          `/api/owner/places/${placeId}/rooms/${roomId}/rates/${rateId}`,
+          { method: "DELETE" },
+        );
+      },
+      async getMenu(placeId: string) {
+        return await request<{ menus: RecordLike[] }>(
+          `/api/owner/places/${placeId}/menu`,
+        );
+      },
+      async upsertMenu(placeId: string, data: RecordLike) {
+        return await request<{ success: boolean; menus: RecordLike[] }>(
+          `/api/owner/places/${placeId}/menu`,
+          { method: "PUT", body: JSON.stringify(data) },
+        );
+      },
+      async listPackages(placeId: string) {
+        return await request<{ packages: RecordLike[] }>(
+          `/api/owner/places/${placeId}/packages`,
+        );
+      },
+      async createPackage(placeId: string, data: RecordLike) {
+        return await request<{ success: boolean; package: RecordLike }>(
+          `/api/owner/places/${placeId}/packages`,
+          { method: "POST", body: JSON.stringify(data) },
+        );
+      },
+      async updatePackage(placeId: string, packageId: string, data: RecordLike) {
+        return await request<{ success: boolean; package: RecordLike }>(
+          `/api/owner/places/${placeId}/packages/${packageId}`,
+          { method: "PUT", body: JSON.stringify(data) },
+        );
+      },
+      async deletePackage(placeId: string, packageId: string) {
+        return await request<{ success: boolean }>(
+          `/api/owner/places/${placeId}/packages/${packageId}`,
+          { method: "DELETE" },
+        );
       },
     },
     blogs: {
@@ -816,7 +1032,34 @@ export const api = {
           queryParams.set("priceMin", params.priceMin.toString());
         if (params?.priceMax !== undefined)
           queryParams.set("priceMax", params.priceMax.toString());
-        if (params?.sort) queryParams.set("sort", params.sort);
+        const normalizedSort = params?.sort?.trim().toLowerCase();
+        if (normalizedSort) {
+          if (["newest", "created_desc", "recent"].includes(normalizedSort)) {
+            queryParams.set("sortBy", "createdAt");
+            queryParams.set("sortOrder", "desc");
+          } else if (["oldest", "created_asc"].includes(normalizedSort)) {
+            queryParams.set("sortBy", "createdAt");
+            queryParams.set("sortOrder", "asc");
+          } else if (
+            ["price_asc", "priceasc", "price-low-to-high"].includes(normalizedSort)
+          ) {
+            queryParams.set("sortBy", "price");
+            queryParams.set("sortOrder", "asc");
+          } else if (
+            ["price_desc", "pricedesc", "price-high-to-low"].includes(normalizedSort)
+          ) {
+            queryParams.set("sortBy", "price");
+            queryParams.set("sortOrder", "desc");
+          } else if (["rating", "rating_desc", "top-rated"].includes(normalizedSort)) {
+            queryParams.set("sortBy", "rating");
+            queryParams.set("sortOrder", "desc");
+          } else if (
+            ["popular", "reviews", "review_count"].includes(normalizedSort)
+          ) {
+            queryParams.set("sortBy", "reviewCount");
+            queryParams.set("sortOrder", "desc");
+          }
+        }
         if (params?.amenities && params.amenities.length > 0) {
           queryParams.set("amenities", params.amenities.join(","));
         }
@@ -942,11 +1185,36 @@ export const api = {
         const response = await request<{
           place: APIPlace;
           nearbyPlaces: APIPlace[];
+          recentReviews?: {
+            id: string;
+            rating: number;
+            title: string | null;
+            content: string | null;
+            createdAt: string;
+            userName: string;
+            userAvatar: string | null;
+          }[];
         } | null>(`/api/places/${slug}`);
         if (!response || !response.place) return null;
+        const mappedReviews: PlaceReview[] = (response.recentReviews ?? [])
+          .filter((review) => review.content || review.title)
+          .map((review) => ({
+            id: review.id,
+            rating: Number(review.rating || 0),
+            comment: review.content || review.title || "",
+            date: new Intl.DateTimeFormat("tr-TR", {
+              month: "long",
+              year: "numeric",
+            }).format(new Date(review.createdAt)),
+            author: {
+              name: review.userName,
+              avatar: review.userAvatar || "",
+            },
+          }));
         return mapBackendPlaceToDetail(
           response.place,
           response.nearbyPlaces || [],
+          mappedReviews,
         );
       } catch (error) {
         console.error(`Failed to fetch place by slug ${slug}:`, error);

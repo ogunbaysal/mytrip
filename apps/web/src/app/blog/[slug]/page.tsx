@@ -32,14 +32,14 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
   if (!data || !data.blogPost) {
     return {
-        title: "Blog | TatilDesen",
+        title: "Blog",
     };
   }
   
   const { blogPost: detail } = data;
 
   return {
-    title: `${detail.title} | TatilDesen Blog`,
+    title: detail.title,
     description: detail.seoDescription || detail.excerpt,
   };
 }

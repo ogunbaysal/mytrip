@@ -6,6 +6,10 @@ import { useRef, useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useAmenities } from "@/hooks/use-amenities";
+import {
+  normalizeAmenityFilterKey,
+  normalizeAmenityFilterList,
+} from "@/lib/place-filters";
 import { cn } from "@/lib/utils";
 
 import { AmenityToggle } from "./amenity-toggle";
@@ -63,20 +67,29 @@ export function PlacesFilterBar({
   }, [amenities]);
 
   const toggleAmenity = (key: string) => {
-    if (selectedAmenities.includes(key)) {
-      onAmenitiesChange(selectedAmenities.filter((a) => a !== key));
+    const normalizedKey = normalizeAmenityFilterKey(key);
+    if (normalizedSelectedAmenitySet.has(normalizedKey)) {
+      onAmenitiesChange(
+        normalizedSelectedAmenities.filter((a) => a !== normalizedKey),
+      );
     } else {
-      onAmenitiesChange([...selectedAmenities, key]);
+      onAmenitiesChange([...normalizedSelectedAmenities, normalizedKey]);
     }
   };
+
+  const normalizedSelectedAmenities = normalizeAmenityFilterList(selectedAmenities);
+  const normalizedSelectedAmenitySet = new Set(normalizedSelectedAmenities);
 
   const activeFiltersCount =
     (selectedType ? 1 : 0) +
     (minPrice !== undefined || maxPrice !== undefined ? 1 : 0) +
-    selectedAmenities.length;
+    normalizedSelectedAmenities.length;
 
   // Show top 10 most common amenities
-  const displayedAmenities = amenities.slice(0, 10);
+  const displayedAmenities = amenities.slice(0, 10).map((amenity) => ({
+    ...amenity,
+    normalizedKey: normalizeAmenityFilterKey(amenity.key),
+  }));
   const mobileAmenities = displayedAmenities.slice(0, 6);
 
   return (
@@ -96,10 +109,10 @@ export function PlacesFilterBar({
         />
         {mobileAmenities.map((amenity) => (
           <AmenityToggle
-            key={amenity.key}
+            key={amenity.normalizedKey}
             label={amenity.label}
-            isSelected={selectedAmenities.includes(amenity.key)}
-            onClick={() => toggleAmenity(amenity.key)}
+            isSelected={normalizedSelectedAmenitySet.has(amenity.normalizedKey)}
+            onClick={() => toggleAmenity(amenity.normalizedKey)}
           />
         ))}
         <Button
@@ -146,10 +159,10 @@ export function PlacesFilterBar({
             <div ref={scrollRef} className="flex items-center gap-2 pb-2">
               {displayedAmenities.map((amenity) => (
                 <AmenityToggle
-                  key={amenity.key}
+                  key={amenity.normalizedKey}
                   label={amenity.label}
-                  isSelected={selectedAmenities.includes(amenity.key)}
-                  onClick={() => toggleAmenity(amenity.key)}
+                  isSelected={normalizedSelectedAmenitySet.has(amenity.normalizedKey)}
+                  onClick={() => toggleAmenity(amenity.normalizedKey)}
                 />
               ))}
             </div>

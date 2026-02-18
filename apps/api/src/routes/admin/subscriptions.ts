@@ -6,6 +6,7 @@ import {
   place,
   subscription,
   subscriptionPlan,
+  subscriptionPlanEntitlement,
   subscriptionPlanFeature,
   user,
 } from "../../db/schemas/index.ts";
@@ -14,6 +15,10 @@ import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
 import { paymentProvider } from "../../lib/payment-provider.ts";
 import { nanoid } from "nanoid";
+import {
+  type PlanResourceKey,
+  resolveResourceKeyForPlaceKind,
+} from "../../lib/plan-entitlements.ts";
 
 const app = new Hono();
 
@@ -63,6 +68,33 @@ const parseNumeric = (value: string | number | null | undefined) => {
   return typeof value === "number" ? value : Number.parseFloat(value);
 };
 
+const RESOURCE_KEYS: PlanResourceKey[] = [
+  "place.hotel",
+  "place.villa",
+  "place.restaurant",
+  "place.cafe",
+  "place.bar_club",
+  "place.beach",
+  "place.natural_location",
+  "place.activity_location",
+  "place.visit_location",
+  "place.other_monetized",
+  "blog.post",
+];
+
+const PLACE_RESOURCE_KEYS = RESOURCE_KEYS.filter((key) =>
+  key.startsWith("place."),
+) as PlanResourceKey[];
+
+const createEmptyUsageResources = (): Record<PlanResourceKey, number> =>
+  RESOURCE_KEYS.reduce(
+    (acc, key) => {
+      acc[key] = 0;
+      return acc;
+    },
+    {} as Record<PlanResourceKey, number>,
+  );
+
 const hydrateSubscriptionRows = async (
   rows: Array<{
     id: string;
@@ -102,33 +134,57 @@ const hydrateSubscriptionRows = async (
   const userIds = Array.from(
     new Set(rows.map((row) => row.user.id).filter((id): id is string => Boolean(id))),
   );
+  const planIds = Array.from(
+    new Set(rows.map((row) => row.plan.id).filter((id): id is string => Boolean(id))),
+  );
 
-  const [placeUsageRows, blogUsageRows] =
-    userIds.length > 0
+  const [placeUsageByKindRows, blogUsageRows, entitlementRows] =
+    userIds.length > 0 || planIds.length > 0
       ? await Promise.all([
-          db
-            .select({
-              userId: place.ownerId,
-              count: sql<number>`COUNT(*)::int`,
-            })
-            .from(place)
-            .where(inArray(place.ownerId, userIds))
-            .groupBy(place.ownerId),
-          db
-            .select({
-              userId: blogPost.authorId,
-              count: sql<number>`COUNT(*)::int`,
-            })
-            .from(blogPost)
-            .where(inArray(blogPost.authorId, userIds))
-            .groupBy(blogPost.authorId),
+          userIds.length > 0
+            ? db
+                .select({
+                  userId: place.ownerId,
+                  kind: place.kind,
+                  count: sql<number>`COUNT(*)::int`,
+                })
+                .from(place)
+                .where(inArray(place.ownerId, userIds))
+                .groupBy(place.ownerId, place.kind)
+            : Promise.resolve([]),
+          userIds.length > 0
+            ? db
+                .select({
+                  userId: blogPost.authorId,
+                  count: sql<number>`COUNT(*)::int`,
+                })
+                .from(blogPost)
+                .where(inArray(blogPost.authorId, userIds))
+                .groupBy(blogPost.authorId)
+            : Promise.resolve([]),
+          planIds.length > 0
+            ? db
+                .select({
+                  planId: subscriptionPlanEntitlement.planId,
+                  resourceKey: subscriptionPlanEntitlement.resourceKey,
+                  limitCount: subscriptionPlanEntitlement.limitCount,
+                  isUnlimited: subscriptionPlanEntitlement.isUnlimited,
+                })
+                .from(subscriptionPlanEntitlement)
+                .where(inArray(subscriptionPlanEntitlement.planId, planIds))
+            : Promise.resolve([]),
         ])
-      : [[], []];
+      : [[], [], []];
 
-  const placeUsageMap = new Map<string, number>();
-  for (const usageRow of placeUsageRows) {
+  const placeUsageByResourceMap = new Map<string, Record<PlanResourceKey, number>>();
+  for (const usageRow of placeUsageByKindRows) {
     if (usageRow.userId) {
-      placeUsageMap.set(usageRow.userId, usageRow.count);
+      const resourceKey = resolveResourceKeyForPlaceKind(usageRow.kind);
+      if (!placeUsageByResourceMap.has(usageRow.userId)) {
+        placeUsageByResourceMap.set(usageRow.userId, createEmptyUsageResources());
+      }
+      const currentByResource = placeUsageByResourceMap.get(usageRow.userId)!;
+      currentByResource[resourceKey] += usageRow.count;
     }
   }
 
@@ -139,10 +195,47 @@ const hydrateSubscriptionRows = async (
     }
   }
 
+  const entitlementMap = new Map<
+    string,
+    Array<{
+      resourceKey: string;
+      limitCount: number | null;
+      isUnlimited: boolean;
+    }>
+  >();
+  for (const row of entitlementRows) {
+    if (!entitlementMap.has(row.planId)) {
+      entitlementMap.set(row.planId, []);
+    }
+    entitlementMap.get(row.planId)!.push({
+      resourceKey: row.resourceKey,
+      limitCount: row.limitCount,
+      isUnlimited: row.isUnlimited,
+    });
+  }
+
   return rows.map((row) => {
     const usagePayload = parseJsonObject(row.usage) as Record<string, unknown>;
     const paymentPayload = parseJsonObject(row.paymentMethod) as Record<string, unknown>;
     const userId = row.user.id ?? "";
+    const computedUsageResources =
+      placeUsageByResourceMap.get(userId) ?? createEmptyUsageResources();
+    const usageResourcesFromPayload =
+      usagePayload.resources &&
+      typeof usagePayload.resources === "object" &&
+      usagePayload.resources !== null
+        ? (usagePayload.resources as Record<string, unknown>)
+        : {};
+    const usageResources = { ...computedUsageResources };
+
+    for (const key of RESOURCE_KEYS) {
+      const payloadValue = usageResourcesFromPayload[key];
+      if (typeof payloadValue === "number" && Number.isFinite(payloadValue)) {
+        usageResources[key] = payloadValue;
+      }
+    }
+
+    usageResources["blog.post"] = blogUsageMap.get(userId) ?? usageResources["blog.post"];
 
     return {
       ...row,
@@ -159,6 +252,7 @@ const hydrateSubscriptionRows = async (
         billingCycle: "yearly" as const,
         maxPlaces: row.plan.maxPlaces ?? 0,
         maxBlogs: row.plan.maxBlogs ?? 0,
+        entitlements: row.plan.id ? (entitlementMap.get(row.plan.id) ?? []) : [],
       },
       price: parseNumeric(row.price),
       basePrice: parseNumeric(row.basePrice),
@@ -167,11 +261,15 @@ const hydrateSubscriptionRows = async (
         currentPlaces:
           typeof usagePayload.currentPlaces === "number"
             ? usagePayload.currentPlaces
-            : placeUsageMap.get(userId) ?? 0,
+            : PLACE_RESOURCE_KEYS.reduce(
+                (sum, key) => sum + (usageResources[key] ?? 0),
+                0,
+              ),
         currentBlogs:
           typeof usagePayload.currentBlogs === "number"
             ? usagePayload.currentBlogs
-            : blogUsageMap.get(userId) ?? 0,
+            : usageResources["blog.post"] ?? blogUsageMap.get(userId) ?? 0,
+        resources: usageResources,
       },
       paymentMethod:
         Object.keys(paymentPayload).length > 0
