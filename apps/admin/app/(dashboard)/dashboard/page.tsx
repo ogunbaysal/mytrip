@@ -7,9 +7,11 @@ import { useAuth } from "@/hooks/use-auth"
 import { useAnalyticsOverview, useRecentActivity } from "@/hooks/use-analytics"
 import { formatDistanceToNow } from "date-fns"
 import { tr } from "date-fns/locale"
+import { useRouter } from "next/navigation"
 
 export default function DashboardPage() {
   const { user } = useAuth()
+  const router = useRouter()
   const { data: stats, isLoading: isLoadingStats } = useAnalyticsOverview()
   const { data: activities, isLoading: isLoadingActivities } = useRecentActivity()
   
@@ -170,24 +172,44 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="grid gap-2">
-              <button className="flex items-center space-x-3 rounded-lg border p-3 hover:bg-gray-50 transition-colors">
+              <button
+                type="button"
+                onClick={() => router.push("/approvals/places")}
+                className="flex w-full items-center space-x-3 rounded-lg border p-3 hover:bg-gray-50 transition-colors"
+              >
                 <Eye className="h-4 w-4 text-blue-600" />
                 <span className="text-sm font-medium">Bekleyen İçerikleri İncele</span>
                 <Badge variant="secondary">26</Badge>
               </button>
-              <button className="flex items-center space-x-3 rounded-lg border p-3 hover:bg-gray-50 transition-colors">
+              <button
+                type="button"
+                onClick={() => router.push("/users/create")}
+                className="flex w-full items-center space-x-3 rounded-lg border p-3 hover:bg-gray-50 transition-colors"
+              >
                 <Users className="h-4 w-4 text-green-600" />
                 <span className="text-sm font-medium">Yeni Kullanıcı Ekle</span>
               </button>
-              <button className="flex items-center space-x-3 rounded-lg border p-3 hover:bg-gray-50 transition-colors">
+              <button
+                type="button"
+                onClick={() => router.push("/blogs/create")}
+                className="flex w-full items-center space-x-3 rounded-lg border p-3 hover:bg-gray-50 transition-colors"
+              >
                 <FileText className="h-4 w-4 text-purple-600" />
                 <span className="text-sm font-medium">Blog Yazısı Oluştur</span>
               </button>
-              <button className="flex items-center space-x-3 rounded-lg border p-3 hover:bg-gray-50 transition-colors">
+              <button
+                type="button"
+                onClick={() => router.push("/places")}
+                className="flex w-full items-center space-x-3 rounded-lg border p-3 hover:bg-gray-50 transition-colors"
+              >
                 <MapPin className="h-4 w-4 text-orange-600" />
-                <span className="text-sm font-medium">Öne Çıkan Mekanlar</span>
+                <span className="text-sm font-medium">Mekanları Yönet</span>
               </button>
-              <button className="flex items-center space-x-3 rounded-lg border p-3 hover:bg-gray-50 transition-colors">
+              <button
+                type="button"
+                onClick={() => router.push("/reports")}
+                className="flex w-full items-center space-x-3 rounded-lg border p-3 hover:bg-gray-50 transition-colors"
+              >
                 <CreditCard className="h-4 w-4 text-red-600" />
                 <span className="text-sm font-medium">Abonelik Raporları</span>
               </button>

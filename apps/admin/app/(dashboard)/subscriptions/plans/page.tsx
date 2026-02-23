@@ -9,6 +9,7 @@ import { SubscriptionPlan } from "@/types/subscriptions"
 import { DataTable } from "@/components/ui/data-table"
 import { columns } from "./columns"
 import { useRouter } from "next/navigation"
+import { apiFetch } from "@/lib/api"
 
 export default function PlansPage() {
   const router = useRouter()
@@ -17,19 +18,17 @@ export default function PlansPage() {
 
   useEffect(() => {
     const fetchPlans = async () => {
-        try {
-            const res = await fetch("/api/admin/plans");
-            const data = await res.json();
-            if (data.plans) {
-                setPlans(data.plans as SubscriptionPlan[]);
-            }
-        } catch (error) {
-            console.error(error);
-        } finally {
-            setLoading(false);
-        }
+      try {
+        const data = await apiFetch<{ plans: SubscriptionPlan[] }>("/api/admin/plans")
+        setPlans(data.plans ?? [])
+      } catch (error) {
+        console.error("Failed to fetch plans:", error)
+        setPlans([])
+      } finally {
+        setLoading(false)
+      }
     }
-    fetchPlans();
+    fetchPlans()
   }, [])
 
   return (

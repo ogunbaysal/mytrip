@@ -16,7 +16,7 @@ const approveRejectSchema = z.object({
   rejectionReason: z.string().optional(),
 });
 
-app.get("/places", async (c) => {
+app.get("/", async (c) => {
   try {
     const adminUser = getAdminUserFromContext(c);
     if (!adminUser?.id) {
@@ -89,7 +89,7 @@ app.get("/places", async (c) => {
   }
 });
 
-app.get("/places/:id", async (c) => {
+app.get("/:id", async (c) => {
   try {
     const adminUser = getAdminUserFromContext(c);
     if (!adminUser?.id) {
@@ -160,7 +160,7 @@ app.get("/places/:id", async (c) => {
   }
 });
 
-app.put("/places/:id/approve", async (c) => {
+app.put("/:id/approve", async (c) => {
   try {
     const adminUser = getAdminUserFromContext(c);
     if (!adminUser?.id) {
@@ -247,7 +247,7 @@ app.put("/places/:id/approve", async (c) => {
 });
 
 app.put(
-  "/places/:id/reject",
+  "/:id/reject",
   zValidator("json", approveRejectSchema),
   async (c) => {
     try {

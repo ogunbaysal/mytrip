@@ -222,7 +222,7 @@ export function AppSidebar() {
                   className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground w-full justify-start"
                 >
                   <Avatar className="h-8 w-8 rounded-lg">
-                    <AvatarImage src={user?.image || "/avatars/admin.jpg"} alt={user?.name || "Admin"} />
+                    <AvatarImage src={user?.image || undefined} alt={user?.name || "Admin"} />
                     <AvatarFallback className="rounded-lg">{userInitials}</AvatarFallback>
                   </Avatar>
                   <div className="grid flex-1 text-left text-sm leading-tight">
@@ -241,7 +241,7 @@ export function AppSidebar() {
                 <DropdownMenuItem>
                   <div className="flex items-center gap-3">
                     <Avatar className="h-8 w-8 rounded-lg">
-                      <AvatarImage src={user?.image || "/avatars/admin.jpg"} alt={user?.name || "Admin"} />
+                      <AvatarImage src={user?.image || undefined} alt={user?.name || "Admin"} />
                       <AvatarFallback className="rounded-lg">{userInitials}</AvatarFallback>
                     </Avatar>
                     <div className="flex flex-col">
