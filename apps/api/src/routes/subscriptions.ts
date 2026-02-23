@@ -5,6 +5,7 @@ import { and, asc, desc, eq, or, sql } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { db } from "../db/index.ts";
 import {
+  businessRegistration,
   coupon,
   couponPlan,
   couponRedemption,
@@ -21,7 +22,14 @@ import {
   hydratePlansWithFeaturesAndEntitlements,
 } from "../lib/plan-entitlements.ts";
 import { getSessionFromRequest } from "../lib/session.ts";
-import { paymentProvider } from "../lib/payment-provider.ts";
+import {
+  type CreateSubscriptionParams,
+  paymentProvider,
+} from "../lib/payment-provider.ts";
+import {
+  type IyzicoSubscriptionWebhookPayload,
+  verifyIyzicoSubscriptionWebhookSignature,
+} from "../lib/iyzico-webhook.ts";
 
 const app = new Hono();
 
@@ -34,10 +42,30 @@ const paymentMethodSchema = z.object({
   cvc: z.string().min(3).max(4),
 });
 
+const iyzicoAddressSchema = z.object({
+  address: z.string().trim().min(3),
+  zipCode: z.string().trim().min(2),
+  contactName: z.string().trim().min(2),
+  city: z.string().trim().min(2),
+  country: z.string().trim().min(2),
+  district: z.string().trim().min(2),
+});
+
+const iyzicoCustomerSchema = z.object({
+  name: z.string().trim().min(1).optional(),
+  surname: z.string().trim().min(1).optional(),
+  identityNumber: z.string().trim().min(10).max(20).optional(),
+  email: z.string().trim().email().optional(),
+  gsmNumber: z.string().trim().min(10).max(20).optional(),
+  billingAddress: iyzicoAddressSchema.optional(),
+  shippingAddress: iyzicoAddressSchema.optional(),
+});
+
 const createSubscriptionSchema = z.object({
   planId: z.string().min(1),
   couponCode: z.string().trim().min(1).optional(),
   paymentMethod: paymentMethodSchema.optional(),
+  customer: iyzicoCustomerSchema.optional(),
 });
 
 const validateCouponSchema = z.object({
@@ -53,6 +81,190 @@ const roundCurrency = (value: number) => Math.round(value * 100) / 100;
 const parseNumeric = (value: string | number | null | undefined) => {
   if (value === null || value === undefined) return 0;
   return typeof value === "number" ? value : Number.parseFloat(value);
+};
+
+const toAddressString = (value: string | null | undefined) => value?.trim() || null;
+
+const sanitizeCardNumber = (value: string) => value.replace(/\s+/g, "");
+
+const normalizePhoneNumber = (value: string | null | undefined) => {
+  if (!value) return null;
+
+  const normalized = value.replace(/[^\d+]/g, "");
+  if (normalized.startsWith("+")) {
+    return normalized;
+  }
+
+  if (normalized.startsWith("90")) {
+    return `+${normalized}`;
+  }
+
+  if (normalized.startsWith("0")) {
+    return `+9${normalized}`;
+  }
+
+  return `+${normalized}`;
+};
+
+const splitName = (fullName: string | null | undefined) => {
+  const fallback = {
+    name: "Guest",
+    surname: "User",
+  };
+
+  if (!fullName?.trim()) {
+    return fallback;
+  }
+
+  const parts = fullName
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (parts.length === 0) {
+    return fallback;
+  }
+
+  if (parts.length === 1) {
+    return { name: parts[0], surname: "User" };
+  }
+
+  return {
+    name: parts[0],
+    surname: parts.slice(1).join(" "),
+  };
+};
+
+const buildIyzicoCustomerPayload = ({
+  userName,
+  userEmail,
+  userPhone,
+  registrationTaxId,
+  registrationAddress,
+  registrationPhone,
+  requestCustomer,
+}: {
+  userName: string | null;
+  userEmail: string | null;
+  userPhone: string | null;
+  registrationTaxId: string | null;
+  registrationAddress: string | null;
+  registrationPhone: string | null;
+  requestCustomer: z.infer<typeof iyzicoCustomerSchema> | undefined;
+}): {
+  customer: CreateSubscriptionParams["customer"] | null;
+  missingFields: string[];
+} => {
+  const defaultCountry = process.env.IYZICO_DEFAULT_COUNTRY?.trim() || "Turkey";
+  const defaultCity = process.env.IYZICO_DEFAULT_CITY?.trim() || "Istanbul";
+  const defaultDistrict = process.env.IYZICO_DEFAULT_DISTRICT?.trim() || "Kadikoy";
+  const defaultZipCode = process.env.IYZICO_DEFAULT_ZIP_CODE?.trim() || "34742";
+  const defaultAddress =
+    process.env.IYZICO_DEFAULT_ADDRESS?.trim() ||
+    "Nidakule Goztepe, Merdivenkoy Mah. Bora Sok. No:1";
+  const defaultIdentity =
+    process.env.IYZICO_DEFAULT_IDENTITY_NUMBER?.trim() || "11111111111";
+  const defaultGsm = normalizePhoneNumber(process.env.IYZICO_DEFAULT_GSM_NUMBER?.trim());
+
+  const fallbackFullName = splitName(userName);
+  const resolvedName = requestCustomer?.name || fallbackFullName.name;
+  const resolvedSurname = requestCustomer?.surname || fallbackFullName.surname;
+  const resolvedContactName = `${resolvedName} ${resolvedSurname}`.trim();
+  const resolvedEmail = requestCustomer?.email || userEmail || null;
+  const resolvedIdentity =
+    requestCustomer?.identityNumber || registrationTaxId || defaultIdentity;
+  const resolvedGsm =
+    normalizePhoneNumber(requestCustomer?.gsmNumber) ||
+    normalizePhoneNumber(registrationPhone) ||
+    normalizePhoneNumber(userPhone) ||
+    defaultGsm ||
+    null;
+  const resolvedAddressLine =
+    requestCustomer?.billingAddress?.address ||
+    toAddressString(registrationAddress) ||
+    defaultAddress;
+
+  const billingAddress = requestCustomer?.billingAddress ?? {
+    address: resolvedAddressLine,
+    zipCode: defaultZipCode,
+    contactName: resolvedContactName,
+    city: defaultCity,
+    country: defaultCountry,
+    district: defaultDistrict,
+  };
+
+  const shippingAddress = requestCustomer?.shippingAddress ?? {
+    ...billingAddress,
+    contactName:
+      requestCustomer?.shippingAddress?.contactName ||
+      billingAddress.contactName ||
+      resolvedContactName,
+  };
+
+  const missingFields = [
+    !resolvedName ? "customer.name" : null,
+    !resolvedSurname ? "customer.surname" : null,
+    !resolvedIdentity ? "customer.identityNumber" : null,
+    !resolvedEmail ? "customer.email" : null,
+    !resolvedGsm ? "customer.gsmNumber" : null,
+    !billingAddress.address ? "customer.billingAddress.address" : null,
+    !billingAddress.city ? "customer.billingAddress.city" : null,
+    !billingAddress.country ? "customer.billingAddress.country" : null,
+    !billingAddress.district ? "customer.billingAddress.district" : null,
+    !shippingAddress.address ? "customer.shippingAddress.address" : null,
+    !shippingAddress.city ? "customer.shippingAddress.city" : null,
+    !shippingAddress.country ? "customer.shippingAddress.country" : null,
+    !shippingAddress.district ? "customer.shippingAddress.district" : null,
+  ].filter((field): field is string => Boolean(field));
+
+  if (missingFields.length > 0 || !resolvedEmail || !resolvedGsm) {
+    return {
+      customer: null,
+      missingFields,
+    };
+  }
+
+  return {
+    customer: {
+      name: resolvedName,
+      surname: resolvedSurname,
+      identityNumber: resolvedIdentity,
+      email: resolvedEmail,
+      gsmNumber: resolvedGsm,
+      billingAddress,
+      shippingAddress,
+    },
+    missingFields: [],
+  };
+};
+
+const parseWebhookTimestamp = (value: number | null | undefined) => {
+  if (!value || !Number.isFinite(value)) return new Date();
+
+  // Iyzi event time can arrive in seconds or milliseconds depending on integration mode.
+  if (value > 1_000_000_000_000) {
+    return new Date(value);
+  }
+
+  return new Date(value * 1000);
+};
+
+const formatDateOnly = (date: Date) => date.toISOString().split("T")[0];
+
+const addBillingCycle = (
+  date: Date,
+  billingCycle: "monthly" | "quarterly" | "yearly",
+) => {
+  const next = new Date(date);
+  if (billingCycle === "monthly") {
+    next.setMonth(next.getMonth() + 1);
+    return next;
+  }
+  if (billingCycle === "quarterly") {
+    next.setMonth(next.getMonth() + 3);
+    return next;
+  }
+  next.setFullYear(next.getFullYear() + 1);
+  return next;
 };
 
 const calculateCouponDiscount = ({
@@ -162,6 +374,204 @@ const validateCouponForUser = async ({
     normalizedCode,
   };
 };
+
+/**
+ * POST /subscriptions/webhook/iyzico
+ */
+app.post("/webhook/iyzico", async (c) => {
+  try {
+    const payload = (await c.req.json()) as IyzicoSubscriptionWebhookPayload &
+      Record<string, unknown>;
+    const eventType = payload.iyziEventType || payload.eventType || "";
+    const subscriptionReferenceCode = payload.subscriptionReferenceCode?.trim() || "";
+    const orderReferenceCode = payload.orderReferenceCode?.trim() || "";
+    const providerTransactionId =
+      orderReferenceCode || payload.iyziReferenceCode?.trim() || null;
+    const eventDate = parseWebhookTimestamp(payload.iyziEventTime ?? null);
+    const receivedSignature =
+      c.req.header("x-iyz-signature-v3") || c.req.header("X-IYZ-SIGNATURE-V3") || "";
+
+    if (!eventType || !subscriptionReferenceCode) {
+      return c.json(
+        {
+          error: "Invalid webhook payload",
+          message: "eventType and subscriptionReferenceCode are required",
+        },
+        400,
+      );
+    }
+
+    const allowUnsigned = process.env.IYZICO_WEBHOOK_ALLOW_UNSIGNED === "true";
+    const secretKey = process.env.IYZICO_SECRET_KEY?.trim() || "";
+    const merchantId =
+      payload.merchantId?.trim() || process.env.IYZICO_MERCHANT_ID?.trim() || "";
+
+    if (!allowUnsigned) {
+      if (!secretKey || !merchantId) {
+        return c.json(
+          {
+            error: "Webhook verification misconfigured",
+            message:
+              "IYZICO_SECRET_KEY and IYZICO_MERCHANT_ID are required for signature verification",
+          },
+          500,
+        );
+      }
+
+      if (!receivedSignature) {
+        return c.json({ error: "Missing webhook signature" }, 401);
+      }
+
+      const verified = verifyIyzicoSubscriptionWebhookSignature({
+        merchantId,
+        secretKey,
+        payload,
+        signature: receivedSignature,
+      });
+
+      if (!verified) {
+        return c.json({ error: "Invalid webhook signature" }, 401);
+      }
+    }
+
+    if (
+      eventType !== "subscription.order.success" &&
+      eventType !== "subscription.order.failure"
+    ) {
+      return c.json({
+        received: true,
+        ignored: true,
+        reason: "unsupported_event",
+        eventType,
+      });
+    }
+
+    const [targetSubscription] = await db
+      .select({
+        id: subscription.id,
+        userId: subscription.userId,
+        status: subscription.status,
+        price: subscription.price,
+        currency: subscription.currency,
+        billingCycle: subscription.billingCycle,
+        paymentMethod: subscription.paymentMethod,
+        endDate: subscription.endDate,
+        nextBillingDate: subscription.nextBillingDate,
+      })
+      .from(subscription)
+      .where(eq(subscription.providerSubscriptionId, subscriptionReferenceCode))
+      .limit(1);
+
+    if (!targetSubscription) {
+      return c.json({
+        received: true,
+        ignored: true,
+        reason: "subscription_not_found",
+        subscriptionReferenceCode,
+      });
+    }
+
+    if (providerTransactionId) {
+      const [existingPayment] = await db
+        .select({ id: payment.id })
+        .from(payment)
+        .where(
+          and(
+            eq(payment.subscriptionId, targetSubscription.id),
+            eq(payment.providerTransactionId, providerTransactionId),
+          ),
+        )
+        .limit(1);
+
+      if (existingPayment) {
+        return c.json({
+          received: true,
+          duplicate: true,
+          paymentId: existingPayment.id,
+        });
+      }
+    }
+
+    const isSuccess = eventType === "subscription.order.success";
+    const paymentStatus = isSuccess ? "success" : "failed";
+
+    await db.insert(payment).values({
+      id: nanoid(),
+      subscriptionId: targetSubscription.id,
+      userId: targetSubscription.userId,
+      provider: "iyzico",
+      providerTransactionId,
+      amount: targetSubscription.price,
+      currency: targetSubscription.currency,
+      status: paymentStatus,
+      paymentMethod: targetSubscription.paymentMethod,
+      gatewayResponse: JSON.stringify(payload),
+      paidAt: isSuccess ? eventDate : null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    let nextSubscriptionStatus = targetSubscription.status;
+    let nextEndDate = targetSubscription.endDate;
+    let nextBillingDate = targetSubscription.nextBillingDate;
+
+    if (isSuccess) {
+      nextSubscriptionStatus = "active";
+      if (targetSubscription.nextBillingDate) {
+        const currentNextBillingDate = new Date(targetSubscription.nextBillingDate);
+        const renewalThreshold = new Date(currentNextBillingDate);
+        renewalThreshold.setDate(renewalThreshold.getDate() - 3);
+
+        if (eventDate >= renewalThreshold) {
+          const renewedUntil = addBillingCycle(
+            currentNextBillingDate,
+            targetSubscription.billingCycle,
+          );
+          nextEndDate = formatDateOnly(renewedUntil);
+          nextBillingDate = formatDateOnly(renewedUntil);
+        }
+      } else {
+        const baseDate = targetSubscription.endDate
+          ? new Date(targetSubscription.endDate)
+          : eventDate;
+        const renewedUntil = addBillingCycle(baseDate, targetSubscription.billingCycle);
+        nextEndDate = formatDateOnly(renewedUntil);
+        nextBillingDate = formatDateOnly(renewedUntil);
+      }
+    } else if (targetSubscription.status !== "active") {
+      nextSubscriptionStatus = "pending";
+    }
+
+    await db
+      .update(subscription)
+      .set({
+        status: nextSubscriptionStatus,
+        endDate: nextEndDate,
+        nextBillingDate: nextBillingDate,
+        updatedAt: new Date(),
+      })
+      .where(eq(subscription.id, targetSubscription.id));
+
+    await db
+      .update(user)
+      .set({
+        subscriptionStatus: nextSubscriptionStatus,
+        updatedAt: new Date(),
+      })
+      .where(eq(user.id, targetSubscription.userId));
+
+    return c.json({
+      received: true,
+      processed: true,
+      eventType,
+      subscriptionId: targetSubscription.id,
+      providerSubscriptionId: subscriptionReferenceCode,
+    });
+  } catch (error) {
+    console.error("Iyzico webhook error:", error);
+    return c.json({ error: "Webhook processing failed" }, 500);
+  }
+});
 
 /**
  * GET /subscriptions/plans
@@ -308,7 +718,7 @@ app.post("/create", zValidator("json", createSubscriptionSchema), async (c) => {
     }
 
     const userId = session.user.id;
-    const { planId, couponCode, paymentMethod } = c.req.valid("json");
+    const { planId, couponCode, paymentMethod, customer } = c.req.valid("json");
 
     const [plan] = await db
       .select()
@@ -352,6 +762,32 @@ app.post("/create", zValidator("json", createSubscriptionSchema), async (c) => {
       );
     }
 
+    const [[subscriberProfile], [latestBusinessRegistration]] = await Promise.all([
+      db
+        .select({
+          name: user.name,
+          email: user.email,
+          phone: user.phone,
+        })
+        .from(user)
+        .where(eq(user.id, userId))
+        .limit(1),
+      db
+        .select({
+          taxId: businessRegistration.taxId,
+          businessAddress: businessRegistration.businessAddress,
+          contactPhone: businessRegistration.contactPhone,
+        })
+        .from(businessRegistration)
+        .where(eq(businessRegistration.userId, userId))
+        .orderBy(desc(businessRegistration.updatedAt))
+        .limit(1),
+    ]);
+
+    if (!subscriberProfile) {
+      return c.json({ error: "User not found" }, 404);
+    }
+
     const startDate = new Date();
     const endDate = new Date(startDate);
     endDate.setFullYear(endDate.getFullYear() + 1);
@@ -388,28 +824,72 @@ app.post("/create", zValidator("json", createSubscriptionSchema), async (c) => {
       );
     }
 
+    const sanitizedPaymentMethod =
+      finalPrice > 0 && paymentMethod
+        ? {
+            cardHolderName: paymentMethod.cardHolderName,
+            cardNumber: sanitizeCardNumber(paymentMethod.cardNumber),
+            expireMonth: paymentMethod.expireMonth,
+            expireYear: paymentMethod.expireYear,
+            cvc: paymentMethod.cvc,
+          }
+        : undefined;
+
+    const { customer: iyzicoCustomer, missingFields } = buildIyzicoCustomerPayload({
+      userName: subscriberProfile.name,
+      userEmail: subscriberProfile.email,
+      userPhone: subscriberProfile.phone,
+      registrationTaxId: latestBusinessRegistration?.taxId ?? null,
+      registrationAddress: latestBusinessRegistration?.businessAddress ?? null,
+      registrationPhone: latestBusinessRegistration?.contactPhone ?? null,
+      requestCustomer: customer,
+    });
+
+    if (finalPrice > 0 && !iyzicoCustomer) {
+      return c.json(
+        {
+          error: "Missing iyzico customer fields",
+          message: "Abonelik ödemesi için müşteri/fatura bilgileri eksik.",
+          missingFields,
+        },
+        400,
+      );
+    }
+
     let providerSubscriptionId: string | null = null;
-    if (finalPrice > 0 && paymentMethod) {
+    let providerTransactionId: string | null = null;
+    let providerStatus: "active" | "pending" = "active";
+    let providerPayload: unknown = null;
+    const paymentProviderName = finalPrice > 0 ? "iyzico" : "mock";
+
+    if (finalPrice > 0 && sanitizedPaymentMethod && iyzicoCustomer) {
       const paymentResult = await paymentProvider.createSubscription({
         userId,
         planId,
         price: finalPrice,
-        currency: plan.currency,
+        currency: plan.currency as CreateSubscriptionParams["currency"],
         billingCycle: "yearly",
-        paymentCard: paymentMethod,
+        paymentCard: sanitizedPaymentMethod,
+        customer: iyzicoCustomer,
       });
 
       if (paymentResult.status === "failed") {
         return c.json(
           {
             error: "Payment failed",
-            message: "Ödeme işleminiz başarısız oldu. Lütfen tekrar deneyiniz.",
+            message:
+              paymentResult.errorMessage ||
+              "Ödeme işleminiz başarısız oldu. Lütfen tekrar deneyiniz.",
+            details: paymentResult.rawResponse,
           },
           400,
         );
       }
 
       providerSubscriptionId = paymentResult.providerSubscriptionId;
+      providerTransactionId = paymentResult.providerTransactionId;
+      providerStatus = paymentResult.status;
+      providerPayload = paymentResult.rawResponse;
     }
 
     const [newSubscription] = await db
@@ -418,8 +898,8 @@ app.post("/create", zValidator("json", createSubscriptionSchema), async (c) => {
         id: nanoid(),
         userId,
         planId,
-        status: "active",
-        provider: "mock",
+        status: providerStatus,
+        provider: paymentProviderName,
         providerSubscriptionId,
         basePrice: basePrice.toString(),
         discountAmount: discountAmount.toString(),
@@ -432,10 +912,10 @@ app.post("/create", zValidator("json", createSubscriptionSchema), async (c) => {
         endDate: endDate.toISOString().split("T")[0],
         nextBillingDate: nextBillingDate.toISOString().split("T")[0],
         paymentMethod:
-          finalPrice > 0 && paymentMethod
+          finalPrice > 0 && sanitizedPaymentMethod
             ? JSON.stringify({
                 type: "credit_card",
-                lastFour: paymentMethod.cardNumber.slice(-4),
+                lastFour: sanitizedPaymentMethod.cardNumber.slice(-4),
               })
             : JSON.stringify({
                 type: "coupon",
@@ -446,29 +926,35 @@ app.post("/create", zValidator("json", createSubscriptionSchema), async (c) => {
       })
       .returning();
 
+    const paymentStatus =
+      finalPrice > 0 ? (providerStatus === "pending" ? "pending" : "success") : "success";
+
     await db.insert(payment).values({
       id: nanoid(),
       subscriptionId: newSubscription.id,
       userId,
-      provider: "mock",
+      provider: paymentProviderName,
+      providerTransactionId,
       amount: finalPrice.toString(),
       currency: plan.currency,
-      status: "success",
+      status: paymentStatus,
       paymentMethod:
-        finalPrice > 0 && paymentMethod
+        finalPrice > 0 && sanitizedPaymentMethod
           ? JSON.stringify({
               type: "credit_card",
-              lastFour: paymentMethod.cardNumber.slice(-4),
+              lastFour: sanitizedPaymentMethod.cardNumber.slice(-4),
             })
           : JSON.stringify({
               type: "coupon",
               code: appliedCouponCode,
             }),
-      gatewayResponse: JSON.stringify({
-        status: "success",
-        source: finalPrice > 0 ? "payment_provider" : "coupon",
-      }),
-      paidAt: new Date(),
+      gatewayResponse: JSON.stringify(
+        providerPayload ?? {
+          status: "success",
+          source: finalPrice > 0 ? "payment_provider" : "coupon",
+        },
+      ),
+      paidAt: paymentStatus === "success" ? new Date() : null,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -491,7 +977,7 @@ app.post("/create", zValidator("json", createSubscriptionSchema), async (c) => {
       .update(user)
       .set({
         role: "owner",
-        subscriptionStatus: "active",
+        subscriptionStatus: providerStatus,
         updatedAt: new Date(),
       })
       .where(eq(user.id, userId));
