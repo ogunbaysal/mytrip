@@ -36,7 +36,7 @@ const RESOURCE_LABELS: Record<string, string> = {
   "place.natural_location": "Doğal Lokasyon",
   "place.activity_location": "Aktivite Lokasyonu",
   "place.visit_location": "Ziyaret Lokasyonu",
-  "place.other_monetized": "Diğer Monetize",
+  "place.other_monetized": "Diğer Ücretli Lokasyonlar",
   "blog.post": "Blog Yazısı",
 };
 

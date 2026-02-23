@@ -70,7 +70,7 @@ const PLACE_LIMIT_FIELDS: Array<{ name: PlaceLimitFieldName; label: string }> = 
   { name: "beachLimit", label: "Plaj" },
   { name: "naturalLocationLimit", label: "Doğal Lokasyon" },
   { name: "activityLocationLimit", label: "Aktivite Lokasyonu" },
-  { name: "otherMonetizedLimit", label: "Diğer Monetize" },
+  { name: "otherMonetizedLimit", label: "Diğer Ücretli Lokasyonlar" },
 ];
 
 interface PlanFormProps {

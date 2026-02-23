@@ -176,7 +176,7 @@ const SUBSCRIPTION_PLANS = [
       { resourceKey: "blog.post", limitCount: 1 },
     ] as PlanEntitlementSeed[],
     features: [
-      "Monetize edilen her mekan türü için 1 ilan hakkı",
+      "Ücretli mekan türü başına 1 ilan hakkı",
       "Ziyaret lokasyonlarında sınırsız ilan",
       "1 blog yazısı hakkı",
       "Temel görünürlük",
@@ -207,7 +207,7 @@ const SUBSCRIPTION_PLANS = [
       { resourceKey: "blog.post", limitCount: 10 },
     ] as PlanEntitlementSeed[],
     features: [
-      "Monetize edilen her mekan türü için 5 ilan hakkı",
+      "Ücretli mekan türü başına 5 ilan hakkı",
       "Ziyaret lokasyonlarında sınırsız ilan",
       "10 blog yazısı hakkı",
       "Öne çıkan listeleme desteği",
@@ -239,7 +239,7 @@ const SUBSCRIPTION_PLANS = [
       { resourceKey: "blog.post", limitCount: 40 },
     ] as PlanEntitlementSeed[],
     features: [
-      "Monetize edilen her mekan türü için 20 ilan hakkı",
+      "Ücretli mekan türü başına 20 ilan hakkı",
       "Ziyaret lokasyonlarında sınırsız ilan",
       "40 blog yazısı hakkı",
       "Premium görünürlük",
@@ -401,10 +401,10 @@ const PLACE_KINDS = [
   },
   {
     id: "other_monetized",
-    name: "Diğer Monetize",
+    name: "Diğer Ücretli İşletme",
     slug: "other-monetized",
     icon: "store",
-    description: "Diğer ücretli/rentable lokasyonlar",
+    description: "Diğer ücretli veya kiralanabilir lokasyonlar",
     monetized: true,
     supportsRooms: false,
     supportsMenu: false,

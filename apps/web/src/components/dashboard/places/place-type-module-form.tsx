@@ -994,7 +994,7 @@ export function PlaceTypeModuleForm({
     return (
       <DashboardCard padding="md">
         <SectionHeader
-          title="Diger Monetize Profil"
+          title="Ücretli İşletme Profili"
           subtitle="Fiyat ve ek notlar"
           size="sm"
           className="mb-6"

@@ -8,7 +8,7 @@ const PLACE_KIND_LABELS: Record<string, string> = {
   natural_location: "Doga Noktasi",
   activity_location: "Aktivite",
   visit_location: "Gezi Noktasi",
-  other_monetized: "Diger Ucretli",
+  other_monetized: "Diger Ucretli Isletme",
 };
 
 const FALLBACK_TYPE_LABELS: Record<string, string> = {
