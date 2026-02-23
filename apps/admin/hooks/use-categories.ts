@@ -41,26 +41,6 @@ export function useCategory(id: string) {
   });
 }
 
-export function useCreateCategory() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (data: CategoryInput) => {
-      return apiFetch<{ success: true; category: Category }>("/api/admin/categories", {
-        method: "POST",
-        body: JSON.stringify(data),
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["categories"] });
-      toast.success("Kategori başarıyla oluşturuldu");
-    },
-    onError: (error: Error) => {
-      toast.error(error.message);
-    },
-  });
-}
-
 export function useUpdateCategory() {
   const queryClient = useQueryClient();
 
@@ -75,25 +55,6 @@ export function useUpdateCategory() {
       queryClient.invalidateQueries({ queryKey: ["categories"] });
       queryClient.invalidateQueries({ queryKey: ["category", id] });
       toast.success("Kategori güncellendi");
-    },
-    onError: (error: Error) => {
-      toast.error(error.message);
-    },
-  });
-}
-
-export function useDeleteCategory() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (id: string) => {
-      return apiFetch<{ success: true }>(`/api/admin/categories/${id}`, {
-        method: "DELETE",
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["categories"] });
-      toast.success("Kategori silindi");
     },
     onError: (error: Error) => {
       toast.error(error.message);
