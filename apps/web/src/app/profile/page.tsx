@@ -98,6 +98,14 @@ export default function ProfilePage() {
     },
   });
 
+  const shouldRedirectToLogin = !isLoading && !session?.data?.user;
+
+  useEffect(() => {
+    if (shouldRedirectToLogin) {
+      router.replace("/login" as Route);
+    }
+  }, [router, shouldRedirectToLogin]);
+
   if (isLoading) {
     return (
       <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center">
@@ -109,12 +117,12 @@ export default function ProfilePage() {
     );
   }
 
-  if (!session?.data?.user) {
-    router.push("/login" as Route);
+  if (shouldRedirectToLogin) {
     return null;
   }
 
-  const user = session.data.user as any;
+  const user = session?.data?.user as any;
+  if (!user) return null;
 
   return (
     <div className="container mx-auto px-4 py-12">

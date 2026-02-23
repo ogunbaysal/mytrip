@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -65,6 +66,9 @@ export function PlaceDetailGalleryModal({
           <DialogTitle className="text-lg font-semibold">
             {placeName} - Fotoğraflar
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            Mekan fotoğrafları arasında gezinmek için sol ve sağ okları kullanın.
+          </DialogDescription>
           <DialogClose asChild>
             <Button variant="ghost" size="icon" className="h-8 w-8">
               <X className="h-4 w-4" />

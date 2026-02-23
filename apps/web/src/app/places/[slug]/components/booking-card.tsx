@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { format, differenceInDays, addDays } from "date-fns";
 import { tr } from "date-fns/locale";
 import { Star, ChevronDown, ChevronUp, Minus, Plus } from "lucide-react";
@@ -20,6 +21,7 @@ const priceFormatter = new Intl.NumberFormat("tr-TR", {
 });
 
 interface PlaceDetailBookingCardProps {
+  placeSlug: string;
   nightlyPrice: number;
   rating: number;
   reviewCount: number;
@@ -29,6 +31,7 @@ interface PlaceDetailBookingCardProps {
 }
 
 export function PlaceDetailBookingCard({
+  placeSlug,
   nightlyPrice,
   rating,
   reviewCount,
@@ -36,6 +39,7 @@ export function PlaceDetailBookingCard({
   cleaningFee = 500,
   serviceFeeRate = 0.14,
 }: PlaceDetailBookingCardProps) {
+  const router = useRouter();
   const [checkIn, setCheckIn] = useState<Date>();
   const [checkOut, setCheckOut] = useState<Date>();
   const [guests, setGuests] = useState({ adults: 1, children: 0, infants: 0 });
@@ -102,6 +106,21 @@ export function PlaceDetailBookingCard({
     if (!checkIn) return "Tarih ekle";
     if (!checkOut) return format(checkIn, "d MMM", { locale: tr });
     return `${format(checkIn, "d MMM", { locale: tr })} - ${format(checkOut, "d MMM", { locale: tr })}`;
+  };
+
+  const handleReserve = () => {
+    if (!checkIn || !checkOut) return;
+
+    const params = new URLSearchParams({
+      place: placeSlug,
+      checkIn: format(checkIn, "yyyy-MM-dd"),
+      checkOut: format(checkOut, "yyyy-MM-dd"),
+      adults: String(guests.adults),
+      children: String(guests.children),
+      infants: String(guests.infants),
+    });
+
+    router.push(`/bookings?${params.toString()}`);
   };
 
   return (
@@ -353,6 +372,7 @@ export function PlaceDetailBookingCard({
       <Button
         className="mt-4 w-full bg-gradient-to-r from-rose-500 to-pink-600 py-6 text-base font-semibold hover:from-rose-600 hover:to-pink-700"
         disabled={!checkIn || !checkOut}
+        onClick={handleReserve}
       >
         {checkIn && checkOut ? "Rezervasyon yap" : "Tarihleri kontrol et"}
       </Button>

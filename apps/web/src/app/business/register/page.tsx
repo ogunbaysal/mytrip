@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Route } from "next";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -35,14 +35,17 @@ export default function BusinessRegisterPage() {
     businessType: "",
   });
 
-  const { data: session } = useQuery({
+  const { data: session, isLoading: isSessionLoading } = useQuery({
     queryKey: ["session"],
     queryFn: () => authClient.getSession(),
   });
 
+  const isAuthenticated = Boolean(session?.data?.user);
+
   const { data: businessStatus } = useQuery({
     queryKey: ["business-status"],
     queryFn: () => api.business.getStatus(),
+    enabled: isAuthenticated,
   });
 
   const registerMutation = useMutation({
@@ -56,31 +59,52 @@ export default function BusinessRegisterPage() {
     },
   });
 
-  if (businessStatus?.hasRegistration) {
-    if (businessStatus.status === "pending") {
-      return (
-        <div className="container mx-auto flex min-h-[calc(100vh-8rem)] items-center justify-center px-4 py-12">
-          <Card className="mx-auto max-w-md p-8 text-center">
-            <div className="mx-auto mb-4 flex size-16 items-center justify-center rounded-full bg-yellow-100 text-yellow-600">
-              <AlertCircle className="size-8" />
-            </div>
-            <h2 className="mb-2 text-2xl font-bold">Kayıt İnceleniyor</h2>
-            <p className="mb-6 text-muted-foreground">
-              İşletme kaydınız şu anda TatilDesen yöneticileri tarafından
-              inceleniyor. Bu süreç genellikle 24-48 saat sürer. Onaylandığında
-              size bildirim gönderilecektir.
-            </p>
-            <Button onClick={() => router.push("/dashboard" as Route)}>
-              Paneye Dön
-            </Button>
-          </Card>
+  useEffect(() => {
+    if (!isSessionLoading && !isAuthenticated) {
+      router.replace("/login" as Route);
+    }
+  }, [isAuthenticated, isSessionLoading, router]);
+
+  useEffect(() => {
+    if (businessStatus?.hasRegistration && businessStatus.status === "approved") {
+      router.replace("/dashboard" as Route);
+    }
+  }, [businessStatus?.hasRegistration, businessStatus?.status, router]);
+
+  if (isSessionLoading || !isAuthenticated) {
+    return (
+      <div className="container mx-auto flex min-h-[calc(100vh-8rem)] items-center justify-center px-4 py-12">
+        <div className="text-center">
+          <div className="mx-auto mb-4 size-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+          <p className="text-muted-foreground">Yükleniyor...</p>
         </div>
-      );
-    }
-    if (businessStatus.status === "approved") {
-      router.push("/dashboard" as Route);
-      return null;
-    }
+      </div>
+    );
+  }
+
+  if (businessStatus?.hasRegistration && businessStatus.status === "pending") {
+    return (
+      <div className="container mx-auto flex min-h-[calc(100vh-8rem)] items-center justify-center px-4 py-12">
+        <Card className="mx-auto max-w-md p-8 text-center">
+          <div className="mx-auto mb-4 flex size-16 items-center justify-center rounded-full bg-yellow-100 text-yellow-600">
+            <AlertCircle className="size-8" />
+          </div>
+          <h2 className="mb-2 text-2xl font-bold">Kayıt İnceleniyor</h2>
+          <p className="mb-6 text-muted-foreground">
+            İşletme kaydınız şu anda TatilDesen yöneticileri tarafından
+            inceleniyor. Bu süreç genellikle 24-48 saat sürer. Onaylandığında
+            size bildirim gönderilecektir.
+          </p>
+          <Button onClick={() => router.push("/dashboard" as Route)}>
+            Paneye Dön
+          </Button>
+        </Card>
+      </div>
+    );
+  }
+
+  if (businessStatus?.hasRegistration && businessStatus.status === "approved") {
+    return null;
   }
 
   const handleChange = (field: keyof typeof formData, value: string) => {

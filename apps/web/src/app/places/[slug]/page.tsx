@@ -667,6 +667,7 @@ export default async function PlaceDetailPage({
             <div className="sticky top-24 space-y-4">
               {showStayBookingCard ? (
                 <PlaceDetailBookingCard
+                  placeSlug={slug}
                   nightlyPrice={detail.nightlyPrice}
                   rating={detail.rating}
                   reviewCount={detail.reviewCount}
@@ -868,9 +869,11 @@ export default async function PlaceDetailPage({
                 ) : null}
               </div>
             </div>
-            <Button className="bg-rose-500 hover:bg-rose-600">
-              <Calendar className="mr-2 h-4 w-4" />
-              Rezervasyon yap
+            <Button className="bg-rose-500 hover:bg-rose-600" asChild>
+              <Link href={`/bookings?place=${encodeURIComponent(slug)}`}>
+                <Calendar className="mr-2 h-4 w-4" />
+                Rezervasyon yap
+              </Link>
             </Button>
           </div>
         </div>
