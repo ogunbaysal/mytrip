@@ -27,6 +27,7 @@ const supportLinks = [
 ] as const satisfies FooterLinkProps[];
 
 const coreLegalLinks = [
+  { label: "Hakkımızda", href: "/about" },
   { label: "Gizlilik", href: "/privacy" },
   { label: "Şartlar", href: "/terms" },
   { label: "Çerezler", href: "/cookies" },
