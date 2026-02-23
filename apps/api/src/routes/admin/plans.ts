@@ -5,7 +5,7 @@ import {
   subscriptionPlanEntitlement,
   subscriptionPlanFeature,
 } from "../../db/schemas/index.ts";
-import { and, asc, desc, eq } from "drizzle-orm";
+import { asc, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
 import { nanoid } from "nanoid";
@@ -131,7 +131,6 @@ app.get("/", async (c) => {
     const plans = await db
       .select()
       .from(subscriptionPlan)
-      .where(eq(subscriptionPlan.billingCycle, "yearly"))
       .orderBy(asc(subscriptionPlan.sortOrder), desc(subscriptionPlan.createdAt));
 
     return c.json({ plans: await hydratePlans(plans) });
@@ -147,9 +146,7 @@ app.get("/:id", async (c) => {
     const [plan] = await db
       .select()
       .from(subscriptionPlan)
-      .where(
-        and(eq(subscriptionPlan.id, id), eq(subscriptionPlan.billingCycle, "yearly")),
-      )
+      .where(eq(subscriptionPlan.id, id))
       .limit(1);
 
     if (!plan) {

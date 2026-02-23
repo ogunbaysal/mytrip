@@ -2,7 +2,6 @@
 "use client";
 
 import Link from "next/link";
-import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -12,20 +11,20 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useCategories, useDeleteCategory } from "@/hooks/use-categories";
+import { useCategories } from "@/hooks/use-categories";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
 import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { MoreHorizontal } from "lucide-react";
+import { toast } from "sonner";
 
 export default function CategoriesPage() {
   const { data: categories, isLoading } = useCategories();
-  const { mutate: deleteCategory } = useDeleteCategory();
 
   if (isLoading) {
     return <div>Yükleniyor...</div>;
@@ -35,12 +34,8 @@ export default function CategoriesPage() {
     <div className="flex-1 space-y-4 p-8 pt-6">
       <div className="flex items-center justify-between space-y-2">
         <h2 className="text-3xl font-bold tracking-tight">Kategoriler</h2>
-        <div className="flex items-center space-x-2">
-          <Link href="/categories/create">
-            <Button>
-              <Plus className="mr-2 h-4 w-4" /> Yeni Kategori
-            </Button>
-          </Link>
+        <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          Uyarı: Yeni kategoriler yalnızca geliştirici tarafından eklenebilir.
         </div>
       </div>
       <div className="rounded-md border">
@@ -77,11 +72,11 @@ export default function CategoriesPage() {
                         <DropdownMenuItem>Düzenle</DropdownMenuItem>
                       </Link>
                       <DropdownMenuItem
-                        className="text-red-600 focus:text-red-600"
+                        className="text-amber-700 focus:text-amber-700"
                         onClick={() => {
-                          if (confirm("Bu kategoriyi silmek istediğinize emin misiniz?")) {
-                            deleteCategory(category.id);
-                          }
+                          toast.warning(
+                            "Silme işlemi devre dışı. Yeni kategoriler yalnızca geliştirici tarafından eklenebilir.",
+                          );
                         }}
                       >
                         Sil
@@ -92,11 +87,11 @@ export default function CategoriesPage() {
               </TableRow>
             ))}
             {categories?.length === 0 && (
-                <TableRow>
-                    <TableCell colSpan={5} className="text-center h-24">
-                        Henüz kategori bulunmuyor.
-                    </TableCell>
-                </TableRow>
+              <TableRow>
+                <TableCell colSpan={5} className="text-center h-24">
+                  Henüz kategori bulunmuyor.
+                </TableCell>
+              </TableRow>
             )}
           </TableBody>
         </Table>
