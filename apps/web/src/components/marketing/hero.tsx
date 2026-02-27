@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Compass, MapPin, Search, Sparkles } from "lucide-react";
+import { MapPin, Search, Sparkles } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 
@@ -33,7 +33,7 @@ export function HeroSection() {
         aria-hidden
       />
 
-      <div className="relative flex h-full items-center justify-between gap-8">
+      <div className="relative flex h-full items-center">
         <motion.div
           initial={{ opacity: 0, y: 18 }}
           animate={{ opacity: 1, y: 0 }}
@@ -62,23 +62,6 @@ export function HeroSection() {
             <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-medium text-white/85">
               <Sparkles className="size-3.5" />
               Güncel önerilerle hızlı keşif
-            </div>
-          </div>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, scale: 0.94 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.45, delay: 0.08, ease: "easeOut" }}
-          className="relative hidden h-full items-center justify-center md:flex"
-        >
-          <div className="relative flex size-40 items-center justify-center rounded-3xl border border-white/20 bg-white/10 text-white/90 shadow-xl backdrop-blur-sm">
-            <Compass className="size-16" />
-            <div className="absolute -right-3 -top-3 rounded-full bg-primary p-2 text-white shadow-lg">
-              <Search className="size-4" />
-            </div>
-            <div className="absolute -bottom-3 -left-3 rounded-full bg-emerald-500 p-2 text-white shadow-lg">
-              <MapPin className="size-4" />
             </div>
           </div>
         </motion.div>
