@@ -18,11 +18,18 @@ function LoginPageContent() {
   const queryClient = useQueryClient();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const redirectTo = resolveSafeRedirect(searchParams.get("redirect"), "/" as Route);
+  const redirectTo = resolveSafeRedirect(
+    searchParams.get("redirect"),
+    "/" as Route,
+  );
   const registerHref =
     redirectTo === "/"
       ? ("/register" as Route)
       : (`/register?redirect=${encodeURIComponent(redirectTo)}` as Route);
+  const forgotPasswordHref =
+    redirectTo === "/"
+      ? ("/forgot-password" as Route)
+      : (`/forgot-password?redirect=${encodeURIComponent(redirectTo)}` as Route);
 
   const login = useMutation({
     mutationFn: async () => {
@@ -55,6 +62,18 @@ function LoginPageContent() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     login.mutate();
+  };
+
+  const handleGoogleSignIn = async () => {
+    const result = await authClient.signIn.social({
+      provider: "google",
+      callbackURL: redirectTo,
+      errorCallbackURL: "/login",
+    });
+
+    if (result.error) {
+      toast.error(result.error.message || "Google ile giriş başarısız oldu");
+    }
   };
 
   return (
@@ -97,12 +116,35 @@ function LoginPageContent() {
               required
               placeholder="•••••••"
             />
+            <div className="mt-2 text-right text-sm">
+              <Link
+                href={forgotPasswordHref}
+                className="font-medium text-primary hover:underline"
+              >
+                Şifremi Unuttum
+              </Link>
+            </div>
           </div>
 
           <Button type="submit" className="w-full" disabled={login.isPending}>
             {login.isPending ? "Giriş yapılıyor..." : "Giriş Yap"}
           </Button>
         </form>
+
+        <div className="my-6 flex items-center gap-3 text-xs text-muted-foreground">
+          <span className="h-px flex-1 bg-border" />
+          veya
+          <span className="h-px flex-1 bg-border" />
+        </div>
+
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full"
+          onClick={handleGoogleSignIn}
+        >
+          Google ile giriş yap
+        </Button>
 
         <div className="mt-6 text-center text-sm">
           <span className="text-muted-foreground">Hesabınız yok mu? </span>
