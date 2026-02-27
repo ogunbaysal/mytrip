@@ -182,7 +182,7 @@ const SUBSCRIPTION_PLANS = [
     ] as PlanEntitlementSeed[],
     features: [
       "Kategori başına 1 ilan hakkı",
-      "Blog yazısı içermez",
+      "0 blog yazısı hakkı",
       "Temel görünürlük",
       "E-posta desteği",
     ],
