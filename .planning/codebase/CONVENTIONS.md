@@ -27,6 +27,7 @@
 - TypeScript-first with semicolons and double quotes as dominant style in app code
 - No strict repository-level Prettier config file detected; style consistency is convention-driven
 - Strict TS mode enabled in base and app tsconfigs
+- Style differs by app: API/web files commonly use semicolons, admin files frequently omit semicolons
 
 **Linting:**
 - Web/Admin use ESLint with Next rules (`apps/web/eslint.config.mjs`, `apps/admin/eslint.config.mjs`)
@@ -96,6 +97,7 @@
 
 **Design Note:**
 - Some route files are large and combine schema, transformation helpers, and handlers; this is an active style pattern but increases coupling risk.
+- For edits, follow local file style first (quote and semicolon choices), then preserve existing import grouping.
 
 ---
 

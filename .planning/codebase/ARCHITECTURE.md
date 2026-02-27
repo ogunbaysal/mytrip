@@ -11,6 +11,7 @@
 - Layered API handlers (route -> validation -> domain helpers -> Drizzle DB)
 - Dual auth namespaces for admin users and traveler/web users
 - Domain-driven route segmentation (public, owner, admin, subscription, profile)
+- Frontend apps proxy `/api/*` to backend through Next rewrites
 
 ## Layers
 
@@ -57,6 +58,7 @@
 - Persistent state: PostgreSQL tables
 - Client cache state: TanStack Query in-memory cache per app session
 - Process-local state: in-memory rate limiter map (API instance local)
+- Session state: Better Auth session/account tables with cookie transport
 
 ## Key Abstractions
 
@@ -102,6 +104,7 @@
 - `try/catch` around auth/session and external API operations
 - Validation failures return 4xx via zod validator middleware behavior
 - Console logging for operational visibility
+- Frontend request wrappers normalize backend errors for UI consumption
 
 ## Cross-Cutting Concerns
 
@@ -116,6 +119,7 @@
 
 **Authorization:**
 - Role/status checks in admin middleware and entitlement checks in owner mutation routes
+- Route-level ownership checks on owner CRUD endpoints (`apps/api/src/routes/owner/*.ts`)
 
 ---
 

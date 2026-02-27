@@ -10,6 +10,7 @@ mytrip/
 │   ├── web/                      # Public + owner Next.js app
 │   ├── admin/                    # Admin Next.js app
 │   └── api/                      # Bun/Hono API + DB layer
+├── .planning/                    # GSD planning artifacts and codebase maps
 ├── docs/                         # Product and framework reference docs
 ├── tests/                        # Root Playwright tests
 ├── turbo.json                    # Turborepo pipeline definition
@@ -41,6 +42,10 @@ mytrip/
 **docs/**
 - Purpose: Internal references (PRD + Better Auth/Drizzle/TanStack/Turborepo notes)
 - Key file: `docs/PRD.md`
+
+**.planning/codebase/**
+- Purpose: Generated/maintained codebase documentation for planning context
+- Contains: `STACK.md`, `INTEGRATIONS.md`, `ARCHITECTURE.md`, `STRUCTURE.md`, `CONVENTIONS.md`, `TESTING.md`, `CONCERNS.md`
 
 ## Key File Locations
 

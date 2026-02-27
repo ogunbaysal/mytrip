@@ -16,6 +16,8 @@
 cd apps/api && bun test                         # API unit tests
 cd apps/api && bun test src/lib/*.test.ts       # Targeted API test files
 npx playwright test                             # Root Playwright suite
+bun run lint                                    # Workspace lint pass (not a test runner)
+bunx turbo run type-check                       # Workspace type-check gate
 ```
 
 ## Test File Organization
@@ -87,6 +89,7 @@ describe("module-name", () => {
 **Current Reality:**
 - API route integration paths are mostly untested
 - Frontend unit/component tests are not present
+- Playwright specs are template smoke tests and do not exercise app routes
 
 ## Test Types
 
@@ -115,7 +118,7 @@ describe("module-name", () => {
 
 - Add endpoint integration tests for critical admin/owner/subscription mutations
 - Add auth/session flow tests for both admin and web auth namespaces
-- Replace placeholder Playwright examples with real app journeys
+- Replace placeholder Playwright examples with real app journeys (`/`, `/places`, admin login/dashboard)
 
 ---
 

@@ -4,6 +4,12 @@
 
 ## Tech Debt
 
+**PRD place-kind redesign not yet aligned with implementation:**
+- Issue: `docs/PRD.md` defines a new place-kind taxonomy (`hotel`, `restaurant`, `visit_location`, etc.) but code still uses legacy kind keys (`hotel_pension`, `boat_tour`, etc.)
+- Files: `docs/PRD.md`, `apps/api/src/db/schemas/place-kind-enum.ts`, `apps/api/src/db/schemas/subscriptions.ts`, `apps/api/src/lib/place-kind-registry.ts`
+- Impact: Product/domain language mismatch, increased migration risk, and confusion across API/admin/web contracts
+- Fix approach: execute phased migration (schema enum/resource keys -> API contracts -> frontend type/capability mappings) with compatibility guards
+
 **Build-time safety reduced in Next apps:**
 - Issue: Both Next apps disable strict build gating (`ignoreBuildErrors`, and web also `ignoreDuringBuilds`)
 - Files: `apps/web/next.config.ts`, `apps/admin/next.config.ts`
@@ -104,6 +110,12 @@
 - Risk: UI/data contract drift and broken user journeys
 - Priority: High
 - Difficulty to test: Medium to High
+
+**Root Playwright suite does not validate product behavior:**
+- What's not tested: actual Next app pages/endpoints in this repository
+- Risk: CI green while user-critical flows are broken
+- Priority: High
+- Difficulty to test: Low to Medium (requires replacing sample tests in `tests/example.spec.ts`)
 
 ---
 

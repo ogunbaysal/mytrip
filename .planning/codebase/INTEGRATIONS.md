@@ -5,13 +5,14 @@
 ## APIs & External Services
 
 **Payment Processing:**
-- Iyzico subscription APIs - Recurring subscriptions and payment state management
-  - SDK/Client: Custom `fetch` + HMAC signing in `apps/api/src/lib/payment-provider.ts`
-  - Auth: `IYZICO_API_KEY`, `IYZICO_SECRET_KEY`, `IYZICO_BASE_URL`
-  - Endpoints used: `/v2/subscription/initialize` and related provider lifecycle calls
+- Iyzico subscription APIs for paid plan creation/cancellation and webhook reconciliation
+  - SDK/Client: custom `fetch` + HMAC signing in `apps/api/src/lib/payment-provider.ts`
+  - Auth: `IYZICO_API_KEY`, `IYZICO_SECRET_KEY`, optional `IYZICO_BASE_URL`
+  - Endpoints used: `/v2/subscription/initialize`, `/v2/subscription/subscriptions/:id/cancel`
 
 **External APIs:**
-- Turkey geodata package (`turkey-neighbourhoods`) used for seeded location catalogs (`apps/api/src/db/seeders/seed-core.ts`)
+- No live third-party REST API dependency detected in runtime route handlers
+- Static location seed source from `turkey-neighbourhoods` package in `apps/api/src/db/seeders/seed-core.ts`
 
 ## Data Storage
 
@@ -23,7 +24,7 @@
 
 **File Storage:**
 - S3-compatible object storage (MinIO-compatible)
-  - SDK: `@aws-sdk/client-s3`
+  - SDK: `@aws-sdk/client-s3` in `apps/api/src/lib/object-storage.ts`
   - Auth: `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`
   - Endpoint config: `MINIO_ENDPOINT`, `MINIO_BUCKET`, optional `MINIO_PUBLIC_BASE_URL`
   - Integration points: `apps/api/src/lib/object-storage.ts`, `apps/api/src/lib/upload-service.ts`
@@ -38,7 +39,7 @@
 - Better Auth with Drizzle adapter
   - Admin namespace: `/api/auth/*` using `apps/api/src/lib/auth.ts`
   - Web user namespace: `/api/web/auth/*` using `apps/api/src/lib/web-auth.ts`
-  - Cookie cross-subdomain behavior is env-controlled (`COOKIE_DOMAIN`, auth cookie prefix env vars)
+  - Cookie cross-subdomain behavior is env-controlled (`COOKIE_DOMAIN`, `BETTER_AUTH_ADMIN_COOKIE_PREFIX`, `BETTER_AUTH_WEB_COOKIE_PREFIX`)
 
 **OAuth Integrations:**
 - No active social provider configuration (`socialProviders: {}` in both auth configs)
@@ -65,6 +66,7 @@
 **CI Pipeline:**
 - GitHub Actions Playwright workflow in `.github/workflows/playwright.yml`
   - Uses `npm ci`, browser install, and `npx playwright test`
+  - No API/web/admin integration test job currently defined in workflows
 
 ## Environment Configuration
 
@@ -83,6 +85,7 @@
 - Iyzico webhook processing in `apps/api/src/routes/subscriptions.ts`
   - Verification helper: `verifyIyzicoSubscriptionWebhookSignature` in `apps/api/src/lib/iyzico-webhook.ts`
   - Signature is HMAC-based using merchant + secret + event fields
+  - Optional bypass exists via `IYZICO_WEBHOOK_ALLOW_UNSIGNED=true` (risk to control per environment)
 
 **Outgoing:**
 - Server-originated provider calls to Iyzico from `payment-provider.ts`
