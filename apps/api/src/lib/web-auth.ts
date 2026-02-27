@@ -3,6 +3,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { db } from "../db/index.ts";
 import * as schema from "../db/schemas/index.ts";
 import { resolveCookieDomain } from "./cookie-domain.ts";
+import { sendPasswordResetEmail } from "./email.ts";
 
 const trustedOrigins = process.env.ALLOWED_ORIGINS?.split(",")
   .map((origin) => origin.trim())
@@ -36,6 +37,12 @@ export const webAuth = betterAuth({
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: false,
+    sendResetPassword: async ({ user, url }) => {
+      await sendPasswordResetEmail({
+        to: user.email,
+        resetUrl: url,
+      });
+    },
   },
   session: {
     expiresIn: 60 * 60 * 24 * 7,
@@ -50,7 +57,12 @@ export const webAuth = betterAuth({
       enabled: false,
     },
   },
-  socialProviders: {},
+  socialProviders: {
+    google: {
+      clientId: process.env.GOOGLE_CLIENT_ID as string,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
+    },
+  },
   advanced: {
     cookiePrefix: webCookiePrefix,
     crossSubDomainCookies: {
