@@ -1,14 +1,16 @@
 import { pgEnum } from "drizzle-orm/pg-core";
 
 export const placeKindEnum = pgEnum("place_kind", [
-  "hotel",
   "villa",
-  "restaurant",
-  "cafe",
-  "bar_club",
-  "beach",
-  "natural_location",
-  "activity_location",
-  "visit_location",
-  "other_monetized",
+  "bungalow_tiny_house",
+  "hotel_pension",
+  "detached_house_apartment",
+  "camp_site",
+  "transfer",
+  "boat_tour",
+  "paragliding_microlight_skydiving",
+  "safari",
+  "water_sports",
+  "ski",
+  "balloon_tour",
 ]);

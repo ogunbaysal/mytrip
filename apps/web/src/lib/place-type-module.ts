@@ -11,19 +11,6 @@ export type HotelRoomDraft = {
   featureList: string;
 };
 
-export type DiningMenuItemDraft = {
-  name: string;
-  description: string;
-  price: string;
-  tags: string;
-};
-
-export type DiningMenuDraft = {
-  name: string;
-  description: string;
-  items: DiningMenuItemDraft[];
-};
-
 export type ActivityPackageDraft = {
   name: string;
   description: string;
@@ -48,39 +35,22 @@ export type PlaceTypeModuleDraft = {
     poolAvailable: boolean;
     cleaningFee: string;
   };
-  dining: {
-    averagePricePerPerson: string;
-    reservationRequired: boolean;
-    servesAlcohol: boolean;
-    dressCode: string;
-    menus: DiningMenuDraft[];
-  };
-  beach: {
-    entranceFee: string;
-    hasSunbedRental: boolean;
-    hasShower: boolean;
-    hasLifeguard: boolean;
-  };
-  natural: {
-    entryFee: string;
-    difficultyLevel: string;
-    recommendedDurationMinutes: string;
-  };
   activity: {
     requiresReservation: boolean;
     safetyRequirements: string;
     packages: ActivityPackageDraft[];
   };
-  visit: {
-    ticketPrice: string;
-    recommendedDurationMinutes: string;
-    requiresGuide: boolean;
-  };
-  otherMonetized: {
-    startingPrice: string;
-    notes: string;
-  };
 };
+
+const ACTIVITY_MODULE_KINDS = [
+  "transfer",
+  "boat_tour",
+  "paragliding_microlight_skydiving",
+  "safari",
+  "water_sports",
+  "ski",
+  "balloon_tour",
+] as const;
 
 const toOptionalNumber = (value: string): number | undefined => {
   const normalized = value.trim();
@@ -124,37 +94,10 @@ export const createDefaultPlaceTypeModuleDraft = (): PlaceTypeModuleDraft => ({
     poolAvailable: false,
     cleaningFee: "",
   },
-  dining: {
-    averagePricePerPerson: "",
-    reservationRequired: false,
-    servesAlcohol: false,
-    dressCode: "",
-    menus: [],
-  },
-  beach: {
-    entranceFee: "",
-    hasSunbedRental: false,
-    hasShower: false,
-    hasLifeguard: false,
-  },
-  natural: {
-    entryFee: "",
-    difficultyLevel: "",
-    recommendedDurationMinutes: "",
-  },
   activity: {
     requiresReservation: false,
     safetyRequirements: "",
     packages: [],
-  },
-  visit: {
-    ticketPrice: "",
-    recommendedDurationMinutes: "",
-    requiresGuide: false,
-  },
-  otherMonetized: {
-    startingPrice: "",
-    notes: "",
   },
 });
 
@@ -163,7 +106,7 @@ export const buildTypeModuleOpeningHoursProfile = (
   moduleData: PlaceTypeModuleDraft,
 ): Record<string, unknown> | undefined => {
   switch (kindId) {
-    case "hotel":
+    case "hotel_pension":
       return {
         typeProfile: {
           kind: "hotel",
@@ -175,6 +118,9 @@ export const buildTypeModuleOpeningHoursProfile = (
         },
       };
     case "villa":
+    case "bungalow_tiny_house":
+    case "detached_house_apartment":
+    case "camp_site":
       return {
         typeProfile: {
           kind: "villa",
@@ -185,67 +131,20 @@ export const buildTypeModuleOpeningHoursProfile = (
           cleaningFee: toOptionalNumber(moduleData.villa.cleaningFee),
         },
       };
-    case "restaurant":
-    case "cafe":
-    case "bar_club":
+    case "transfer":
+    case "boat_tour":
+    case "paragliding_microlight_skydiving":
+    case "safari":
+    case "water_sports":
+    case "ski":
+    case "balloon_tour":
       return {
         typeProfile: {
-          kind: "dining",
-          averagePricePerPerson: toOptionalNumber(moduleData.dining.averagePricePerPerson),
-          reservationRequired: moduleData.dining.reservationRequired,
-          servesAlcohol: moduleData.dining.servesAlcohol,
-          dressCode: moduleData.dining.dressCode.trim() || undefined,
-          menuDraftCount: moduleData.dining.menus.filter((menu) => menu.name.trim()).length,
-        },
-      };
-    case "beach":
-      return {
-        typeProfile: {
-          kind: "beach",
-          entranceFee: toOptionalNumber(moduleData.beach.entranceFee),
-          hasSunbedRental: moduleData.beach.hasSunbedRental,
-          hasShower: moduleData.beach.hasShower,
-          hasLifeguard: moduleData.beach.hasLifeguard,
-        },
-      };
-    case "natural_location":
-      return {
-        typeProfile: {
-          kind: "natural_location",
-          entryFee: toOptionalNumber(moduleData.natural.entryFee),
-          difficultyLevel: moduleData.natural.difficultyLevel.trim() || undefined,
-          recommendedDurationMinutes: toOptionalInt(
-            moduleData.natural.recommendedDurationMinutes,
-          ),
-        },
-      };
-    case "activity_location":
-      return {
-        typeProfile: {
-          kind: "activity_location",
+          kind: "activity",
           requiresReservation: moduleData.activity.requiresReservation,
           safetyRequirements: moduleData.activity.safetyRequirements.trim() || undefined,
           packageDraftCount: moduleData.activity.packages.filter((item) => item.name.trim())
             .length,
-        },
-      };
-    case "visit_location":
-      return {
-        typeProfile: {
-          kind: "visit_location",
-          ticketPrice: toOptionalNumber(moduleData.visit.ticketPrice),
-          recommendedDurationMinutes: toOptionalInt(
-            moduleData.visit.recommendedDurationMinutes,
-          ),
-          requiresGuide: moduleData.visit.requiresGuide,
-        },
-      };
-    case "other_monetized":
-      return {
-        typeProfile: {
-          kind: "other_monetized",
-          startingPrice: toOptionalNumber(moduleData.otherMonetized.startingPrice),
-          notes: moduleData.otherMonetized.notes.trim() || undefined,
         },
       };
     default:
@@ -258,49 +157,31 @@ export const buildTypeModulePreviewHighlights = (
   moduleData: PlaceTypeModuleDraft,
 ): string[] => {
   switch (kindId) {
-    case "hotel":
+    case "hotel_pension":
       return [
         `Taslak oda: ${moduleData.hotel.rooms.filter((room) => room.name.trim()).length}`,
         `Yildiz: ${moduleData.hotel.starRating || "-"}`,
         `Min konaklama: ${moduleData.hotel.minimumStayNights || "-"} gece`,
       ];
     case "villa":
+    case "bungalow_tiny_house":
+    case "detached_house_apartment":
+    case "camp_site":
       return [
         `Maks misafir: ${moduleData.villa.maxGuests || "-"}`,
         `Yatak odasi: ${moduleData.villa.bedroomCount || "-"}`,
         `Havuz: ${moduleData.villa.poolAvailable ? "Var" : "Yok"}`,
       ];
-    case "restaurant":
-    case "cafe":
-    case "bar_club":
-      return [
-        `Taslak menu: ${moduleData.dining.menus.filter((menu) => menu.name.trim()).length}`,
-        `Ort. kisi basi fiyat: ${moduleData.dining.averagePricePerPerson || "-"}`,
-        `Rezervasyon: ${moduleData.dining.reservationRequired ? "Gerekli" : "Opsiyonel"}`,
-      ];
-    case "beach":
-      return [
-        `Giriste ucret: ${moduleData.beach.entranceFee || "-"}`,
-        `Can kurtaran: ${moduleData.beach.hasLifeguard ? "Var" : "Yok"}`,
-      ];
-    case "natural_location":
-      return [
-        `Zorluk: ${moduleData.natural.difficultyLevel || "-"}`,
-        `Süre: ${moduleData.natural.recommendedDurationMinutes || "-"} dk`,
-      ];
-    case "activity_location":
+    case "transfer":
+    case "boat_tour":
+    case "paragliding_microlight_skydiving":
+    case "safari":
+    case "water_sports":
+    case "ski":
+    case "balloon_tour":
       return [
         `Taslak paket: ${moduleData.activity.packages.filter((item) => item.name.trim()).length}`,
         `Rezervasyon: ${moduleData.activity.requiresReservation ? "Gerekli" : "Opsiyonel"}`,
-      ];
-    case "visit_location":
-      return [
-        `Bilet: ${moduleData.visit.ticketPrice || "-"}`,
-        `Süre: ${moduleData.visit.recommendedDurationMinutes || "-"} dk`,
-      ];
-    case "other_monetized":
-      return [
-        `Baslangic fiyat: ${moduleData.otherMonetized.startingPrice || "-"}`,
       ];
     default:
       return [];
@@ -311,24 +192,17 @@ export const validateTypeModuleDraft = (
   kindId: string,
   moduleData: PlaceTypeModuleDraft,
 ): string | null => {
-  if (kindId === "hotel") {
+  if (kindId === "hotel_pension") {
     const validRooms = moduleData.hotel.rooms.filter((room) => room.name.trim());
     if (validRooms.length === 0) {
       return "Otel türünde en az bir oda taslağı eklemelisiniz";
     }
   }
 
-  if (kindId === "activity_location") {
+  if ((ACTIVITY_MODULE_KINDS as readonly string[]).includes(kindId)) {
     const validPackages = moduleData.activity.packages.filter((pkg) => pkg.name.trim());
     if (validPackages.length === 0) {
       return "Aktivite türünde en az bir paket taslağı eklemelisiniz";
-    }
-  }
-
-  if (["restaurant", "cafe", "bar_club"].includes(kindId)) {
-    const validMenus = moduleData.dining.menus.filter((menu) => menu.name.trim());
-    if (validMenus.length === 0) {
-      return "Yeme & içme türlerinde en az bir menü taslağı eklemelisiniz";
     }
   }
 
@@ -344,7 +218,7 @@ export const provisionTypeModulesForPlace = async ({
   kindId: string;
   moduleData: PlaceTypeModuleDraft;
 }): Promise<void> => {
-  if (kindId === "hotel") {
+  if (kindId === "hotel_pension") {
     const validRooms = moduleData.hotel.rooms.filter((room) => room.name.trim());
     for (const room of validRooms) {
       await api.owner.places.createRoom(placeId, {
@@ -362,40 +236,7 @@ export const provisionTypeModulesForPlace = async ({
     return;
   }
 
-  if (["restaurant", "cafe", "bar_club"].includes(kindId)) {
-    const menus = moduleData.dining.menus
-      .filter((menu) => menu.name.trim())
-      .map((menu, menuIndex) => ({
-        name: menu.name.trim(),
-        description: menu.description.trim() || undefined,
-        isActive: true,
-        sortOrder: menuIndex,
-        sections: [
-          {
-            name: "Genel",
-            description: undefined,
-            sortOrder: 0,
-            items: menu.items
-              .filter((item) => item.name.trim())
-              .map((item, itemIndex) => ({
-                name: item.name.trim(),
-                description: item.description.trim() || undefined,
-                price: toOptionalNumber(item.price),
-                isAvailable: true,
-                sortOrder: itemIndex,
-                tags: normalizeTags(item.tags),
-              })),
-          },
-        ],
-      }));
-
-    if (menus.length > 0) {
-      await api.owner.places.upsertMenu(placeId, { menus });
-    }
-    return;
-  }
-
-  if (kindId === "activity_location") {
+  if ((ACTIVITY_MODULE_KINDS as readonly string[]).includes(kindId)) {
     const packages = moduleData.activity.packages.filter((item) => item.name.trim());
     for (const [index, pkg] of packages.entries()) {
       await api.owner.places.createPackage(placeId, {

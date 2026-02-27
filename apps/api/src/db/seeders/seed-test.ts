@@ -619,20 +619,29 @@ async function seedTestPlaces(userMap: Map<string, string>): Promise<string[]> {
   const placesToCreate = 50;
 
   const typeMapping: Record<string, string[]> = {
-    hotel: ["hotels", "villas", "guesthouses", "apart-hotels"],
-    restaurant: ["restaurants"],
-    cafe: ["cafes", "bars", "beach-clubs"],
-    activity: ["activities", "attractions", "nature-beaches", "spa-wellness"],
+    stay: [
+      "villa",
+      "bungalov-tiny-house",
+      "otel-pansiyon",
+      "mustakil-ev-daire",
+      "kamp-alani",
+    ],
+    activity: [
+      "transfer",
+      "tekne-turu",
+      "parasut-microlight-skydiving",
+      "safari",
+      "su-sporlari",
+      "kayak",
+      "balon-turu",
+    ],
   };
 
   for (let i = 0; i < placesToCreate; i++) {
-    const placeType = random([
-      "hotel",
-      "restaurant",
-      "cafe",
-      "activity",
-    ]) as keyof typeof PLACE_TEMPLATES;
-    const template = random(PLACE_TEMPLATES[placeType]);
+    const placeType = random(["stay", "activity"]) as "stay" | "activity";
+    const templatePool =
+      placeType === "stay" ? PLACE_TEMPLATES.hotel : PLACE_TEMPLATES.activity;
+    const template = random(templatePool);
     const districtData = random(MUGLA_DISTRICTS);
     const neighborhood = random(districtData.neighborhoods);
     const districtId = districtMap.get(slugify(districtData.name));
@@ -660,9 +669,8 @@ async function seedTestPlaces(userMap: Map<string, string>): Promise<string[]> {
     const lat = 36.5 + Math.random() * 0.8; // Muğla area
     const lng = 27.5 + Math.random() * 1.2;
 
-    const typeFeatures =
-      FEATURES[placeType as keyof typeof FEATURES] || FEATURES.hotel;
-    const typeImages = IMAGES[placeType as keyof typeof IMAGES] || IMAGES.hotel;
+    const typeFeatures = placeType === "stay" ? FEATURES.hotel : FEATURES.activity;
+    const typeImages = placeType === "stay" ? IMAGES.hotel : IMAGES.activity;
 
     const id = nanoid();
 

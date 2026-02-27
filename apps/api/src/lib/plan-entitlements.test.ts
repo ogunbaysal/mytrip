@@ -4,10 +4,10 @@ import { evaluateEntitlementLimit } from "./entitlement-evaluator.ts";
 describe("plan-entitlements integration helpers", () => {
   test("blocks kind change when target kind quota is full", () => {
     const result = evaluateEntitlementLimit({
-      resourceKey: "place.hotel",
+      resourceKey: "place.hotel_pension",
       entitlements: [
         {
-          resourceKey: "place.hotel",
+          resourceKey: "place.hotel_pension",
           limitCount: 1,
           isUnlimited: false,
         },
@@ -18,7 +18,7 @@ describe("plan-entitlements integration helpers", () => {
         },
       ],
       usageByResource: {
-        "place.hotel": 1,
+        "place.hotel_pension": 1,
         "place.villa": 0,
       },
     });

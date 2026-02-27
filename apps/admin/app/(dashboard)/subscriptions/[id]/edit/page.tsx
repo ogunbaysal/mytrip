@@ -315,7 +315,7 @@ export default function SubscriptionEditPage() {
                   )}
                 </p>
                 <p className="text-muted-foreground">
-                  Gezi Lokasyonları:{" "}
+                  Aktivite Kategorileri:{" "}
                   {formatLimit(selectedPlanVisit.max, selectedPlanVisit.isUnlimited)}
                 </p>
                 <p className="text-muted-foreground">

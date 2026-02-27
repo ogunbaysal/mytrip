@@ -1,39 +1,42 @@
 const PLACE_KIND_LABELS: Record<string, string> = {
-  hotel: "Otel",
   villa: "Villa",
-  restaurant: "Restoran",
-  cafe: "Kafe",
-  bar_club: "Bar / Club",
-  beach: "Plaj",
-  natural_location: "Doga Noktasi",
-  activity_location: "Aktivite",
-  visit_location: "Gezi Noktasi",
-  other_monetized: "Diger Ucretli Isletme",
+  bungalow_tiny_house: "Bungalov & Tiny House",
+  hotel_pension: "Otel & Pansiyon",
+  detached_house_apartment: "Müstakil Ev & Daire",
+  camp_site: "Kamp Alanı",
+  transfer: "Transfer",
+  boat_tour: "Tekne Turu",
+  paragliding_microlight_skydiving: "Paraşüt & Microlight & Skydiving",
+  safari: "Safari",
+  water_sports: "Su Sporları",
+  ski: "Kayak",
+  balloon_tour: "Balon Turu",
 };
 
 const FALLBACK_TYPE_LABELS: Record<string, string> = {
   stay: "Konaklama",
-  experience: "Deneyim",
-  restaurant: "Restoran",
-  hotel: "Otel",
-  cafe: "Kafe",
   activity: "Aktivite",
-  attraction: "Gezi Yeri",
-  transport: "Ulasim",
 };
 
-const STAY_KINDS = new Set(["hotel", "villa"]);
-const DINING_KINDS = new Set(["restaurant", "cafe", "bar_club"]);
-const MONETIZED_KINDS = new Set([
-  "hotel",
+const STAY_KINDS = new Set([
   "villa",
-  "restaurant",
-  "cafe",
-  "bar_club",
-  "beach",
-  "activity_location",
-  "other_monetized",
+  "bungalow_tiny_house",
+  "hotel_pension",
+  "detached_house_apartment",
+  "camp_site",
 ]);
+
+const ACTIVITY_KINDS = new Set([
+  "transfer",
+  "boat_tour",
+  "paragliding_microlight_skydiving",
+  "safari",
+  "water_sports",
+  "ski",
+  "balloon_tour",
+]);
+
+const MONETIZED_KINDS = new Set([...STAY_KINDS, ...ACTIVITY_KINDS]);
 
 function toReadableKindLabel(value: string): string {
   return value
@@ -62,20 +65,24 @@ export function isStayPlaceKind(kind?: string | null): boolean {
   return STAY_KINDS.has(normalizePlaceKind(kind));
 }
 
-export function isDiningPlaceKind(kind?: string | null): boolean {
-  return DINING_KINDS.has(normalizePlaceKind(kind));
+export function isDiningPlaceKind(): boolean {
+  return false;
 }
 
 export function isMonetizedPlaceKind(kind?: string | null): boolean {
   return MONETIZED_KINDS.has(normalizePlaceKind(kind));
 }
 
+export function isActivityPlaceKind(kind?: string | null): boolean {
+  return ACTIVITY_KINDS.has(normalizePlaceKind(kind));
+}
+
+export function isRoomRequiredStayKind(kind?: string | null): boolean {
+  return normalizePlaceKind(kind) === "hotel_pension";
+}
+
 export function getPlacePriceUnitLabel(kind?: string | null): string {
   if (isStayPlaceKind(kind)) return "/gece";
-  if (isDiningPlaceKind(kind)) return "ortalama";
-
-  const normalizedKind = normalizePlaceKind(kind);
-  if (normalizedKind === "activity_location") return "/kisi";
-
+  if (isActivityPlaceKind(kind)) return "/paket";
   return "baslangic";
 }

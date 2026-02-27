@@ -2,7 +2,7 @@ import { create } from "zustand";
 
 export type ThemePreference = "light" | "dark" | "system";
 
-export const STAY_TYPES = ["all", "stay", "experience", "restaurant"] as const;
+export const STAY_TYPES = ["all", "stay", "activity"] as const;
 export type StayType = (typeof STAY_TYPES)[number];
 
 export type SearchFilters = {

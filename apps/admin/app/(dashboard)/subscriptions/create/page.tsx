@@ -266,7 +266,7 @@ export default function CreateSubscriptionPage() {
                       )}
                     </p>
                     <p>
-                      <span className="text-muted-foreground">Gezi Lokasyonları:</span>{" "}
+                      <span className="text-muted-foreground">Aktivite Kategorileri:</span>{" "}
                       {formatLimit(selectedPlanVisit.max, selectedPlanVisit.isUnlimited)}
                     </p>
                     <p>

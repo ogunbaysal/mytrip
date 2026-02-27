@@ -1,29 +1,22 @@
 const TYPE_ALIASES: Record<string, string> = {
-  stay: "hotel",
   experience: "activity",
   experiences: "activity",
   activities: "activity",
-  dining: "restaurant",
-  villa: "hotel",
-  bar_club: "cafe",
-  "bar-club": "cafe",
-  natural_location: "attraction",
-  "natural-location": "attraction",
-  visit_location: "attraction",
-  "visit-location": "attraction",
-  beach: "attraction",
-  other_monetized: "activity",
-  "other-monetized": "activity",
+  villa: "stay",
+  bungalow_tiny_house: "stay",
+  hotel_pension: "stay",
+  detached_house_apartment: "stay",
+  camp_site: "stay",
+  transfer: "activity",
+  boat_tour: "activity",
+  paragliding_microlight_skydiving: "activity",
+  safari: "activity",
+  water_sports: "activity",
+  ski: "activity",
+  balloon_tour: "activity",
 };
 
-const SUPPORTED_TYPES = new Set([
-  "hotel",
-  "restaurant",
-  "cafe",
-  "activity",
-  "attraction",
-  "transport",
-]);
+const SUPPORTED_TYPES = new Set(["stay", "activity"]);
 
 export function normalizePlaceTypeFilter(
   type?: string | null,

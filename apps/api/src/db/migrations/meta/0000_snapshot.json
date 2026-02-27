@@ -1,5 +1,5 @@
 {
-  "id": "7da47c13-e9ae-4df9-8541-613161cc1958",
+  "id": "358dd694-8aed-4264-bdbd-1e26b4ae7329",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -1737,6 +1737,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "room_id": {
+          "name": "room_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "user_id": {
           "name": "user_id",
           "type": "text",
@@ -1789,6 +1795,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "pricing_snapshot": {
+          "name": "pricing_snapshot",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "payment_status": {
           "name": "payment_status",
           "type": "booking_payment_status",
@@ -1818,7 +1830,74 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "booking_place_status_dates_idx": {
+          "name": "booking_place_status_dates_idx",
+          "columns": [
+            {
+              "expression": "place_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "check_in_date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "check_out_date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "booking_room_status_dates_idx": {
+          "name": "booking_room_status_dates_idx",
+          "columns": [
+            {
+              "expression": "room_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "check_in_date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "check_out_date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "booking_place_id_place_id_fk": {
           "name": "booking_place_id_place_id_fk",
@@ -1831,6 +1910,19 @@
             "id"
           ],
           "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "booking_room_id_hotel_room_id_fk": {
+          "name": "booking_room_id_hotel_room_id_fk",
+          "tableFrom": "booking",
+          "tableTo": "hotel_room",
+          "columnsFrom": [
+            "room_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
           "onUpdate": "no action"
         },
         "booking_user_id_user_id_fk": {
@@ -1867,7 +1959,7 @@
       "columns": {
         "id": {
           "name": "id",
-          "type": "text",
+          "type": "place_kind",
           "primaryKey": true,
           "notNull": true
         },
@@ -4093,11 +4185,11 @@
           "typeSchema": "public",
           "primaryKey": false,
           "notNull": true,
-          "default": "'visit_location'"
+          "default": "'villa'"
         },
         "category_id": {
           "name": "category_id",
-          "type": "text",
+          "type": "place_kind",
           "primaryKey": false,
           "notNull": false
         },
@@ -5984,6 +6076,318 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.hotel_room_availability_block": {
+      "name": "hotel_room_availability_block",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "room_id": {
+          "name": "room_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "starts_on": {
+          "name": "starts_on",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ends_on": {
+          "name": "ends_on",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "hotel_room_availability_block_room_dates_idx": {
+          "name": "hotel_room_availability_block_room_dates_idx",
+          "columns": [
+            {
+              "expression": "room_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "starts_on",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ends_on",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "hotel_room_availability_block_room_id_hotel_room_id_fk": {
+          "name": "hotel_room_availability_block_room_id_hotel_room_id_fk",
+          "tableFrom": "hotel_room_availability_block",
+          "tableTo": "hotel_room",
+          "columnsFrom": [
+            "room_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "hotel_room_availability_block_date_order_ck": {
+          "name": "hotel_room_availability_block_date_order_ck",
+          "value": "\"hotel_room_availability_block\".\"starts_on\" <= \"hotel_room_availability_block\".\"ends_on\""
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.place_availability_block": {
+      "name": "place_availability_block",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "place_id": {
+          "name": "place_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "starts_on": {
+          "name": "starts_on",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ends_on": {
+          "name": "ends_on",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "place_availability_block_place_dates_idx": {
+          "name": "place_availability_block_place_dates_idx",
+          "columns": [
+            {
+              "expression": "place_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "starts_on",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ends_on",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "place_availability_block_place_id_place_id_fk": {
+          "name": "place_availability_block_place_id_place_id_fk",
+          "tableFrom": "place_availability_block",
+          "tableTo": "place",
+          "columnsFrom": [
+            "place_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "place_availability_block_date_order_ck": {
+          "name": "place_availability_block_date_order_ck",
+          "value": "\"place_availability_block\".\"starts_on\" <= \"place_availability_block\".\"ends_on\""
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.place_price_rule": {
+      "name": "place_price_rule",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "place_id": {
+          "name": "place_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "starts_on": {
+          "name": "starts_on",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ends_on": {
+          "name": "ends_on",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "nightly_price": {
+          "name": "nightly_price",
+          "type": "numeric(10, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "place_price_rule_place_dates_idx": {
+          "name": "place_price_rule_place_dates_idx",
+          "columns": [
+            {
+              "expression": "place_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "starts_on",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ends_on",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "place_price_rule_place_id_place_id_fk": {
+          "name": "place_price_rule_place_id_place_id_fk",
+          "tableFrom": "place_price_rule",
+          "tableTo": "place",
+          "columnsFrom": [
+            "place_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "place_price_rule_date_order_ck": {
+          "name": "place_price_rule_date_order_ck",
+          "value": "\"place_price_rule\".\"starts_on\" <= \"place_price_rule\".\"ends_on\""
+        }
+      },
+      "isRLSEnabled": false
+    },
     "public.dining_menu": {
       "name": "dining_menu",
       "schema": "",
@@ -7092,33 +7496,19 @@
       "name": "plan_resource_key",
       "schema": "public",
       "values": [
-        "place.hotel",
         "place.villa",
-        "place.restaurant",
-        "place.cafe",
-        "place.bar_club",
-        "place.beach",
-        "place.natural_location",
-        "place.activity_location",
-        "place.visit_location",
-        "place.other_monetized",
+        "place.bungalow_tiny_house",
+        "place.hotel_pension",
+        "place.detached_house_apartment",
+        "place.camp_site",
+        "place.transfer",
+        "place.boat_tour",
+        "place.paragliding_microlight_skydiving",
+        "place.safari",
+        "place.water_sports",
+        "place.ski",
+        "place.balloon_tour",
         "blog.post"
-      ]
-    },
-    "public.place_kind": {
-      "name": "place_kind",
-      "schema": "public",
-      "values": [
-        "hotel",
-        "villa",
-        "restaurant",
-        "cafe",
-        "bar_club",
-        "beach",
-        "natural_location",
-        "activity_location",
-        "visit_location",
-        "other_monetized"
       ]
     },
     "public.place_media_usage": {
@@ -7170,6 +7560,24 @@
         "published",
         "hidden",
         "flagged"
+      ]
+    },
+    "public.place_kind": {
+      "name": "place_kind",
+      "schema": "public",
+      "values": [
+        "villa",
+        "bungalow_tiny_house",
+        "hotel_pension",
+        "detached_house_apartment",
+        "camp_site",
+        "transfer",
+        "boat_tour",
+        "paragliding_microlight_skydiving",
+        "safari",
+        "water_sports",
+        "ski",
+        "balloon_tour"
       ]
     },
     "public.business_registration_status": {

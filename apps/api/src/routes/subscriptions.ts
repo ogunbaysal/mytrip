@@ -1102,16 +1102,18 @@ app.get("/usage", async (c) => {
     ]);
 
     const placeResourceKeys = [
-      "place.hotel",
       "place.villa",
-      "place.restaurant",
-      "place.cafe",
-      "place.bar_club",
-      "place.beach",
-      "place.natural_location",
-      "place.activity_location",
-      "place.visit_location",
-      "place.other_monetized",
+      "place.bungalow_tiny_house",
+      "place.hotel_pension",
+      "place.detached_house_apartment",
+      "place.camp_site",
+      "place.transfer",
+      "place.boat_tour",
+      "place.paragliding_microlight_skydiving",
+      "place.safari",
+      "place.water_sports",
+      "place.ski",
+      "place.balloon_tour",
     ] as const;
 
     const placesCurrent = placeResourceKeys.reduce(

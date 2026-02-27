@@ -14,13 +14,13 @@ CREATE TYPE "public"."file_usage" AS ENUM('blog_hero', 'blog_featured', 'blog_co
 CREATE TYPE "public"."billing_cycle" AS ENUM('monthly', 'quarterly', 'yearly');--> statement-breakpoint
 CREATE TYPE "public"."coupon_discount_type" AS ENUM('percent', 'fixed');--> statement-breakpoint
 CREATE TYPE "public"."coupon_scope" AS ENUM('all_plans', 'specific_plans');--> statement-breakpoint
-CREATE TYPE "public"."plan_resource_key" AS ENUM('place.hotel', 'place.villa', 'place.restaurant', 'place.cafe', 'place.bar_club', 'place.beach', 'place.natural_location', 'place.activity_location', 'place.visit_location', 'place.other_monetized', 'blog.post');--> statement-breakpoint
-CREATE TYPE "public"."place_kind" AS ENUM('hotel', 'villa', 'restaurant', 'cafe', 'bar_club', 'beach', 'natural_location', 'activity_location', 'visit_location', 'other_monetized');--> statement-breakpoint
+CREATE TYPE "public"."plan_resource_key" AS ENUM('place.villa', 'place.bungalow_tiny_house', 'place.hotel_pension', 'place.detached_house_apartment', 'place.camp_site', 'place.transfer', 'place.boat_tour', 'place.paragliding_microlight_skydiving', 'place.safari', 'place.water_sports', 'place.ski', 'place.balloon_tour', 'blog.post');--> statement-breakpoint
 CREATE TYPE "public"."place_media_usage" AS ENUM('cover', 'gallery', 'menu', 'room', 'package', 'other');--> statement-breakpoint
 CREATE TYPE "public"."place_status" AS ENUM('active', 'inactive', 'pending', 'suspended', 'rejected');--> statement-breakpoint
 CREATE TYPE "public"."price_level" AS ENUM('budget', 'moderate', 'expensive', 'luxury');--> statement-breakpoint
 CREATE TYPE "public"."hotel_room_status" AS ENUM('active', 'inactive', 'maintenance');--> statement-breakpoint
 CREATE TYPE "public"."review_status" AS ENUM('published', 'hidden', 'flagged');--> statement-breakpoint
+CREATE TYPE "public"."place_kind" AS ENUM('villa', 'bungalow_tiny_house', 'hotel_pension', 'detached_house_apartment', 'camp_site', 'transfer', 'boat_tour', 'paragliding_microlight_skydiving', 'safari', 'water_sports', 'ski', 'balloon_tour');--> statement-breakpoint
 CREATE TYPE "public"."business_registration_status" AS ENUM('pending', 'approved', 'rejected');--> statement-breakpoint
 CREATE TYPE "public"."currency" AS ENUM('TRY', 'USD', 'EUR');--> statement-breakpoint
 CREATE TYPE "public"."payment_status" AS ENUM('success', 'failed', 'pending', 'refunded');--> statement-breakpoint
@@ -230,6 +230,7 @@ CREATE TABLE "blog_image" (
 CREATE TABLE "booking" (
 	"id" text PRIMARY KEY NOT NULL,
 	"place_id" text NOT NULL,
+	"room_id" text,
 	"user_id" text NOT NULL,
 	"check_in_date" date NOT NULL,
 	"check_out_date" date NOT NULL,
@@ -238,6 +239,7 @@ CREATE TABLE "booking" (
 	"currency" "booking_currency" DEFAULT 'TRY' NOT NULL,
 	"status" "booking_status" DEFAULT 'pending' NOT NULL,
 	"special_requests" text,
+	"pricing_snapshot" text,
 	"payment_status" "booking_payment_status" DEFAULT 'pending' NOT NULL,
 	"booking_reference" text NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
@@ -246,7 +248,7 @@ CREATE TABLE "booking" (
 );
 --> statement-breakpoint
 CREATE TABLE "place_kind_meta" (
-	"id" text PRIMARY KEY NOT NULL,
+	"id" "place_kind" PRIMARY KEY NOT NULL,
 	"slug" text NOT NULL,
 	"name" text NOT NULL,
 	"icon" text,
@@ -483,8 +485,8 @@ CREATE TABLE "place" (
 	"id" text PRIMARY KEY NOT NULL,
 	"slug" text NOT NULL,
 	"name" text NOT NULL,
-	"kind" "place_kind" DEFAULT 'visit_location' NOT NULL,
-	"category_id" text,
+	"kind" "place_kind" DEFAULT 'villa' NOT NULL,
+	"category_id" "place_kind",
 	"description" text,
 	"short_description" text,
 	"address" text,
@@ -672,6 +674,39 @@ CREATE TABLE "hotel_room_rate" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "hotel_room_availability_block" (
+	"id" text PRIMARY KEY NOT NULL,
+	"room_id" text NOT NULL,
+	"starts_on" date NOT NULL,
+	"ends_on" date NOT NULL,
+	"reason" text,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "hotel_room_availability_block_date_order_ck" CHECK ("hotel_room_availability_block"."starts_on" <= "hotel_room_availability_block"."ends_on")
+);
+--> statement-breakpoint
+CREATE TABLE "place_availability_block" (
+	"id" text PRIMARY KEY NOT NULL,
+	"place_id" text NOT NULL,
+	"starts_on" date NOT NULL,
+	"ends_on" date NOT NULL,
+	"reason" text,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "place_availability_block_date_order_ck" CHECK ("place_availability_block"."starts_on" <= "place_availability_block"."ends_on")
+);
+--> statement-breakpoint
+CREATE TABLE "place_price_rule" (
+	"id" text PRIMARY KEY NOT NULL,
+	"place_id" text NOT NULL,
+	"starts_on" date NOT NULL,
+	"ends_on" date NOT NULL,
+	"nightly_price" numeric(10, 2) NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "place_price_rule_date_order_ck" CHECK ("place_price_rule"."starts_on" <= "place_price_rule"."ends_on")
+);
+--> statement-breakpoint
 CREATE TABLE "dining_menu" (
 	"id" text PRIMARY KEY NOT NULL,
 	"place_id" text NOT NULL,
@@ -790,6 +825,7 @@ ALTER TABLE "blog_comment" ADD CONSTRAINT "blog_comment_user_id_user_id_fk" FORE
 ALTER TABLE "blog_image" ADD CONSTRAINT "blog_image_blog_id_blog_id_fk" FOREIGN KEY ("blog_id") REFERENCES "public"."blog"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "blog_image" ADD CONSTRAINT "blog_image_file_id_file_id_fk" FOREIGN KEY ("file_id") REFERENCES "public"."file"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "booking" ADD CONSTRAINT "booking_place_id_place_id_fk" FOREIGN KEY ("place_id") REFERENCES "public"."place"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "booking" ADD CONSTRAINT "booking_room_id_hotel_room_id_fk" FOREIGN KEY ("room_id") REFERENCES "public"."hotel_room"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "booking" ADD CONSTRAINT "booking_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "file" ADD CONSTRAINT "file_uploaded_by_id_user_id_fk" FOREIGN KEY ("uploaded_by_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "business_profile" ADD CONSTRAINT "business_profile_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -834,6 +870,9 @@ ALTER TABLE "hotel_room_feature" ADD CONSTRAINT "hotel_room_feature_room_id_hote
 ALTER TABLE "hotel_room_media" ADD CONSTRAINT "hotel_room_media_room_id_hotel_room_id_fk" FOREIGN KEY ("room_id") REFERENCES "public"."hotel_room"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "hotel_room_media" ADD CONSTRAINT "hotel_room_media_file_id_file_id_fk" FOREIGN KEY ("file_id") REFERENCES "public"."file"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "hotel_room_rate" ADD CONSTRAINT "hotel_room_rate_room_id_hotel_room_id_fk" FOREIGN KEY ("room_id") REFERENCES "public"."hotel_room"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "hotel_room_availability_block" ADD CONSTRAINT "hotel_room_availability_block_room_id_hotel_room_id_fk" FOREIGN KEY ("room_id") REFERENCES "public"."hotel_room"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "place_availability_block" ADD CONSTRAINT "place_availability_block_place_id_place_id_fk" FOREIGN KEY ("place_id") REFERENCES "public"."place"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "place_price_rule" ADD CONSTRAINT "place_price_rule_place_id_place_id_fk" FOREIGN KEY ("place_id") REFERENCES "public"."place"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "dining_menu" ADD CONSTRAINT "dining_menu_place_id_place_id_fk" FOREIGN KEY ("place_id") REFERENCES "public"."place"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "dining_menu_item" ADD CONSTRAINT "dining_menu_item_section_id_dining_menu_section_id_fk" FOREIGN KEY ("section_id") REFERENCES "public"."dining_menu_section"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "dining_menu_item" ADD CONSTRAINT "dining_menu_item_image_file_id_file_id_fk" FOREIGN KEY ("image_file_id") REFERENCES "public"."file"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
@@ -863,6 +902,8 @@ CREATE INDEX "blog_comment_user_id_idx" ON "blog_comment" USING btree ("user_id"
 CREATE UNIQUE INDEX "blog_image_blog_sort_order_uniq" ON "blog_image" USING btree ("blog_id","sort_order");--> statement-breakpoint
 CREATE INDEX "blog_image_blog_sort_idx" ON "blog_image" USING btree ("blog_id","sort_order");--> statement-breakpoint
 CREATE INDEX "blog_image_file_id_idx" ON "blog_image" USING btree ("file_id");--> statement-breakpoint
+CREATE INDEX "booking_place_status_dates_idx" ON "booking" USING btree ("place_id","status","check_in_date","check_out_date");--> statement-breakpoint
+CREATE INDEX "booking_room_status_dates_idx" ON "booking" USING btree ("room_id","status","check_in_date","check_out_date");--> statement-breakpoint
 CREATE UNIQUE INDEX "coupon_code_uniq" ON "coupon" USING btree ("code");--> statement-breakpoint
 CREATE INDEX "coupon_active_idx" ON "coupon" USING btree ("active");--> statement-breakpoint
 CREATE INDEX "coupon_starts_at_idx" ON "coupon" USING btree ("starts_at");--> statement-breakpoint
@@ -920,6 +961,9 @@ CREATE INDEX "hotel_room_place_status_idx" ON "hotel_room" USING btree ("place_i
 CREATE INDEX "hotel_room_feature_room_sort_idx" ON "hotel_room_feature" USING btree ("room_id","sort_order");--> statement-breakpoint
 CREATE UNIQUE INDEX "hotel_room_media_room_sort_uniq" ON "hotel_room_media" USING btree ("room_id","sort_order");--> statement-breakpoint
 CREATE INDEX "hotel_room_rate_room_dates_idx" ON "hotel_room_rate" USING btree ("room_id","starts_on","ends_on");--> statement-breakpoint
+CREATE INDEX "hotel_room_availability_block_room_dates_idx" ON "hotel_room_availability_block" USING btree ("room_id","starts_on","ends_on");--> statement-breakpoint
+CREATE INDEX "place_availability_block_place_dates_idx" ON "place_availability_block" USING btree ("place_id","starts_on","ends_on");--> statement-breakpoint
+CREATE INDEX "place_price_rule_place_dates_idx" ON "place_price_rule" USING btree ("place_id","starts_on","ends_on");--> statement-breakpoint
 CREATE UNIQUE INDEX "dining_menu_place_name_uniq" ON "dining_menu" USING btree ("place_id","name");--> statement-breakpoint
 CREATE INDEX "dining_menu_place_sort_idx" ON "dining_menu" USING btree ("place_id","sort_order");--> statement-breakpoint
 CREATE INDEX "dining_menu_item_section_sort_idx" ON "dining_menu_item" USING btree ("section_id","sort_order");--> statement-breakpoint

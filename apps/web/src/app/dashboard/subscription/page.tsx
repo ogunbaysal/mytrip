@@ -27,16 +27,18 @@ import {
 import { api } from "@/lib/api";
 
 const RESOURCE_LABELS: Record<string, string> = {
-  "place.hotel": "Otel",
   "place.villa": "Villa",
-  "place.restaurant": "Restoran",
-  "place.cafe": "Kafe",
-  "place.bar_club": "Bar/Club",
-  "place.beach": "Plaj",
-  "place.natural_location": "Doğal Lokasyon",
-  "place.activity_location": "Aktivite Lokasyonu",
-  "place.visit_location": "Ziyaret Lokasyonu",
-  "place.other_monetized": "Diğer Ücretli Lokasyonlar",
+  "place.bungalow_tiny_house": "Bungalov & Tiny House",
+  "place.hotel_pension": "Otel & Pansiyon",
+  "place.detached_house_apartment": "Müstakil Ev & Daire",
+  "place.camp_site": "Kamp Alanı",
+  "place.transfer": "Transfer",
+  "place.boat_tour": "Tekne Turu",
+  "place.paragliding_microlight_skydiving": "Paraşüt & Microlight & Skydiving",
+  "place.safari": "Safari",
+  "place.water_sports": "Su Sporları",
+  "place.ski": "Kayak",
+  "place.balloon_tour": "Balon Turu",
   "blog.post": "Blog Yazısı",
 };
 

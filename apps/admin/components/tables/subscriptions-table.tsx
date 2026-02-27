@@ -343,7 +343,7 @@ export function SubscriptionsTable({ initialData }: SubscriptionsTableProps) {
         return (
           <div className="space-y-2 min-w-[200px]">
             {renderUsageBlock("Ücretli Mekanlar", monetized)}
-            {renderUsageBlock("Gezi Lokasyonları", visit)}
+            {renderUsageBlock("Aktivite Kategorileri", visit)}
             {renderUsageBlock("Blog Yazıları", blog)}
           </div>
         )

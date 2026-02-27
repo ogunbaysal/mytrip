@@ -4,34 +4,55 @@ import {
 } from "@/types/subscriptions";
 
 export const RESOURCE_LABELS: Record<PlanResourceKey, string> = {
-  "place.hotel": "Oteller",
-  "place.villa": "Villalar",
-  "place.restaurant": "Restoranlar",
-  "place.cafe": "Kafeler",
-  "place.bar_club": "Barlar / Kulüpler",
-  "place.beach": "Plajlar",
-  "place.natural_location": "Doğal Lokasyonlar",
-  "place.activity_location": "Aktivite Lokasyonları",
-  "place.visit_location": "Gezi Lokasyonları",
-  "place.other_monetized": "Diğer Ücretli Lokasyonlar",
+  "place.villa": "Villa",
+  "place.bungalow_tiny_house": "Bungalov & Tiny House",
+  "place.hotel_pension": "Otel & Pansiyon",
+  "place.detached_house_apartment": "Müstakil Ev & Daire",
+  "place.camp_site": "Kamp Alanı",
+  "place.transfer": "Transfer",
+  "place.boat_tour": "Tekne Turu",
+  "place.paragliding_microlight_skydiving": "Paraşüt & Microlight & Skydiving",
+  "place.safari": "Safari",
+  "place.water_sports": "Su Sporları",
+  "place.ski": "Kayak",
+  "place.balloon_tour": "Balon Turu",
   "blog.post": "Blog Yazıları",
 };
 
 export const PLACE_RESOURCE_KEYS: PlanResourceKey[] = [
-  "place.hotel",
   "place.villa",
-  "place.restaurant",
-  "place.cafe",
-  "place.bar_club",
-  "place.beach",
-  "place.natural_location",
-  "place.activity_location",
-  "place.visit_location",
-  "place.other_monetized",
+  "place.bungalow_tiny_house",
+  "place.hotel_pension",
+  "place.detached_house_apartment",
+  "place.camp_site",
+  "place.transfer",
+  "place.boat_tour",
+  "place.paragliding_microlight_skydiving",
+  "place.safari",
+  "place.water_sports",
+  "place.ski",
+  "place.balloon_tour",
 ];
 
-export const MONETIZED_PLACE_RESOURCE_KEYS: PlanResourceKey[] =
-  PLACE_RESOURCE_KEYS.filter((key) => key !== "place.visit_location");
+export const STAY_RESOURCE_KEYS: PlanResourceKey[] = [
+  "place.villa",
+  "place.bungalow_tiny_house",
+  "place.hotel_pension",
+  "place.detached_house_apartment",
+  "place.camp_site",
+];
+
+export const ACTIVITY_RESOURCE_KEYS: PlanResourceKey[] = [
+  "place.transfer",
+  "place.boat_tour",
+  "place.paragliding_microlight_skydiving",
+  "place.safari",
+  "place.water_sports",
+  "place.ski",
+  "place.balloon_tour",
+];
+
+export const MONETIZED_PLACE_RESOURCE_KEYS: PlanResourceKey[] = PLACE_RESOURCE_KEYS;
 
 export type UsageByResource = Partial<Record<PlanResourceKey, number>>;
 
@@ -138,17 +159,18 @@ export const getMonetizedPlaceUsageSummary = (
   usageByResource: UsageByResource | undefined,
 ) => buildSummary(entitlements, usageByResource, MONETIZED_PLACE_RESOURCE_KEYS);
 
-export const getVisitLocationUsageSummary = (
+export const getStayUsageSummary = (
   entitlements: PlanEntitlement[] | undefined,
   usageByResource: UsageByResource | undefined,
-): UsageSummary => {
-  const entitlement = getEntitlementByKey(entitlements, "place.visit_location");
-  return {
-    current: usageByResource?.["place.visit_location"] ?? 0,
-    max: entitlement?.isUnlimited ? null : (entitlement?.limitCount ?? 0),
-    isUnlimited: Boolean(entitlement?.isUnlimited),
-  };
-};
+): UsageSummary => buildSummary(entitlements, usageByResource, STAY_RESOURCE_KEYS);
+
+export const getActivityUsageSummary = (
+  entitlements: PlanEntitlement[] | undefined,
+  usageByResource: UsageByResource | undefined,
+): UsageSummary => buildSummary(entitlements, usageByResource, ACTIVITY_RESOURCE_KEYS);
+
+// Backward-compat alias for existing call sites.
+export const getVisitLocationUsageSummary = getActivityUsageSummary;
 
 export const getBlogUsageSummary = (
   entitlements: PlanEntitlement[] | undefined,

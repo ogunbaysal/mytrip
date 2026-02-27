@@ -17,33 +17,41 @@ export const resolvePublicFileUrl = (value: string | null | undefined): string =
 };
 
 const PLACE_TYPE_TO_KIND_IDS: Record<string, readonly string[]> = {
-  hotel: ["hotel", "villa"],
-  restaurant: ["restaurant"],
-  cafe: ["cafe", "bar_club"],
-  activity: [
-    "activity_location",
-    "beach",
-    "natural_location",
-    "visit_location",
-    "other_monetized",
+  stay: [
+    "villa",
+    "bungalow_tiny_house",
+    "hotel_pension",
+    "detached_house_apartment",
+    "camp_site",
   ],
-  attraction: ["visit_location", "natural_location", "beach"],
-  transport: [],
+  activity: [
+    "transfer",
+    "boat_tour",
+    "paragliding_microlight_skydiving",
+    "safari",
+    "water_sports",
+    "ski",
+    "balloon_tour",
+  ],
 };
 
 const PLACE_TYPE_TO_KIND_SLUGS: Record<string, readonly string[]> = {
-  hotel: ["hotel", "villa"],
-  restaurant: ["restaurant"],
-  cafe: ["cafe", "bar-club"],
-  activity: [
-    "activity-location",
-    "beach",
-    "natural-location",
-    "visit-location",
-    "other-monetized",
+  stay: [
+    "villa",
+    "bungalov-tiny-house",
+    "otel-pansiyon",
+    "mustakil-ev-daire",
+    "kamp-alani",
   ],
-  attraction: ["visit-location", "natural-location", "beach"],
-  transport: [],
+  activity: [
+    "transfer",
+    "tekne-turu",
+    "parasut-microlight-skydiving",
+    "safari",
+    "su-sporlari",
+    "kayak",
+    "balon-turu",
+  ],
 };
 
 const KIND_SLUG_TO_PLACE_TYPE: Record<string, string> = Object.entries(

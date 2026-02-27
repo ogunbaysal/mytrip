@@ -54,6 +54,7 @@ import {
 } from "../../lib/plan-entitlements.ts";
 import { evaluateEntitlementLimit } from "../../lib/entitlement-evaluator.ts";
 import {
+  isStayPlaceKind,
   supportsMenuForKind,
   supportsPackagesForKind,
   supportsRoomsForKind,
@@ -70,18 +71,22 @@ const placeStatusEnum = [
   "rejected",
 ] as const;
 
-const placeKindEnum = z.enum([
-  "hotel",
+const OWNER_PLACE_KIND_IDS = [
   "villa",
-  "restaurant",
-  "cafe",
-  "bar_club",
-  "beach",
-  "natural_location",
-  "activity_location",
-  "visit_location",
-  "other_monetized",
-]);
+  "bungalow_tiny_house",
+  "hotel_pension",
+  "detached_house_apartment",
+  "camp_site",
+  "transfer",
+  "boat_tour",
+  "paragliding_microlight_skydiving",
+  "safari",
+  "water_sports",
+  "ski",
+  "balloon_tour",
+] as const;
+
+const placeKindEnum = z.enum(OWNER_PLACE_KIND_IDS);
 
 const placeBaseSchema = z.object({
   name: z.string().min(2).max(200),
@@ -107,18 +112,7 @@ const placeBaseSchema = z.object({
   checkOutInfo: z.record(z.string(), z.unknown()).optional(),
 });
 
-const createPlaceSchema = z.discriminatedUnion("kind", [
-  placeBaseSchema.extend({ kind: z.literal("hotel") }),
-  placeBaseSchema.extend({ kind: z.literal("villa") }),
-  placeBaseSchema.extend({ kind: z.literal("restaurant") }),
-  placeBaseSchema.extend({ kind: z.literal("cafe") }),
-  placeBaseSchema.extend({ kind: z.literal("bar_club") }),
-  placeBaseSchema.extend({ kind: z.literal("beach") }),
-  placeBaseSchema.extend({ kind: z.literal("natural_location") }),
-  placeBaseSchema.extend({ kind: z.literal("activity_location") }),
-  placeBaseSchema.extend({ kind: z.literal("visit_location") }),
-  placeBaseSchema.extend({ kind: z.literal("other_monetized") }),
-]);
+const createPlaceSchema = placeBaseSchema.extend({ kind: placeKindEnum });
 
 const updatePlaceSchema = placeBaseSchema
   .partial()
@@ -1490,7 +1484,7 @@ async function getOwnedPackageContext({
   return row ?? null;
 }
 
-const isStayKind = (kind: string) => kind === "hotel" || kind === "villa";
+const isStayKind = (kind: string) => isStayPlaceKind(kind);
 
 const parsePricingSnapshot = (input: string | null) => {
   if (!input) return null;
@@ -2781,8 +2775,15 @@ app.get("/:id/availability-blocks", async (c) => {
     const placeId = c.req.param("id");
     const placeCtx = await getOwnedPlaceContext(placeId, userId);
     if (!placeCtx) return c.json({ error: "Place not found" }, 404);
-    if (placeCtx.kind !== "villa") {
-      return c.json({ error: "Not supported", message: "Otel için oda bazlı takvim blokları kullanılmalıdır" }, 400);
+    if (!isStayKind(placeCtx.kind) || supportsRoomsForKind(placeCtx.kind)) {
+      return c.json(
+        {
+          error: "Not supported",
+          message:
+            "Sadece oda gerektirmeyen konaklama kategorileri için mekan bazlı takvim blokları kullanılabilir",
+        },
+        400,
+      );
     }
 
     const blocks = await db
@@ -2811,8 +2812,15 @@ app.post(
       const data = c.req.valid("json");
       const placeCtx = await getOwnedPlaceContext(placeId, userId);
       if (!placeCtx) return c.json({ error: "Place not found" }, 404);
-      if (placeCtx.kind !== "villa") {
-        return c.json({ error: "Not supported", message: "Otel için oda bazlı takvim blokları kullanılmalıdır" }, 400);
+      if (!isStayKind(placeCtx.kind) || supportsRoomsForKind(placeCtx.kind)) {
+        return c.json(
+          {
+            error: "Not supported",
+            message:
+              "Sadece oda gerektirmeyen konaklama kategorileri için mekan bazlı takvim blokları kullanılabilir",
+          },
+          400,
+        );
       }
 
       const dateValidation = validateInclusiveDateRange(data.startsOn, data.endsOn);
@@ -2852,8 +2860,15 @@ app.delete("/:id/availability-blocks/:blockId", async (c) => {
     const blockId = c.req.param("blockId");
     const placeCtx = await getOwnedPlaceContext(placeId, userId);
     if (!placeCtx) return c.json({ error: "Place not found" }, 404);
-    if (placeCtx.kind !== "villa") {
-      return c.json({ error: "Not supported", message: "Otel için oda bazlı takvim blokları kullanılmalıdır" }, 400);
+    if (!isStayKind(placeCtx.kind) || supportsRoomsForKind(placeCtx.kind)) {
+      return c.json(
+        {
+          error: "Not supported",
+          message:
+            "Sadece oda gerektirmeyen konaklama kategorileri için mekan bazlı takvim blokları kullanılabilir",
+        },
+        400,
+      );
     }
 
     const [deleted] = await db

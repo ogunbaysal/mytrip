@@ -28,7 +28,6 @@ import { api } from "@/lib/api";
 import {
   getPlaceKindLabel,
   getPlacePriceUnitLabel,
-  isDiningPlaceKind,
   isMonetizedPlaceKind,
   isStayPlaceKind,
   normalizePlaceKind,
@@ -153,182 +152,34 @@ function buildKindSection(
     };
   }
 
-  if (isDiningPlaceKind(normalizedKind)) {
-    const averagePrice =
-      toNumber(profile.averagePricePerPerson) ?? (nightlyPrice > 0 ? nightlyPrice : undefined);
-    const reservationRequired = toBoolean(profile.reservationRequired);
-    const servesAlcohol = toBoolean(profile.servesAlcohol);
-    const dressCode = toStringValue(profile.dressCode);
+  const startingPrice =
+    toNumber(profile.startingPrice) ?? (nightlyPrice > 0 ? nightlyPrice : undefined);
+  const averageDurationMinutes = toNumber(profile.averageDurationMinutes);
+  const requiresReservation = toBoolean(profile.requiresReservation);
+  const safetyRequirements = toStringValue(profile.safetyRequirements);
 
-    if (averagePrice) {
-      facts.push({
-        label: "Ortalama kişi başı",
-        value: priceFormatter.format(averagePrice),
-      });
-    }
-    if (reservationRequired !== undefined) {
-      tags.push(reservationRequired ? "Rezervasyon gerekli" : "Rezervasyon opsiyonel");
-    }
-    if (servesAlcohol !== undefined) {
-      tags.push(servesAlcohol ? "Alkol servisi var" : "Alkol servisi yok");
-    }
-    if (dressCode) {
-      facts.push({ label: "Dress code", value: dressCode });
-    }
-
-    return {
-      title: "Servis bilgileri",
-      facts,
-      tags,
-      notes,
-      sidebarCtaLabel: "Menüyü incele",
-    };
+  if (startingPrice) {
+    facts.push({ label: "Başlangıç fiyatı", value: priceFormatter.format(startingPrice) });
   }
-
-  if (normalizedKind === "beach") {
-    const entranceFee =
-      toNumber(profile.entranceFee) ?? (nightlyPrice > 0 ? nightlyPrice : undefined);
-    const hasSunbedRental = toBoolean(profile.hasSunbedRental);
-    const hasShower = toBoolean(profile.hasShower);
-    const hasLifeguard = toBoolean(profile.hasLifeguard);
-
-    if (entranceFee) {
-      facts.push({ label: "Giriş ücreti", value: priceFormatter.format(entranceFee) });
-    }
-    if (hasSunbedRental !== undefined) {
-      tags.push(hasSunbedRental ? "Şezlong kiralama var" : "Şezlong kiralama yok");
-    }
-    if (hasShower !== undefined) {
-      tags.push(hasShower ? "Duş alanı mevcut" : "Duş alanı yok");
-    }
-    if (hasLifeguard !== undefined) {
-      tags.push(hasLifeguard ? "Cankurtaran mevcut" : "Cankurtaran bulunmuyor");
-    }
-
-    return {
-      title: "Plaj bilgileri",
-      facts,
-      tags,
-      notes,
-      sidebarCtaLabel: "Giriş bilgilerini gör",
-    };
+  if (averageDurationMinutes) {
+    facts.push({
+      label: "Ortalama süre",
+      value: `${averageDurationMinutes} dakika`,
+    });
   }
-
-  if (normalizedKind === "natural_location") {
-    const entryFee =
-      toNumber(profile.entryFee) ?? (nightlyPrice > 0 ? nightlyPrice : undefined);
-    const difficultyLevel = toStringValue(profile.difficultyLevel);
-    const recommendedDurationMinutes = toNumber(profile.recommendedDurationMinutes);
-
-    if (entryFee) {
-      facts.push({ label: "Giriş ücreti", value: priceFormatter.format(entryFee) });
-    }
-    if (difficultyLevel) {
-      facts.push({ label: "Zorluk seviyesi", value: difficultyLevel });
-    }
-    if (recommendedDurationMinutes) {
-      facts.push({
-        label: "Önerilen süre",
-        value: `${recommendedDurationMinutes} dakika`,
-      });
-    }
-
-    return {
-      title: "Doğal rota bilgileri",
-      facts,
-      tags,
-      notes,
-      sidebarCtaLabel: "Rota detaylarını gör",
-    };
+  if (requiresReservation !== undefined) {
+    tags.push(requiresReservation ? "Rezervasyon gerekli" : "Anlık katılım mümkün");
   }
-
-  if (normalizedKind === "activity_location") {
-    const startingPrice =
-      toNumber(profile.startingPrice) ?? (nightlyPrice > 0 ? nightlyPrice : undefined);
-    const averageDurationMinutes = toNumber(profile.averageDurationMinutes);
-    const requiresReservation = toBoolean(profile.requiresReservation);
-    const safetyRequirements = toStringValue(profile.safetyRequirements);
-
-    if (startingPrice) {
-      facts.push({ label: "Başlangıç fiyatı", value: priceFormatter.format(startingPrice) });
-    }
-    if (averageDurationMinutes) {
-      facts.push({
-        label: "Ortalama süre",
-        value: `${averageDurationMinutes} dakika`,
-      });
-    }
-    if (requiresReservation !== undefined) {
-      tags.push(requiresReservation ? "Rezervasyon gerekli" : "Anlık katılım mümkün");
-    }
-    if (safetyRequirements) {
-      notes.push(safetyRequirements);
-    }
-
-    return {
-      title: "Aktivite bilgileri",
-      facts,
-      tags,
-      notes,
-      sidebarCtaLabel: "Paketleri incele",
-    };
-  }
-
-  if (normalizedKind === "visit_location") {
-    const ticketPrice =
-      toNumber(profile.ticketPrice) ?? (nightlyPrice > 0 ? nightlyPrice : undefined);
-    const recommendedDurationMinutes = toNumber(profile.recommendedDurationMinutes);
-    const requiresGuide = toBoolean(profile.requiresGuide);
-
-    if (ticketPrice) {
-      facts.push({ label: "Bilet", value: priceFormatter.format(ticketPrice) });
-    }
-    if (recommendedDurationMinutes) {
-      facts.push({
-        label: "Önerilen gezi süresi",
-        value: `${recommendedDurationMinutes} dakika`,
-      });
-    }
-    if (requiresGuide !== undefined) {
-      tags.push(requiresGuide ? "Rehber eşliğinde" : "Bireysel geziye uygun");
-    }
-
-    return {
-      title: "Ziyaret bilgileri",
-      facts,
-      tags,
-      notes,
-      sidebarCtaLabel: "Ziyaret planını gör",
-    };
-  }
-
-  if (normalizedKind === "other_monetized") {
-    const startingPrice =
-      toNumber(profile.startingPrice) ?? (nightlyPrice > 0 ? nightlyPrice : undefined);
-    const notesText = toStringValue(profile.notes);
-
-    if (startingPrice) {
-      facts.push({ label: "Başlangıç fiyatı", value: priceFormatter.format(startingPrice) });
-    }
-    if (notesText) {
-      notes.push(notesText);
-    }
-
-    return {
-      title: "Fiyatlandırma bilgileri",
-      facts,
-      tags,
-      notes,
-      sidebarCtaLabel: "Detayları incele",
-    };
+  if (safetyRequirements) {
+    notes.push(safetyRequirements);
   }
 
   return {
-    title: "Öne çıkan özellikler",
+    title: "Aktivite bilgileri",
     facts,
     tags,
     notes,
-    sidebarCtaLabel: "Detayları incele",
+    sidebarCtaLabel: "Paketleri incele",
   };
 }
 
@@ -367,7 +218,6 @@ export default async function PlaceDetailPage({
   const normalizedKind = normalizePlaceKind(kindSource);
   const kindLabel = getPlaceKindLabel(kindSource, detail.type);
   const isStayKind = isStayPlaceKind(normalizedKind);
-  const isDiningKind = isDiningPlaceKind(normalizedKind);
   const hasBookablePrice =
     detail.nightlyPrice > 0 && isMonetizedPlaceKind(normalizedKind);
   const bookingPriceUnitLabel = getPlacePriceUnitLabel(normalizedKind);
@@ -839,7 +689,7 @@ export default async function PlaceDetailPage({
           <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
             <h2 className="text-xl font-semibold">Yakındaki öneriler</h2>
             <Link
-              href={isDiningKind ? "/places?type=restaurant" : "/places"}
+              href="/places"
               className="text-sm font-semibold text-primary hover:text-primary/80"
             >
               Tüm mekanları gör

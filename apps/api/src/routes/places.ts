@@ -70,12 +70,8 @@ function toLegacyPlace(row: PlaceRow) {
 }
 
 const TYPE_NAMES: Record<string, string> = {
-  hotel: "Hotels",
-  restaurant: "Restaurants",
-  cafe: "Cafes",
-  activity: "Activities",
-  attraction: "Attractions",
-  transport: "Transportation",
+  stay: "Konaklama",
+  activity: "Aktivite",
 };
 
 const normalizeFilterSlug = (value: string): string =>
@@ -531,7 +527,7 @@ app.get("/categories", async (c) => {
       )
       .where(eq(placeKind.active, true))
       .groupBy(placeKind.id)
-      .orderBy(sql`COUNT(${place.id}) DESC`);
+      .orderBy(asc(placeKind.sortOrder), asc(placeKind.name));
 
     return c.json({
       categories: kinds.map((cat) => ({
@@ -593,7 +589,7 @@ app.get("/kinds", async (c) => {
       )
       .where(eq(placeKind.active, true))
       .groupBy(placeKind.id)
-      .orderBy(sql`COUNT(${place.id}) DESC`);
+      .orderBy(asc(placeKind.sortOrder), asc(placeKind.name));
 
     return c.json({ kinds });
   } catch (error) {

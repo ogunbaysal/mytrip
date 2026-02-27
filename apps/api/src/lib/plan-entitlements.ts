@@ -10,16 +10,18 @@ import {
 } from "../db/schemas/index.ts";
 
 export type PlanResourceKey =
-  | "place.hotel"
   | "place.villa"
-  | "place.restaurant"
-  | "place.cafe"
-  | "place.bar_club"
-  | "place.beach"
-  | "place.natural_location"
-  | "place.activity_location"
-  | "place.visit_location"
-  | "place.other_monetized"
+  | "place.bungalow_tiny_house"
+  | "place.hotel_pension"
+  | "place.detached_house_apartment"
+  | "place.camp_site"
+  | "place.transfer"
+  | "place.boat_tour"
+  | "place.paragliding_microlight_skydiving"
+  | "place.safari"
+  | "place.water_sports"
+  | "place.ski"
+  | "place.balloon_tour"
   | "blog.post";
 
 export type PlanEntitlement = {
@@ -28,17 +30,21 @@ export type PlanEntitlement = {
   isUnlimited: boolean;
 };
 
+const DEFAULT_PLACE_RESOURCE_KEY: PlanResourceKey = "place.villa";
+
 const PLACE_KIND_TO_RESOURCE_KEY: Record<string, PlanResourceKey> = {
-  hotel: "place.hotel",
   villa: "place.villa",
-  restaurant: "place.restaurant",
-  cafe: "place.cafe",
-  bar_club: "place.bar_club",
-  beach: "place.beach",
-  natural_location: "place.natural_location",
-  activity_location: "place.activity_location",
-  visit_location: "place.visit_location",
-  other_monetized: "place.other_monetized",
+  bungalow_tiny_house: "place.bungalow_tiny_house",
+  hotel_pension: "place.hotel_pension",
+  detached_house_apartment: "place.detached_house_apartment",
+  camp_site: "place.camp_site",
+  transfer: "place.transfer",
+  boat_tour: "place.boat_tour",
+  paragliding_microlight_skydiving: "place.paragliding_microlight_skydiving",
+  safari: "place.safari",
+  water_sports: "place.water_sports",
+  ski: "place.ski",
+  balloon_tour: "place.balloon_tour",
 };
 
 const RESOURCE_KEY_TO_PLACE_KIND: Partial<Record<PlanResourceKey, string>> =
@@ -50,11 +56,26 @@ const RESOURCE_KEY_TO_PLACE_KIND: Partial<Record<PlanResourceKey, string>> =
     {} as Partial<Record<PlanResourceKey, string>>,
   );
 
+export const PLACE_RESOURCE_KEYS: PlanResourceKey[] = [
+  "place.villa",
+  "place.bungalow_tiny_house",
+  "place.hotel_pension",
+  "place.detached_house_apartment",
+  "place.camp_site",
+  "place.transfer",
+  "place.boat_tour",
+  "place.paragliding_microlight_skydiving",
+  "place.safari",
+  "place.water_sports",
+  "place.ski",
+  "place.balloon_tour",
+];
+
 export const resolveResourceKeyForPlaceKind = (
   kind: string | null | undefined,
 ): PlanResourceKey => {
-  if (!kind) return "place.other_monetized";
-  return PLACE_KIND_TO_RESOURCE_KEY[kind] ?? "place.other_monetized";
+  if (!kind) return DEFAULT_PLACE_RESOURCE_KEY;
+  return PLACE_KIND_TO_RESOURCE_KEY[kind] ?? DEFAULT_PLACE_RESOURCE_KEY;
 };
 
 export const resolvePlaceKindForResourceKey = (
@@ -176,16 +197,20 @@ export const getCurrentUsageByResource = async (userId: string) => {
   }
 
   const usage: Record<PlanResourceKey, number> = {
-    "place.hotel": placeCountByKind.get("hotel") ?? 0,
     "place.villa": placeCountByKind.get("villa") ?? 0,
-    "place.restaurant": placeCountByKind.get("restaurant") ?? 0,
-    "place.cafe": placeCountByKind.get("cafe") ?? 0,
-    "place.bar_club": placeCountByKind.get("bar_club") ?? 0,
-    "place.beach": placeCountByKind.get("beach") ?? 0,
-    "place.natural_location": placeCountByKind.get("natural_location") ?? 0,
-    "place.activity_location": placeCountByKind.get("activity_location") ?? 0,
-    "place.visit_location": placeCountByKind.get("visit_location") ?? 0,
-    "place.other_monetized": placeCountByKind.get("other_monetized") ?? 0,
+    "place.bungalow_tiny_house": placeCountByKind.get("bungalow_tiny_house") ?? 0,
+    "place.hotel_pension": placeCountByKind.get("hotel_pension") ?? 0,
+    "place.detached_house_apartment":
+      placeCountByKind.get("detached_house_apartment") ?? 0,
+    "place.camp_site": placeCountByKind.get("camp_site") ?? 0,
+    "place.transfer": placeCountByKind.get("transfer") ?? 0,
+    "place.boat_tour": placeCountByKind.get("boat_tour") ?? 0,
+    "place.paragliding_microlight_skydiving":
+      placeCountByKind.get("paragliding_microlight_skydiving") ?? 0,
+    "place.safari": placeCountByKind.get("safari") ?? 0,
+    "place.water_sports": placeCountByKind.get("water_sports") ?? 0,
+    "place.ski": placeCountByKind.get("ski") ?? 0,
+    "place.balloon_tour": placeCountByKind.get("balloon_tour") ?? 0,
     "blog.post": blogCountRows[0]?.count ?? 0,
   };
 

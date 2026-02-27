@@ -26,17 +26,18 @@ const formSchema = z.object({
   description: z.string().optional(),
   price: z.coerce.number().min(0, "Fiyat 0 veya daha büyük olmalıdır"),
   currency: z.enum(["TRY", "USD", "EUR"]),
-  hotelLimit: z.coerce.number().int().min(0),
   villaLimit: z.coerce.number().int().min(0),
-  restaurantLimit: z.coerce.number().int().min(0),
-  cafeLimit: z.coerce.number().int().min(0),
-  barClubLimit: z.coerce.number().int().min(0),
-  beachLimit: z.coerce.number().int().min(0),
-  naturalLocationLimit: z.coerce.number().int().min(0),
-  activityLocationLimit: z.coerce.number().int().min(0),
-  otherMonetizedLimit: z.coerce.number().int().min(0),
-  visitLocationUnlimited: z.boolean().default(true),
-  visitLocationLimit: z.coerce.number().int().min(0).optional(),
+  bungalowTinyHouseLimit: z.coerce.number().int().min(0),
+  hotelPensionLimit: z.coerce.number().int().min(0),
+  detachedHouseApartmentLimit: z.coerce.number().int().min(0),
+  campSiteLimit: z.coerce.number().int().min(0),
+  transferLimit: z.coerce.number().int().min(0),
+  boatTourLimit: z.coerce.number().int().min(0),
+  paraglidingMicrolightSkydivingLimit: z.coerce.number().int().min(0),
+  safariLimit: z.coerce.number().int().min(0),
+  waterSportsLimit: z.coerce.number().int().min(0),
+  skiLimit: z.coerce.number().int().min(0),
+  balloonTourLimit: z.coerce.number().int().min(0),
   blogPostLimit: z.coerce.number().int().min(0),
   featuresText: z.string().optional(),
   active: z.boolean().default(true),
@@ -51,26 +52,35 @@ type PlanEntitlement = {
 };
 
 type PlaceLimitFieldName =
-  | "hotelLimit"
   | "villaLimit"
-  | "restaurantLimit"
-  | "cafeLimit"
-  | "barClubLimit"
-  | "beachLimit"
-  | "naturalLocationLimit"
-  | "activityLocationLimit"
-  | "otherMonetizedLimit";
+  | "bungalowTinyHouseLimit"
+  | "hotelPensionLimit"
+  | "detachedHouseApartmentLimit"
+  | "campSiteLimit"
+  | "transferLimit"
+  | "boatTourLimit"
+  | "paraglidingMicrolightSkydivingLimit"
+  | "safariLimit"
+  | "waterSportsLimit"
+  | "skiLimit"
+  | "balloonTourLimit";
 
 const PLACE_LIMIT_FIELDS: Array<{ name: PlaceLimitFieldName; label: string }> = [
-  { name: "hotelLimit", label: "Otel" },
   { name: "villaLimit", label: "Villa" },
-  { name: "restaurantLimit", label: "Restoran" },
-  { name: "cafeLimit", label: "Kafe" },
-  { name: "barClubLimit", label: "Bar / Club" },
-  { name: "beachLimit", label: "Plaj" },
-  { name: "naturalLocationLimit", label: "Doğal Lokasyon" },
-  { name: "activityLocationLimit", label: "Aktivite Lokasyonu" },
-  { name: "otherMonetizedLimit", label: "Diğer Ücretli Lokasyonlar" },
+  { name: "bungalowTinyHouseLimit", label: "Bungalov & Tiny House" },
+  { name: "hotelPensionLimit", label: "Otel & Pansiyon" },
+  { name: "detachedHouseApartmentLimit", label: "Müstakil Ev & Daire" },
+  { name: "campSiteLimit", label: "Kamp Alanı" },
+  { name: "transferLimit", label: "Transfer" },
+  { name: "boatTourLimit", label: "Tekne Turu" },
+  {
+    name: "paraglidingMicrolightSkydivingLimit",
+    label: "Paraşüt & Microlight & Skydiving",
+  },
+  { name: "safariLimit", label: "Safari" },
+  { name: "waterSportsLimit", label: "Su Sporları" },
+  { name: "skiLimit", label: "Kayak" },
+  { name: "balloonTourLimit", label: "Balon Turu" },
 ];
 
 interface PlanFormProps {
@@ -104,7 +114,6 @@ export const PlanForm: React.FC<PlanFormProps> = ({ initialData }) => {
     initialData?.maxPlaces ?? initialData?.limits?.maxPlaces ?? 1;
   const fallbackBlogLimit =
     initialData?.maxBlogs ?? initialData?.limits?.maxBlogs ?? 1;
-  const visitEntitlement = entitlementMap.get("place.visit_location");
 
   const defaultValues: PlanFormValues = initialData
     ? {
@@ -112,53 +121,58 @@ export const PlanForm: React.FC<PlanFormProps> = ({ initialData }) => {
         description: initialData.description || "",
         price: parseFloat(initialData.price.toString()),
         currency: initialData.currency as "TRY" | "USD" | "EUR",
-        hotelLimit: resolveLimitValue(
+        villaLimit: resolveLimitValue(entitlementMap, "place.villa", fallbackPlaceLimit),
+        bungalowTinyHouseLimit: resolveLimitValue(
           entitlementMap,
-          "place.hotel",
+          "place.bungalow_tiny_house",
           fallbackPlaceLimit,
         ),
-        villaLimit: resolveLimitValue(
+        hotelPensionLimit: resolveLimitValue(
           entitlementMap,
-          "place.villa",
+          "place.hotel_pension",
           fallbackPlaceLimit,
         ),
-        restaurantLimit: resolveLimitValue(
+        detachedHouseApartmentLimit: resolveLimitValue(
           entitlementMap,
-          "place.restaurant",
+          "place.detached_house_apartment",
           fallbackPlaceLimit,
         ),
-        cafeLimit: resolveLimitValue(
+        campSiteLimit: resolveLimitValue(
           entitlementMap,
-          "place.cafe",
+          "place.camp_site",
           fallbackPlaceLimit,
         ),
-        barClubLimit: resolveLimitValue(
+        transferLimit: resolveLimitValue(
           entitlementMap,
-          "place.bar_club",
+          "place.transfer",
           fallbackPlaceLimit,
         ),
-        beachLimit: resolveLimitValue(
+        boatTourLimit: resolveLimitValue(
           entitlementMap,
-          "place.beach",
+          "place.boat_tour",
           fallbackPlaceLimit,
         ),
-        naturalLocationLimit: resolveLimitValue(
+        paraglidingMicrolightSkydivingLimit: resolveLimitValue(
           entitlementMap,
-          "place.natural_location",
+          "place.paragliding_microlight_skydiving",
           fallbackPlaceLimit,
         ),
-        activityLocationLimit: resolveLimitValue(
+        safariLimit: resolveLimitValue(
           entitlementMap,
-          "place.activity_location",
+          "place.safari",
           fallbackPlaceLimit,
         ),
-        otherMonetizedLimit: resolveLimitValue(
+        waterSportsLimit: resolveLimitValue(
           entitlementMap,
-          "place.other_monetized",
+          "place.water_sports",
           fallbackPlaceLimit,
         ),
-        visitLocationUnlimited: visitEntitlement?.isUnlimited ?? true,
-        visitLocationLimit: visitEntitlement?.limitCount ?? 0,
+        skiLimit: resolveLimitValue(entitlementMap, "place.ski", fallbackPlaceLimit),
+        balloonTourLimit: resolveLimitValue(
+          entitlementMap,
+          "place.balloon_tour",
+          fallbackPlaceLimit,
+        ),
         blogPostLimit: resolveLimitValue(
           entitlementMap,
           "blog.post",
@@ -172,17 +186,18 @@ export const PlanForm: React.FC<PlanFormProps> = ({ initialData }) => {
         description: "",
         price: 0,
         currency: "TRY",
-        hotelLimit: 1,
         villaLimit: 1,
-        restaurantLimit: 1,
-        cafeLimit: 1,
-        barClubLimit: 1,
-        beachLimit: 1,
-        naturalLocationLimit: 1,
-        activityLocationLimit: 1,
-        otherMonetizedLimit: 1,
-        visitLocationUnlimited: true,
-        visitLocationLimit: 0,
+        bungalowTinyHouseLimit: 1,
+        hotelPensionLimit: 1,
+        detachedHouseApartmentLimit: 1,
+        campSiteLimit: 1,
+        transferLimit: 1,
+        boatTourLimit: 1,
+        paraglidingMicrolightSkydivingLimit: 1,
+        safariLimit: 1,
+        waterSportsLimit: 1,
+        skiLimit: 1,
+        balloonTourLimit: 1,
         blogPostLimit: 1,
         featuresText: "",
         active: true,
@@ -206,47 +221,58 @@ export const PlanForm: React.FC<PlanFormProps> = ({ initialData }) => {
         .filter(Boolean);
 
       const entitlements = [
-        { resourceKey: "place.hotel", limitCount: data.hotelLimit, isUnlimited: false },
         { resourceKey: "place.villa", limitCount: data.villaLimit, isUnlimited: false },
-        { resourceKey: "place.restaurant", limitCount: data.restaurantLimit, isUnlimited: false },
-        { resourceKey: "place.cafe", limitCount: data.cafeLimit, isUnlimited: false },
-        { resourceKey: "place.bar_club", limitCount: data.barClubLimit, isUnlimited: false },
-        { resourceKey: "place.beach", limitCount: data.beachLimit, isUnlimited: false },
         {
-          resourceKey: "place.natural_location",
-          limitCount: data.naturalLocationLimit,
+          resourceKey: "place.bungalow_tiny_house",
+          limitCount: data.bungalowTinyHouseLimit,
           isUnlimited: false,
         },
         {
-          resourceKey: "place.activity_location",
-          limitCount: data.activityLocationLimit,
+          resourceKey: "place.hotel_pension",
+          limitCount: data.hotelPensionLimit,
           isUnlimited: false,
         },
         {
-          resourceKey: "place.other_monetized",
-          limitCount: data.otherMonetizedLimit,
+          resourceKey: "place.detached_house_apartment",
+          limitCount: data.detachedHouseApartmentLimit,
           isUnlimited: false,
         },
+        { resourceKey: "place.camp_site", limitCount: data.campSiteLimit, isUnlimited: false },
+        { resourceKey: "place.transfer", limitCount: data.transferLimit, isUnlimited: false },
+        { resourceKey: "place.boat_tour", limitCount: data.boatTourLimit, isUnlimited: false },
         {
-          resourceKey: "place.visit_location",
-          limitCount: data.visitLocationUnlimited
-            ? null
-            : (data.visitLocationLimit ?? 0),
-          isUnlimited: data.visitLocationUnlimited,
+          resourceKey: "place.paragliding_microlight_skydiving",
+          limitCount: data.paraglidingMicrolightSkydivingLimit,
+          isUnlimited: false,
+        },
+        { resourceKey: "place.safari", limitCount: data.safariLimit, isUnlimited: false },
+        {
+          resourceKey: "place.water_sports",
+          limitCount: data.waterSportsLimit,
+          isUnlimited: false,
+        },
+        { resourceKey: "place.ski", limitCount: data.skiLimit, isUnlimited: false },
+        {
+          resourceKey: "place.balloon_tour",
+          limitCount: data.balloonTourLimit,
+          isUnlimited: false,
         },
         { resourceKey: "blog.post", limitCount: data.blogPostLimit, isUnlimited: false },
       ];
 
       const maxPlaces =
-        data.hotelLimit +
         data.villaLimit +
-        data.restaurantLimit +
-        data.cafeLimit +
-        data.barClubLimit +
-        data.beachLimit +
-        data.naturalLocationLimit +
-        data.activityLocationLimit +
-        data.otherMonetizedLimit;
+        data.bungalowTinyHouseLimit +
+        data.hotelPensionLimit +
+        data.detachedHouseApartmentLimit +
+        data.campSiteLimit +
+        data.transferLimit +
+        data.boatTourLimit +
+        data.paraglidingMicrolightSkydivingLimit +
+        data.safariLimit +
+        data.waterSportsLimit +
+        data.skiLimit +
+        data.balloonTourLimit;
 
       const res = await fetch(url, {
         method,
@@ -277,8 +303,6 @@ export const PlanForm: React.FC<PlanFormProps> = ({ initialData }) => {
       setLoading(false);
     }
   };
-
-  const visitLocationUnlimited = form.watch("visitLocationUnlimited");
 
   return (
     <Form {...form}>
@@ -354,7 +378,7 @@ export const PlanForm: React.FC<PlanFormProps> = ({ initialData }) => {
           />
 
           <div className="md:col-span-2 rounded-md border p-4 space-y-4">
-            <h3 className="text-sm font-semibold">Yer Türü Limitleri</h3>
+            <h3 className="text-sm font-semibold">Kategori Limitleri</h3>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
               {PLACE_LIMIT_FIELDS.map((fieldConfig) => (
                 <FormField
@@ -373,48 +397,6 @@ export const PlanForm: React.FC<PlanFormProps> = ({ initialData }) => {
                 />
               ))}
             </div>
-
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <FormField
-                control={form.control}
-                name="visitLocationUnlimited"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                    <FormControl>
-                      <Checkbox
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    </FormControl>
-                    <div className="space-y-1 leading-none">
-                      <FormLabel>Ziyaret Lokasyonu Sınırsız</FormLabel>
-                      <p className="text-sm text-muted-foreground">
-                        Açıkken ziyaret lokasyonu için adet limiti uygulanmaz.
-                      </p>
-                    </div>
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="visitLocationLimit"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Ziyaret Lokasyonu Limiti</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        disabled={loading || visitLocationUnlimited}
-                        min={0}
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
           </div>
 
           <FormField
@@ -426,7 +408,7 @@ export const PlanForm: React.FC<PlanFormProps> = ({ initialData }) => {
                 <FormControl>
                   <Textarea
                     disabled={loading}
-                    placeholder={"Her satıra bir özellik yazın\nÖrn: 5 mekan yayınlama hakkı"}
+                    placeholder={"Her satıra bir özellik yazın\nÖrn: Her kategori için 5 ilan hakkı"}
                     rows={6}
                     {...field}
                   />

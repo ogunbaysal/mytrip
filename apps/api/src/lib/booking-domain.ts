@@ -9,6 +9,10 @@ import {
   placeAvailabilityBlock,
   placePriceRule,
 } from "../db/schemas/index.ts";
+import {
+  isStayPlaceKind,
+  requiresRoomSelectionForKind,
+} from "./place-kind-registry.ts";
 
 export type BookingWindowValidation =
   | { ok: true }
@@ -205,17 +209,25 @@ export const resolveBookingContext = async ({
     return { ok: false, status: 404, message: "Mekan bulunamadı" };
   }
 
-  if (!["hotel", "villa"].includes(placeCtx.kind)) {
-    return { ok: false, status: 400, message: "Sadece otel ve villa rezervasyon alabilir" };
+  if (!isStayPlaceKind(placeCtx.kind)) {
+    return {
+      ok: false,
+      status: 400,
+      message: "Sadece konaklama kategorileri rezervasyon alabilir",
+    };
   }
 
   if (placeCtx.status !== "active") {
     return { ok: false, status: 400, message: "Mekan rezervasyona uygun değil" };
   }
 
-  if (placeCtx.kind === "hotel") {
+  if (requiresRoomSelectionForKind(placeCtx.kind)) {
     if (!roomId) {
-      return { ok: false, status: 400, message: "Otel rezervasyonu için oda seçimi zorunludur" };
+      return {
+        ok: false,
+        status: 400,
+        message: "Bu kategori için rezervasyonda oda seçimi zorunludur",
+      };
     }
 
     const roomCtx = await loadRoomContext(placeId, roomId);
@@ -386,7 +398,7 @@ export const checkAvailability = async ({
   available: boolean;
   reason?: string;
 }> => {
-  if (placeCtx.kind === "hotel") {
+  if (requiresRoomSelectionForKind(placeCtx.kind)) {
     if (!roomCtx) {
       return { available: false, reason: "Oda bilgisi eksik" };
     }

@@ -19,16 +19,18 @@ interface Plan {
   features: string[];
   entitlements: {
     resourceKey:
-      | "place.hotel"
       | "place.villa"
-      | "place.restaurant"
-      | "place.cafe"
-      | "place.bar_club"
-      | "place.beach"
-      | "place.natural_location"
-      | "place.activity_location"
-      | "place.visit_location"
-      | "place.other_monetized"
+      | "place.bungalow_tiny_house"
+      | "place.hotel_pension"
+      | "place.detached_house_apartment"
+      | "place.camp_site"
+      | "place.transfer"
+      | "place.boat_tour"
+      | "place.paragliding_microlight_skydiving"
+      | "place.safari"
+      | "place.water_sports"
+      | "place.ski"
+      | "place.balloon_tour"
       | "blog.post";
     limitCount: number | null;
     isUnlimited: boolean;
@@ -44,29 +46,33 @@ interface Plan {
 const PLACE_ENTITLEMENT_ORDER: Array<
   Exclude<Plan["entitlements"][number]["resourceKey"], "blog.post">
 > = [
-  "place.hotel",
   "place.villa",
-  "place.restaurant",
-  "place.cafe",
-  "place.bar_club",
-  "place.beach",
-  "place.natural_location",
-  "place.activity_location",
-  "place.visit_location",
-  "place.other_monetized",
+  "place.bungalow_tiny_house",
+  "place.hotel_pension",
+  "place.detached_house_apartment",
+  "place.camp_site",
+  "place.transfer",
+  "place.boat_tour",
+  "place.paragliding_microlight_skydiving",
+  "place.safari",
+  "place.water_sports",
+  "place.ski",
+  "place.balloon_tour",
 ];
 
 const RESOURCE_LABELS: Record<Plan["entitlements"][number]["resourceKey"], string> = {
-  "place.hotel": "Oteller",
   "place.villa": "Villalar",
-  "place.restaurant": "Restoranlar",
-  "place.cafe": "Kafeler",
-  "place.bar_club": "Barlar / Kulüpler",
-  "place.beach": "Plajlar",
-  "place.natural_location": "Doğal Lokasyonlar",
-  "place.activity_location": "Aktivite Lokasyonları",
-  "place.visit_location": "Gezi Lokasyonları",
-  "place.other_monetized": "Diğer Ücretli Lokasyonlar",
+  "place.bungalow_tiny_house": "Bungalov & Tiny House",
+  "place.hotel_pension": "Otel & Pansiyon",
+  "place.detached_house_apartment": "Müstakil Ev & Daire",
+  "place.camp_site": "Kamp Alanı",
+  "place.transfer": "Transfer",
+  "place.boat_tour": "Tekne Turu",
+  "place.paragliding_microlight_skydiving": "Paraşüt & Microlight & Skydiving",
+  "place.safari": "Safari",
+  "place.water_sports": "Su Sporları",
+  "place.ski": "Kayak",
+  "place.balloon_tour": "Balon Turu",
   "blog.post": "Blog Yazıları",
 };
 
@@ -181,7 +187,6 @@ export default function PricingPage() {
                     <div className="space-y-2 text-sm">
                       {PLACE_ENTITLEMENT_ORDER.map((resourceKey) => {
                         const entitlement = getEntitlement(plan, resourceKey);
-                        const isVisitResource = resourceKey === "place.visit_location";
 
                         return (
                           <div
@@ -191,9 +196,7 @@ export default function PricingPage() {
                             <span className="text-muted-foreground">
                               {RESOURCE_LABELS[resourceKey]}
                             </span>
-                            <span
-                              className={`font-semibold ${isVisitResource ? "text-emerald-600" : ""}`}
-                            >
+                            <span className="font-semibold">
                               {formatEntitlementLimit(entitlement)}
                             </span>
                           </div>
@@ -208,9 +211,6 @@ export default function PricingPage() {
                         </span>
                       </div>
 
-                      <p className="pt-1 text-xs text-emerald-700">
-                        Gezi lokasyonları tüm planlarda sınırsızdır.
-                      </p>
                     </div>
                   </div>
 
@@ -239,8 +239,7 @@ export default function PricingPage() {
                         : plan.entitlements
                               .filter(
                                 (item) =>
-                                  item.resourceKey.startsWith("place.") &&
-                                  item.resourceKey !== "place.visit_location",
+                                  item.resourceKey.startsWith("place."),
                               )
                               .every(
                                 (item) =>

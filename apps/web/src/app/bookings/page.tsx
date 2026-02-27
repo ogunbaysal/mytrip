@@ -55,7 +55,7 @@ export default function BookingsPage() {
   });
 
   const place = placeQuery.data;
-  const isHotel = place?.kind === "hotel";
+  const isHotel = place?.kind === "hotel_pension";
 
   const roomsQuery = useQuery({
     queryKey: ["booking-rooms", place?.id, checkInDate, checkOutDate, guests],

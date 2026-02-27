@@ -1,16 +1,18 @@
 import { Place, PlaceKind, PlaceKindId } from "@/hooks/use-places";
 
 export const PLACE_KIND_LABELS: Record<PlaceKindId, string> = {
-  hotel: "Otel",
   villa: "Villa",
-  restaurant: "Restoran",
-  cafe: "Kafe",
-  bar_club: "Bar / Kulüp",
-  beach: "Plaj",
-  natural_location: "Doğal Lokasyon",
-  activity_location: "Aktivite Lokasyonu",
-  visit_location: "Gezi Noktası",
-  other_monetized: "Diğer Ücretli",
+  bungalow_tiny_house: "Bungalov & Tiny House",
+  hotel_pension: "Otel & Pansiyon",
+  detached_house_apartment: "Müstakil Ev & Daire",
+  camp_site: "Kamp Alanı",
+  transfer: "Transfer",
+  boat_tour: "Tekne Turu",
+  paragliding_microlight_skydiving: "Paraşüt & Microlight & Skydiving",
+  safari: "Safari",
+  water_sports: "Su Sporları",
+  ski: "Kayak",
+  balloon_tour: "Balon Turu",
 };
 
 export const getPlaceKindLabel = (

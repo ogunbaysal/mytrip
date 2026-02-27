@@ -8,8 +8,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type {
   ActivityPackageDraft,
-  DiningMenuDraft,
-  DiningMenuItemDraft,
   HotelRoomDraft,
   PlaceTypeModuleDraft,
 } from "@/lib/place-type-module";
@@ -21,6 +19,23 @@ type PlaceTypeModuleFormProps = {
   disabled?: boolean;
 };
 
+const VILLA_KIND_IDS = [
+  "villa",
+  "bungalow_tiny_house",
+  "detached_house_apartment",
+  "camp_site",
+] as const;
+
+const ACTIVITY_KIND_IDS = [
+  "transfer",
+  "boat_tour",
+  "paragliding_microlight_skydiving",
+  "safari",
+  "water_sports",
+  "ski",
+  "balloon_tour",
+] as const;
+
 const createRoomDraft = (): HotelRoomDraft => ({
   name: "",
   description: "",
@@ -30,19 +45,6 @@ const createRoomDraft = (): HotelRoomDraft => ({
   bathroomCount: "",
   baseNightlyPrice: "",
   featureList: "",
-});
-
-const createDiningItemDraft = (): DiningMenuItemDraft => ({
-  name: "",
-  description: "",
-  price: "",
-  tags: "",
-});
-
-const createDiningMenuDraft = (): DiningMenuDraft => ({
-  name: "",
-  description: "",
-  items: [createDiningItemDraft()],
 });
 
 const createActivityPackageDraft = (): ActivityPackageDraft => ({
@@ -80,42 +82,6 @@ export function PlaceTypeModuleForm({
     });
   };
 
-  const setDiningField = (
-    field: keyof PlaceTypeModuleDraft["dining"],
-    fieldValue: unknown,
-  ) => {
-    onChange({
-      ...value,
-      dining: {
-        ...value.dining,
-        [field]: fieldValue,
-      },
-    });
-  };
-
-  const setBeachField = (field: keyof PlaceTypeModuleDraft["beach"], fieldValue: unknown) => {
-    onChange({
-      ...value,
-      beach: {
-        ...value.beach,
-        [field]: fieldValue,
-      },
-    });
-  };
-
-  const setNaturalField = (
-    field: keyof PlaceTypeModuleDraft["natural"],
-    fieldValue: unknown,
-  ) => {
-    onChange({
-      ...value,
-      natural: {
-        ...value.natural,
-        [field]: fieldValue,
-      },
-    });
-  };
-
   const setActivityField = (
     field: keyof PlaceTypeModuleDraft["activity"],
     fieldValue: unknown,
@@ -124,29 +90,6 @@ export function PlaceTypeModuleForm({
       ...value,
       activity: {
         ...value.activity,
-        [field]: fieldValue,
-      },
-    });
-  };
-
-  const setVisitField = (field: keyof PlaceTypeModuleDraft["visit"], fieldValue: unknown) => {
-    onChange({
-      ...value,
-      visit: {
-        ...value.visit,
-        [field]: fieldValue,
-      },
-    });
-  };
-
-  const setOtherField = (
-    field: keyof PlaceTypeModuleDraft["otherMonetized"],
-    fieldValue: unknown,
-  ) => {
-    onChange({
-      ...value,
-      otherMonetized: {
-        ...value.otherMonetized,
         [field]: fieldValue,
       },
     });
@@ -170,45 +113,6 @@ export function PlaceTypeModuleForm({
     );
   };
 
-  const updateDiningMenu = (
-    menuIndex: number,
-    field: keyof DiningMenuDraft,
-    fieldValue: string | DiningMenuItemDraft[],
-  ) => {
-    const nextMenus = value.dining.menus.map((menu, index) =>
-      index === menuIndex ? { ...menu, [field]: fieldValue } : menu,
-    );
-    setDiningField("menus", nextMenus);
-  };
-
-  const updateDiningItem = (
-    menuIndex: number,
-    itemIndex: number,
-    field: keyof DiningMenuItemDraft,
-    fieldValue: string,
-  ) => {
-    const menu = value.dining.menus[menuIndex];
-    if (!menu) return;
-    const nextItems = menu.items.map((item, index) =>
-      index === itemIndex ? { ...item, [field]: fieldValue } : item,
-    );
-    updateDiningMenu(menuIndex, "items", nextItems);
-  };
-
-  const removeDiningMenu = (menuIndex: number) => {
-    setDiningField(
-      "menus",
-      value.dining.menus.filter((_, index) => index !== menuIndex),
-    );
-  };
-
-  const removeDiningItem = (menuIndex: number, itemIndex: number) => {
-    const menu = value.dining.menus[menuIndex];
-    if (!menu) return;
-    const nextItems = menu.items.filter((_, index) => index !== itemIndex);
-    updateDiningMenu(menuIndex, "items", nextItems.length > 0 ? nextItems : [createDiningItemDraft()]);
-  };
-
   const updateActivityPackage = (
     packageIndex: number,
     field: keyof ActivityPackageDraft,
@@ -227,24 +131,24 @@ export function PlaceTypeModuleForm({
     );
   };
 
-  if (kindId === "hotel") {
+  if (kindId === "hotel_pension") {
     return (
       <div className="space-y-6">
         <DashboardCard padding="md">
           <SectionHeader
             title="Otel Profili"
-            subtitle="Konaklama kurallari ve temel profil bilgileri"
+            subtitle="Konaklama kuralları ve temel profil bilgileri"
             size="sm"
             className="mb-6"
           />
 
           <div className="grid gap-6 md:grid-cols-3">
             <div className="space-y-2">
-              <Label>Yildiz</Label>
+              <Label>Yıldız</Label>
               <Input
                 value={value.hotel.starRating}
                 onChange={(event) => setHotelField("starRating", event.target.value)}
-                placeholder="Orn: 5"
+                placeholder="Örn: 5"
                 disabled={disabled}
               />
             </div>
@@ -255,7 +159,7 @@ export function PlaceTypeModuleForm({
                 onChange={(event) =>
                   setHotelField("minimumStayNights", event.target.value)
                 }
-                placeholder="Orn: 2"
+                placeholder="Örn: 2"
                 disabled={disabled}
               />
             </div>
@@ -269,7 +173,7 @@ export function PlaceTypeModuleForm({
                   }
                   disabled={disabled}
                 />
-                Cocuk dostu
+                Çocuk dostu
               </label>
               <label className="flex items-center gap-2 text-sm">
                 <input
@@ -286,8 +190,8 @@ export function PlaceTypeModuleForm({
 
         <DashboardCard padding="md">
           <SectionHeader
-            title="Oda Taslaklari"
-            subtitle="Gonderimden sonra odalar otomatik olusturulacak"
+            title="Oda Taslakları"
+            subtitle="Gönderimden sonra odalar otomatik oluşturulacak"
             size="sm"
             className="mb-6"
           />
@@ -306,35 +210,35 @@ export function PlaceTypeModuleForm({
                     className="text-red-600"
                   >
                     <Trash2 className="mr-1 size-4" />
-                    Kaldir
+                    Kaldır
                   </Button>
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2 md:col-span-2">
-                    <Label>Oda Adi *</Label>
+                    <Label>Oda Adı *</Label>
                     <Input
                       value={room.name}
                       onChange={(event) =>
                         updateRoom(roomIndex, "name", event.target.value)
                       }
-                      placeholder="Orn: Deluxe Deniz Manzarali"
+                      placeholder="Örn: Deluxe Deniz Manzaralı"
                       disabled={disabled}
                     />
                   </div>
                   <div className="space-y-2 md:col-span-2">
-                    <Label>Aciklama</Label>
+                    <Label>Açıklama</Label>
                     <Input
                       value={room.description}
                       onChange={(event) =>
                         updateRoom(roomIndex, "description", event.target.value)
                       }
-                      placeholder="Kisa oda aciklamasi"
+                      placeholder="Kısa oda açıklaması"
                       disabled={disabled}
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Maks Yetiskin</Label>
+                    <Label>Maks Yetişkin</Label>
                     <Input
                       value={room.maxAdults}
                       onChange={(event) =>
@@ -344,7 +248,7 @@ export function PlaceTypeModuleForm({
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Maks Cocuk</Label>
+                    <Label>Maks Çocuk</Label>
                     <Input
                       value={room.maxChildren}
                       onChange={(event) =>
@@ -354,7 +258,7 @@ export function PlaceTypeModuleForm({
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Yatak Sayisi</Label>
+                    <Label>Yatak Sayısı</Label>
                     <Input
                       value={room.bedCount}
                       onChange={(event) =>
@@ -364,7 +268,7 @@ export function PlaceTypeModuleForm({
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Banyo Sayisi</Label>
+                    <Label>Banyo Sayısı</Label>
                     <Input
                       value={room.bathroomCount}
                       onChange={(event) =>
@@ -374,24 +278,23 @@ export function PlaceTypeModuleForm({
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Temel Gecelik Fiyat</Label>
+                    <Label>Taban Fiyat (gecelik)</Label>
                     <Input
                       value={room.baseNightlyPrice}
                       onChange={(event) =>
                         updateRoom(roomIndex, "baseNightlyPrice", event.target.value)
                       }
-                      placeholder="TRY"
                       disabled={disabled}
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label>Ozellikler (virgulle)</Label>
+                  <div className="space-y-2 md:col-span-2">
+                    <Label>Özellikler (virgülle)</Label>
                     <Input
                       value={room.featureList}
                       onChange={(event) =>
                         updateRoom(roomIndex, "featureList", event.target.value)
                       }
-                      placeholder="wifi, klima, balkon"
+                      placeholder="wifi, balkon, klima"
                       disabled={disabled}
                     />
                   </div>
@@ -414,17 +317,17 @@ export function PlaceTypeModuleForm({
     );
   }
 
-  if (kindId === "villa") {
+  if ((VILLA_KIND_IDS as readonly string[]).includes(kindId)) {
     return (
       <DashboardCard padding="md">
         <SectionHeader
-          title="Villa Profili"
-          subtitle="Villa turu icin temel profil alanlari"
+          title="Konaklama Profili"
+          subtitle="Müstakil konaklamalar için kapasite ve altyapı bilgileri"
           size="sm"
           className="mb-6"
         />
 
-        <div className="grid gap-6 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
             <Label>Maks Misafir</Label>
             <Input
@@ -434,7 +337,7 @@ export function PlaceTypeModuleForm({
             />
           </div>
           <div className="space-y-2">
-            <Label>Yatak Odasi</Label>
+            <Label>Yatak Odası</Label>
             <Input
               value={value.villa.bedroomCount}
               onChange={(event) => setVillaField("bedroomCount", event.target.value)}
@@ -450,15 +353,14 @@ export function PlaceTypeModuleForm({
             />
           </div>
           <div className="space-y-2">
-            <Label>Temizlik Ucreti</Label>
+            <Label>Temizlik Ücreti</Label>
             <Input
               value={value.villa.cleaningFee}
               onChange={(event) => setVillaField("cleaningFee", event.target.value)}
-              placeholder="TRY"
               disabled={disabled}
             />
           </div>
-          <div className="flex items-end pb-2">
+          <div className="md:col-span-2">
             <label className="flex items-center gap-2 text-sm">
               <input
                 type="checkbox"
@@ -466,7 +368,7 @@ export function PlaceTypeModuleForm({
                 onChange={(event) => setVillaField("poolAvailable", event.target.checked)}
                 disabled={disabled}
               />
-              Havuz var
+              Havuz mevcut
             </label>
           </div>
         </div>
@@ -474,456 +376,100 @@ export function PlaceTypeModuleForm({
     );
   }
 
-  if (["restaurant", "cafe", "bar_club"].includes(kindId)) {
+  if ((ACTIVITY_KIND_IDS as readonly string[]).includes(kindId)) {
     return (
-      <div className="space-y-6">
-        <DashboardCard padding="md">
-          <SectionHeader
-            title="Yeme Icme Profili"
-            subtitle="Fiyat ve hizmet bilgileri"
-            size="sm"
-            className="mb-6"
-          />
+      <DashboardCard padding="md">
+        <SectionHeader
+          title="Aktivite Paketleri"
+          subtitle="Bu kategorilerde en az bir paket taslağı gerekir"
+          size="sm"
+          className="mb-6"
+        />
 
-          <div className="grid gap-6 md:grid-cols-3">
-            <div className="space-y-2">
-              <Label>Ortalama Kisi Basi Fiyat</Label>
-              <Input
-                value={value.dining.averagePricePerPerson}
-                onChange={(event) =>
-                  setDiningField("averagePricePerPerson", event.target.value)
-                }
-                placeholder="TRY"
-                disabled={disabled}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Dress Code</Label>
-              <Input
-                value={value.dining.dressCode}
-                onChange={(event) => setDiningField("dressCode", event.target.value)}
-                disabled={disabled}
-              />
-            </div>
-            <div className="flex items-end gap-4 pb-2">
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={value.dining.reservationRequired}
-                  onChange={(event) =>
-                    setDiningField("reservationRequired", event.target.checked)
-                  }
+        <div className="space-y-4">
+          {value.activity.packages.map((pkg, packageIndex) => (
+            <div key={`pkg-${packageIndex}`} className="rounded-xl border p-4">
+              <div className="mb-4 flex items-center justify-between">
+                <h4 className="text-sm font-semibold">Paket #{packageIndex + 1}</h4>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => removeActivityPackage(packageIndex)}
                   disabled={disabled}
-                />
-                Rezervasyon gerekli
-              </label>
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={value.dining.servesAlcohol}
-                  onChange={(event) =>
-                    setDiningField("servesAlcohol", event.target.checked)
-                  }
-                  disabled={disabled}
-                />
-                Alkol servisi
-              </label>
-            </div>
-          </div>
-        </DashboardCard>
+                  className="text-red-600"
+                >
+                  <Trash2 className="mr-1 size-4" />
+                  Kaldır
+                </Button>
+              </div>
 
-        <DashboardCard padding="md">
-          <SectionHeader
-            title="Menu Taslaklari"
-            subtitle="Gonderimde bu menuler otomatik kaydedilir"
-            size="sm"
-            className="mb-6"
-          />
-
-          <div className="space-y-4">
-            {value.dining.menus.map((menu, menuIndex) => (
-              <div key={`menu-${menuIndex}`} className="rounded-xl border p-4">
-                <div className="mb-4 flex items-center justify-between">
-                  <h4 className="text-sm font-semibold">Menu #{menuIndex + 1}</h4>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => removeDiningMenu(menuIndex)}
-                    disabled={disabled}
-                    className="text-red-600"
-                  >
-                    <Trash2 className="mr-1 size-4" />
-                    Kaldir
-                  </Button>
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label>Menu Adi *</Label>
-                    <Input
-                      value={menu.name}
-                      onChange={(event) =>
-                        updateDiningMenu(menuIndex, "name", event.target.value)
-                      }
-                      disabled={disabled}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Aciklama</Label>
-                    <Input
-                      value={menu.description}
-                      onChange={(event) =>
-                        updateDiningMenu(menuIndex, "description", event.target.value)
-                      }
-                      disabled={disabled}
-                    />
-                  </div>
-                </div>
-
-                <div className="mt-4 space-y-3">
-                  {menu.items.map((item, itemIndex) => (
-                    <div key={`menu-item-${menuIndex}-${itemIndex}`} className="rounded-lg border p-3">
-                      <div className="mb-3 flex items-center justify-between">
-                        <h5 className="text-xs font-semibold text-muted-foreground">
-                          Urun #{itemIndex + 1}
-                        </h5>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeDiningItem(menuIndex, itemIndex)}
-                          disabled={disabled}
-                          className="text-red-600"
-                        >
-                          <Trash2 className="mr-1 size-3" />
-                          Sil
-                        </Button>
-                      </div>
-
-                      <div className="grid gap-3 md:grid-cols-2">
-                        <Input
-                          value={item.name}
-                          onChange={(event) =>
-                            updateDiningItem(menuIndex, itemIndex, "name", event.target.value)
-                          }
-                          placeholder="Urun adi"
-                          disabled={disabled}
-                        />
-                        <Input
-                          value={item.price}
-                          onChange={(event) =>
-                            updateDiningItem(menuIndex, itemIndex, "price", event.target.value)
-                          }
-                          placeholder="Fiyat"
-                          disabled={disabled}
-                        />
-                        <Input
-                          value={item.description}
-                          onChange={(event) =>
-                            updateDiningItem(
-                              menuIndex,
-                              itemIndex,
-                              "description",
-                              event.target.value,
-                            )
-                          }
-                          placeholder="Aciklama"
-                          disabled={disabled}
-                        />
-                        <Input
-                          value={item.tags}
-                          onChange={(event) =>
-                            updateDiningItem(menuIndex, itemIndex, "tags", event.target.value)
-                          }
-                          placeholder="etiket1, etiket2"
-                          disabled={disabled}
-                        />
-                      </div>
-                    </div>
-                  ))}
-
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() =>
-                      updateDiningMenu(menuIndex, "items", [
-                        ...menu.items,
-                        createDiningItemDraft(),
-                      ])
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2 md:col-span-2">
+                  <Label>Paket Adı *</Label>
+                  <Input
+                    value={pkg.name}
+                    onChange={(event) =>
+                      updateActivityPackage(packageIndex, "name", event.target.value)
                     }
                     disabled={disabled}
-                  >
-                    <Plus className="mr-2 size-4" />
-                    Urun Ekle
-                  </Button>
+                  />
                 </div>
-              </div>
-            ))}
-
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setDiningField("menus", [...value.dining.menus, createDiningMenuDraft()])}
-              disabled={disabled}
-            >
-              <Plus className="mr-2 size-4" />
-              Menu Ekle
-            </Button>
-          </div>
-        </DashboardCard>
-      </div>
-    );
-  }
-
-  if (kindId === "beach") {
-    return (
-      <DashboardCard padding="md">
-        <SectionHeader
-          title="Plaj Profili"
-          subtitle="Giriste ucret ve tesis ozellikleri"
-          size="sm"
-          className="mb-6"
-        />
-
-        <div className="grid gap-6 md:grid-cols-2">
-          <div className="space-y-2">
-            <Label>Giris Ucreti</Label>
-            <Input
-              value={value.beach.entranceFee}
-              onChange={(event) => setBeachField("entranceFee", event.target.value)}
-              placeholder="TRY"
-              disabled={disabled}
-            />
-          </div>
-          <div className="flex items-end gap-4 pb-2">
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={value.beach.hasSunbedRental}
-                onChange={(event) =>
-                  setBeachField("hasSunbedRental", event.target.checked)
-                }
-                disabled={disabled}
-              />
-              Sunbed kiralama var
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={value.beach.hasShower}
-                onChange={(event) => setBeachField("hasShower", event.target.checked)}
-                disabled={disabled}
-              />
-              Dus var
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={value.beach.hasLifeguard}
-                onChange={(event) => setBeachField("hasLifeguard", event.target.checked)}
-                disabled={disabled}
-              />
-              Cankurtaran var
-            </label>
-          </div>
-        </div>
-      </DashboardCard>
-    );
-  }
-
-  if (kindId === "natural_location") {
-    return (
-      <DashboardCard padding="md">
-        <SectionHeader
-          title="Dogal Lokasyon Profili"
-          subtitle="Zorluk ve ziyaret suresi"
-          size="sm"
-          className="mb-6"
-        />
-
-        <div className="grid gap-6 md:grid-cols-3">
-          <div className="space-y-2">
-            <Label>Giris Ucreti</Label>
-            <Input
-              value={value.natural.entryFee}
-              onChange={(event) => setNaturalField("entryFee", event.target.value)}
-              placeholder="TRY"
-              disabled={disabled}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Zorluk Seviyesi</Label>
-            <Input
-              value={value.natural.difficultyLevel}
-              onChange={(event) => setNaturalField("difficultyLevel", event.target.value)}
-              placeholder="Kolay / Orta / Zor"
-              disabled={disabled}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Onerilen Sure (dk)</Label>
-            <Input
-              value={value.natural.recommendedDurationMinutes}
-              onChange={(event) =>
-                setNaturalField("recommendedDurationMinutes", event.target.value)
-              }
-              disabled={disabled}
-            />
-          </div>
-        </div>
-      </DashboardCard>
-    );
-  }
-
-  if (kindId === "activity_location") {
-    return (
-      <div className="space-y-6">
-        <DashboardCard padding="md">
-          <SectionHeader
-            title="Aktivite Profili"
-            subtitle="Rezervasyon ve guvenlik notlari"
-            size="sm"
-            className="mb-6"
-          />
-
-          <div className="grid gap-6 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label>Guvenlik Gereksinimleri</Label>
-              <Input
-                value={value.activity.safetyRequirements}
-                onChange={(event) =>
-                  setActivityField("safetyRequirements", event.target.value)
-                }
-                placeholder="Orn: Kask, lisans"
-                disabled={disabled}
-              />
-            </div>
-            <div className="flex items-end pb-2">
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={value.activity.requiresReservation}
-                  onChange={(event) =>
-                    setActivityField("requiresReservation", event.target.checked)
-                  }
-                  disabled={disabled}
-                />
-                Rezervasyon gerekli
-              </label>
-            </div>
-          </div>
-        </DashboardCard>
-
-        <DashboardCard padding="md">
-          <SectionHeader
-            title="Paket Taslaklari"
-            subtitle="Kayit sonrasinda paketler otomatik olusturulur"
-            size="sm"
-            className="mb-6"
-          />
-
-          <div className="space-y-4">
-            {value.activity.packages.map((pkg, packageIndex) => (
-              <div key={`package-${packageIndex}`} className="rounded-xl border p-4">
-                <div className="mb-4 flex items-center justify-between">
-                  <h4 className="text-sm font-semibold">Paket #{packageIndex + 1}</h4>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => removeActivityPackage(packageIndex)}
+                <div className="space-y-2 md:col-span-2">
+                  <Label>Açıklama</Label>
+                  <Input
+                    value={pkg.description}
+                    onChange={(event) =>
+                      updateActivityPackage(packageIndex, "description", event.target.value)
+                    }
                     disabled={disabled}
-                    className="text-red-600"
-                  >
-                    <Trash2 className="mr-1 size-4" />
-                    Kaldir
-                  </Button>
+                  />
                 </div>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2 md:col-span-2">
-                    <Label>Paket Adi *</Label>
-                    <Input
-                      value={pkg.name}
-                      onChange={(event) =>
-                        updateActivityPackage(packageIndex, "name", event.target.value)
-                      }
-                      disabled={disabled}
-                    />
-                  </div>
-                  <div className="space-y-2 md:col-span-2">
-                    <Label>Aciklama</Label>
-                    <Input
-                      value={pkg.description}
-                      onChange={(event) =>
-                        updateActivityPackage(
-                          packageIndex,
-                          "description",
-                          event.target.value,
-                        )
-                      }
-                      disabled={disabled}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Fiyat</Label>
-                    <Input
-                      value={pkg.price}
-                      onChange={(event) =>
-                        updateActivityPackage(packageIndex, "price", event.target.value)
-                      }
-                      placeholder="TRY"
-                      disabled={disabled}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Sure (dk)</Label>
-                    <Input
-                      value={pkg.durationMinutes}
-                      onChange={(event) =>
-                        updateActivityPackage(
-                          packageIndex,
-                          "durationMinutes",
-                          event.target.value,
-                        )
-                      }
-                      disabled={disabled}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Min Katilimci</Label>
-                    <Input
-                      value={pkg.minParticipants}
-                      onChange={(event) =>
-                        updateActivityPackage(
-                          packageIndex,
-                          "minParticipants",
-                          event.target.value,
-                        )
-                      }
-                      disabled={disabled}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Maks Katilimci</Label>
-                    <Input
-                      value={pkg.maxParticipants}
-                      onChange={(event) =>
-                        updateActivityPackage(
-                          packageIndex,
-                          "maxParticipants",
-                          event.target.value,
-                        )
-                      }
-                      disabled={disabled}
-                    />
-                  </div>
+                <div className="space-y-2">
+                  <Label>Fiyat</Label>
+                  <Input
+                    value={pkg.price}
+                    onChange={(event) =>
+                      updateActivityPackage(packageIndex, "price", event.target.value)
+                    }
+                    disabled={disabled}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Süre (dk)</Label>
+                  <Input
+                    value={pkg.durationMinutes}
+                    onChange={(event) =>
+                      updateActivityPackage(packageIndex, "durationMinutes", event.target.value)
+                    }
+                    disabled={disabled}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Min Katılımcı</Label>
+                  <Input
+                    value={pkg.minParticipants}
+                    onChange={(event) =>
+                      updateActivityPackage(packageIndex, "minParticipants", event.target.value)
+                    }
+                    disabled={disabled}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Maks Katılımcı</Label>
+                  <Input
+                    value={pkg.maxParticipants}
+                    onChange={(event) =>
+                      updateActivityPackage(packageIndex, "maxParticipants", event.target.value)
+                    }
+                    disabled={disabled}
+                  />
                 </div>
               </div>
-            ))}
+            </div>
+          ))}
 
+          <div className="flex items-center gap-3">
             <Button
               type="button"
               variant="outline"
@@ -938,88 +484,18 @@ export function PlaceTypeModuleForm({
               <Plus className="mr-2 size-4" />
               Paket Ekle
             </Button>
-          </div>
-        </DashboardCard>
-      </div>
-    );
-  }
 
-  if (kindId === "visit_location") {
-    return (
-      <DashboardCard padding="md">
-        <SectionHeader
-          title="Ziyaret Lokasyonu Profili"
-          subtitle="Bilet ve gezi bilgileri"
-          size="sm"
-          className="mb-6"
-        />
-
-        <div className="grid gap-6 md:grid-cols-3">
-          <div className="space-y-2">
-            <Label>Bilet Fiyati</Label>
-            <Input
-              value={value.visit.ticketPrice}
-              onChange={(event) => setVisitField("ticketPrice", event.target.value)}
-              placeholder="TRY"
-              disabled={disabled}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Onerilen Sure (dk)</Label>
-            <Input
-              value={value.visit.recommendedDurationMinutes}
-              onChange={(event) =>
-                setVisitField("recommendedDurationMinutes", event.target.value)
-              }
-              disabled={disabled}
-            />
-          </div>
-          <div className="flex items-end pb-2">
             <label className="flex items-center gap-2 text-sm">
               <input
                 type="checkbox"
-                checked={value.visit.requiresGuide}
-                onChange={(event) => setVisitField("requiresGuide", event.target.checked)}
+                checked={value.activity.requiresReservation}
+                onChange={(event) =>
+                  setActivityField("requiresReservation", event.target.checked)
+                }
                 disabled={disabled}
               />
-              Rehber gerekli
+              Rezervasyon gerekli
             </label>
-          </div>
-        </div>
-      </DashboardCard>
-    );
-  }
-
-  if (kindId === "other_monetized") {
-    return (
-      <DashboardCard padding="md">
-        <SectionHeader
-          title="Ücretli İşletme Profili"
-          subtitle="Fiyat ve ek notlar"
-          size="sm"
-          className="mb-6"
-        />
-
-        <div className="grid gap-6 md:grid-cols-2">
-          <div className="space-y-2">
-            <Label>Baslangic Fiyati</Label>
-            <Input
-              value={value.otherMonetized.startingPrice}
-              onChange={(event) =>
-                setOtherField("startingPrice", event.target.value)
-              }
-              placeholder="TRY"
-              disabled={disabled}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Notlar</Label>
-            <Input
-              value={value.otherMonetized.notes}
-              onChange={(event) => setOtherField("notes", event.target.value)}
-              placeholder="Ek fiyatlandirma notlari"
-              disabled={disabled}
-            />
           </div>
         </div>
       </DashboardCard>
@@ -1029,8 +505,8 @@ export function PlaceTypeModuleForm({
   return (
     <DashboardCard padding="md">
       <SectionHeader
-        title="Tur Modulu"
-        subtitle="Bu tur icin ozel modül bulunmuyor"
+        title="Ek Modül Yok"
+        subtitle="Bu kategori için ek form alanı tanımlı değil"
         size="sm"
       />
     </DashboardCard>

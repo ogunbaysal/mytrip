@@ -95,7 +95,7 @@ app.get("/rooms", async (c) => {
       return c.json({ error: "Validation failed", message: "Mekan bulunamadı" }, 404);
     }
 
-    if (placeData.kind !== "hotel") {
+    if (placeData.kind !== "hotel_pension") {
       return c.json({ rooms: [] });
     }
 

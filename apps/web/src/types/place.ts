@@ -1,14 +1,16 @@
 export type PlaceKind =
-  | "hotel"
   | "villa"
-  | "restaurant"
-  | "cafe"
-  | "bar_club"
-  | "beach"
-  | "natural_location"
-  | "activity_location"
-  | "visit_location"
-  | "other_monetized";
+  | "bungalow_tiny_house"
+  | "hotel_pension"
+  | "detached_house_apartment"
+  | "camp_site"
+  | "transfer"
+  | "boat_tour"
+  | "paragliding_microlight_skydiving"
+  | "safari"
+  | "water_sports"
+  | "ski"
+  | "balloon_tour";
 
 export type PlaceCategory =
   | "beachfront"
@@ -29,7 +31,7 @@ export type PlaceSummary = {
   imageUrl: string;
   city: string;
   district: string;
-  type: "stay" | "experience" | "restaurant";
+  type: "stay" | "activity";
   kind: PlaceKind | string;
   kindSlug?: string | null;
   kindName?: string | null;

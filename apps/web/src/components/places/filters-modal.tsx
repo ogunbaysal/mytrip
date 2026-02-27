@@ -22,11 +22,8 @@ import { cn } from "@/lib/utils";
 
 // Place type definitions with Turkish labels
 const PLACE_TYPES = [
-  { value: "hotel", label: "Konaklama" },
-  { value: "restaurant", label: "Restoran" },
-  { value: "cafe", label: "Kafe" },
+  { value: "stay", label: "Konaklama" },
   { value: "activity", label: "Aktivite" },
-  { value: "attraction", label: "Gezi Yeri" },
 ] as const;
 
 // Amenity groups for better organization

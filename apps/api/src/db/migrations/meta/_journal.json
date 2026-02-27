@@ -5,29 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1771191671128,
-      "tag": "0000_lowly_spacker_dave",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1771196022744,
-      "tag": "0001_petite_shocker",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1771196138624,
-      "tag": "0002_ambiguous_tinkerer",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1772056800000,
-      "tag": "0003_owner_calendar_pricing",
+      "when": 1772199035417,
+      "tag": "0000_cold_morlun",
       "breakpoints": true
     }
   ]

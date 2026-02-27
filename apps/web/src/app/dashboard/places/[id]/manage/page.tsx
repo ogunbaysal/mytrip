@@ -66,8 +66,13 @@ export default function OwnerPlaceManagePage() {
     queryFn: () => api.owner.places.getById(placeId),
   });
   const place = placeQuery.data?.place;
-  const isHotel = place?.kind === "hotel";
-  const isVilla = place?.kind === "villa";
+  const isHotel = place?.kind === "hotel_pension";
+  const isVilla = [
+    "villa",
+    "bungalow_tiny_house",
+    "detached_house_apartment",
+    "camp_site",
+  ].includes(place?.kind ?? "");
 
   const roomsQuery = useQuery({
     queryKey: ["owner-place-rooms", placeId],

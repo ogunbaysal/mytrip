@@ -5,12 +5,8 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 
 const TYPE_LABELS: Record<string, string> = {
-  hotel: "Konaklama",
-  restaurant: "Restoran",
-  cafe: "Kafe",
+  stay: "Konaklama",
   activity: "Aktivite",
-  attraction: "Gezi Yeri",
-  transport: "Ulaşım",
 };
 
 type PlaceTypeOption = {
@@ -33,4 +29,3 @@ export function usePlaceTypes() {
     staleTime: 1000 * 60 * 10,
   });
 }
-

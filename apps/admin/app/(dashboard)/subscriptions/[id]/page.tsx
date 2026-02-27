@@ -256,7 +256,7 @@ export default function SubscriptionDetailPage() {
                 Ücretli Mekanlar: {formatLimit(monetizedUsage.max, monetizedUsage.isUnlimited)}
               </p>
               <p>
-                Gezi Lokasyonları: {formatLimit(visitUsage.max, visitUsage.isUnlimited)}
+                Aktivite Kategorileri: {formatLimit(visitUsage.max, visitUsage.isUnlimited)}
               </p>
               <p>
                 Blog Yazıları: {formatLimit(blogUsage.max, blogUsage.isUnlimited)}
@@ -320,7 +320,7 @@ export default function SubscriptionDetailPage() {
               {formatLimit(monetizedUsage.max, monetizedUsage.isUnlimited)}
             </p>
             <p>
-              <span className="text-muted-foreground">Gezi Lokasyonları:</span>{" "}
+              <span className="text-muted-foreground">Aktivite Kategorileri:</span>{" "}
               {visitUsage.current} / {formatLimit(visitUsage.max, visitUsage.isUnlimited)}
             </p>
             <p>

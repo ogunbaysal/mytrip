@@ -469,26 +469,21 @@ function mapBackendPlaceToSummary(place: APIPlace): PlaceSummary {
     place.kind || place.kindSlug || place.categorySlug || place.category || place.type || "";
   const normalizedKind = normalizedKindSource.toLowerCase().replace(/-/g, "_");
 
-  const type: PlaceSummary["type"] = [
-    "hotel",
+  const stayKinds = new Set([
     "villa",
-  ].includes(normalizedKind)
-    ? "stay"
-    : ["restaurant", "cafe", "bar_club"].includes(normalizedKind)
-      ? "restaurant"
-      : "experience";
+    "bungalow_tiny_house",
+    "hotel_pension",
+    "detached_house_apartment",
+    "camp_site",
+  ]);
 
-  const category: PlaceSummary["category"] = ["beach"].includes(normalizedKind)
-    ? "beachfront"
-    : ["hotel", "villa"].includes(normalizedKind)
-      ? "family"
-      : ["restaurant", "cafe", "bar_club"].includes(normalizedKind)
-        ? "gastronomy"
-        : ["activity_location"].includes(normalizedKind)
-          ? "sailing"
-          : ["natural_location", "visit_location"].includes(normalizedKind)
-            ? "design"
-            : "wellness";
+  const type: PlaceSummary["type"] = stayKinds.has(normalizedKind)
+    ? "stay"
+    : "activity";
+
+  const category: PlaceSummary["category"] = stayKinds.has(normalizedKind)
+    ? "family"
+    : "wellness";
 
   return {
     id: place.id,

@@ -121,7 +121,7 @@ export function PlaceKindModuleRenderer({
         <DashboardCard padding="md">
           <SectionHeader
             title="Konaklama Saatleri"
-            subtitle="Otel ve villa turleri icin check-in/check-out alanlari"
+            subtitle="Konaklama kategorileri için check-in/check-out alanları"
             icon={<Clock className="size-5" />}
             size="sm"
             className="mb-6"

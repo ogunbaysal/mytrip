@@ -56,16 +56,18 @@ import { PlaceTypeModuleForm } from "@/components/dashboard/places/place-type-mo
 const DEFAULT_COORDS = { lat: 39.0, lng: 35.0 };
 
 const KIND_RESOURCE_KEY_MAP: Record<string, string> = {
-  hotel: "place.hotel",
   villa: "place.villa",
-  restaurant: "place.restaurant",
-  cafe: "place.cafe",
-  bar_club: "place.bar_club",
-  beach: "place.beach",
-  natural_location: "place.natural_location",
-  activity_location: "place.activity_location",
-  visit_location: "place.visit_location",
-  other_monetized: "place.other_monetized",
+  bungalow_tiny_house: "place.bungalow_tiny_house",
+  hotel_pension: "place.hotel_pension",
+  detached_house_apartment: "place.detached_house_apartment",
+  camp_site: "place.camp_site",
+  transfer: "place.transfer",
+  boat_tour: "place.boat_tour",
+  paragliding_microlight_skydiving: "place.paragliding_microlight_skydiving",
+  safari: "place.safari",
+  water_sports: "place.water_sports",
+  ski: "place.ski",
+  balloon_tour: "place.balloon_tour",
 };
 
 const CREATE_PLACE_STEPS: PlaceFormStep[] = [

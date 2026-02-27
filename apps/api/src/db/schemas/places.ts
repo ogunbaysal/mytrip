@@ -62,7 +62,7 @@ const placeTable = pgTable(
     id: text("id").primaryKey(),
     slug: text("slug").notNull().unique(),
     name: text("name").notNull(),
-    kind: placeKindEnum("kind").notNull().default("visit_location"),
+    kind: placeKindEnum("kind").notNull().default("villa"),
     // Legacy category reference kept temporarily for incremental route migration.
     categoryId: placeKindId("category_id").references(() => placeKind.id, {
       onDelete: "set null",

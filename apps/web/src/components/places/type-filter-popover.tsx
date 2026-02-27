@@ -19,11 +19,8 @@ type PlaceType = {
 };
 
 const PLACE_TYPES: PlaceType[] = [
-  { type: "hotel", name: "Otel", count: 0 },
-  { type: "restaurant", name: "Restoran", count: 0 },
-  { type: "cafe", name: "Kafe", count: 0 },
+  { type: "stay", name: "Konaklama", count: 0 },
   { type: "activity", name: "Aktivite", count: 0 },
-  { type: "attraction", name: "Gezi Yeri", count: 0 },
 ];
 
 type TypeFilterPopoverProps = {
