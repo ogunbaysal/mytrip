@@ -50,7 +50,9 @@ function CheckoutForm() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [agreed, setAgreed] = useState(false);
   const [couponCode, setCouponCode] = useState("");
-  const [appliedCouponCode, setAppliedCouponCode] = useState<string | null>(null);
+  const [appliedCouponCode, setAppliedCouponCode] = useState<string | null>(
+    null,
+  );
   const [couponError, setCouponError] = useState<string | null>(null);
   const [couponPricing, setCouponPricing] = useState<{
     basePrice: number;
@@ -91,7 +93,9 @@ function CheckoutForm() {
     (plan) => plan.id === planId,
   );
 
-  const basePrice = selectedPlan ? Number.parseFloat(selectedPlan.price.toString()) : 0;
+  const basePrice = selectedPlan
+    ? Number.parseFloat(selectedPlan.price.toString())
+    : 0;
   const effectivePricing = useMemo(
     () =>
       couponPricing ?? {
@@ -148,14 +152,17 @@ function CheckoutForm() {
       }
 
       await queryClient.invalidateQueries({ queryKey: ["session"] });
-      await queryClient.invalidateQueries({ queryKey: ["subscription-current"] });
+      await queryClient.invalidateQueries({
+        queryKey: ["subscription-current"],
+      });
       await queryClient.invalidateQueries({ queryKey: ["usage"] });
 
       router.push("/dashboard" as Route);
     },
     onError: (error: Error) => {
       toast.error(
-        error.message || "Odeme islemi basarisiz oldu. Lutfen tekrar deneyiniz.",
+        error.message ||
+          "Odeme islemi basarisiz oldu. Lutfen tekrar deneyiniz.",
       );
     },
   });
@@ -286,8 +293,10 @@ function CheckoutForm() {
     validateCouponMutation.mutate();
   };
 
-  const maxPlaces = selectedPlan?.maxPlaces ?? selectedPlan?.limits?.maxPlaces ?? 0;
-  const maxBlogs = selectedPlan?.maxBlogs ?? selectedPlan?.limits?.maxBlogs ?? 0;
+  const maxPlaces =
+    selectedPlan?.maxPlaces ?? selectedPlan?.limits?.maxPlaces ?? 0;
+  const maxBlogs =
+    selectedPlan?.maxBlogs ?? selectedPlan?.limits?.maxBlogs ?? 0;
 
   if (!selectedPlan) {
     return (
@@ -296,9 +305,12 @@ function CheckoutForm() {
           <AlertTriangle className="mx-auto mb-4 size-16 text-yellow-500" />
           <h2 className="mb-2 text-2xl font-bold">Plan Bulunamadi</h2>
           <p className="mb-6 text-muted-foreground">
-            Secilen plan bulunamadi. Lutfen pricing sayfasina gidip tekrar deneyiniz.
+            Secilen plan bulunamadi. Lutfen pricing sayfasina gidip tekrar
+            deneyiniz.
           </p>
-          <Button onClick={() => router.push("/pricing")}>Pricing Sayfasina Don</Button>
+          <Button onClick={() => router.push("/pricing")}>
+            Pricing Sayfasina Don
+          </Button>
         </Card>
       </div>
     );
@@ -307,7 +319,9 @@ function CheckoutForm() {
   return (
     <div className="container mx-auto px-4 py-12 md:px-6">
       <div className="mx-auto max-w-6xl">
-        <h1 className="mb-8 text-center text-4xl font-bold tracking-tight">Odeme Yap</h1>
+        <h1 className="mb-8 text-center text-4xl font-bold tracking-tight">
+          Odeme Yap
+        </h1>
 
         <div className="grid gap-8 lg:grid-cols-2">
           <Card className="p-6">
@@ -371,13 +385,19 @@ function CheckoutForm() {
                   <Button
                     type="button"
                     variant="outline"
-                    disabled={validateCouponMutation.isPending || !couponCode.trim()}
+                    disabled={
+                      validateCouponMutation.isPending || !couponCode.trim()
+                    }
                     onClick={handleApplyCoupon}
                   >
-                    {validateCouponMutation.isPending ? "Dogrulaniyor..." : "Uygula"}
+                    {validateCouponMutation.isPending
+                      ? "Dogrulaniyor..."
+                      : "Uygula"}
                   </Button>
                 </div>
-                {couponError && <p className="text-sm text-destructive">{couponError}</p>}
+                {couponError && (
+                  <p className="text-sm text-destructive">{couponError}</p>
+                )}
                 {appliedCouponCode && !couponError && (
                   <p className="text-sm text-emerald-600">
                     {appliedCouponCode} kuponu uygulandi.
@@ -392,26 +412,29 @@ function CheckoutForm() {
               <div className="flex justify-between text-sm">
                 <span>Ara Toplam:</span>
                 <span>
-                  {effectivePricing.basePrice.toFixed(2)} {selectedPlan.currency}
+                  {effectivePricing.basePrice.toFixed(2)}{" "}
+                  {selectedPlan.currency}
                 </span>
               </div>
               {effectivePricing.discountAmount > 0 && (
                 <div className="flex justify-between text-sm text-emerald-600">
                   <span>Kupon Indirimi:</span>
                   <span>
-                    -{effectivePricing.discountAmount.toFixed(2)} {selectedPlan.currency}
+                    -{effectivePricing.discountAmount.toFixed(2)}{" "}
+                    {selectedPlan.currency}
                   </span>
                 </div>
               )}
               <div className="flex justify-between text-lg font-bold">
                 <span>Toplam:</span>
                 <span>
-                  {effectivePricing.finalPrice.toFixed(2)} {selectedPlan.currency}
+                  {effectivePricing.finalPrice.toFixed(2)}{" "}
+                  {selectedPlan.currency}
                 </span>
               </div>
               <p className="text-sm text-muted-foreground">
                 {isFreeCheckout
-                  ? "* Bu siparis kupon ile tamamen ucretsizdir."
+                  ? "* Bu plan ucretsizdir. Odeme yontemi eklemeden abonelik aktive edilir."
                   : "* Bu tutar otomatik olarak kartinizdan cekilecektir."}
               </p>
             </div>
@@ -426,7 +449,7 @@ function CheckoutForm() {
             <form onSubmit={handleSubmit} className="space-y-6">
               {isFreeCheckout ? (
                 <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
-                  Kupon indirimi nedeniyle odeme alinmayacak. Aboneliginiz hemen
+                  Bu plan ucretsizdir. Odeme bilgisi girmeden aboneliginiz hemen
                   aktive edilecektir.
                 </div>
               ) : (
@@ -447,7 +470,9 @@ function CheckoutForm() {
                       <CreditCard className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-muted-foreground" />
                     </div>
                     {errors.cardNumber && (
-                      <p className="text-sm text-destructive">{errors.cardNumber}</p>
+                      <p className="text-sm text-destructive">
+                        {errors.cardNumber}
+                      </p>
                     )}
                   </div>
 
@@ -457,13 +482,18 @@ function CheckoutForm() {
                       id="cardHolderName"
                       value={paymentData.cardHolderName}
                       onChange={(event) =>
-                        handlePaymentChange("cardHolderName", event.target.value)
+                        handlePaymentChange(
+                          "cardHolderName",
+                          event.target.value,
+                        )
                       }
                       placeholder="Ad Soyad"
                       maxLength={100}
                     />
                     {errors.cardHolderName && (
-                      <p className="text-sm text-destructive">{errors.cardHolderName}</p>
+                      <p className="text-sm text-destructive">
+                        {errors.cardHolderName}
+                      </p>
                     )}
                   </div>
 
@@ -480,7 +510,9 @@ function CheckoutForm() {
                         maxLength={2}
                       />
                       {errors.expireMonth && (
-                        <p className="text-sm text-destructive">{errors.expireMonth}</p>
+                        <p className="text-sm text-destructive">
+                          {errors.expireMonth}
+                        </p>
                       )}
                     </div>
                     <div className="space-y-2">
@@ -495,7 +527,9 @@ function CheckoutForm() {
                         maxLength={2}
                       />
                       {errors.expireYear && (
-                        <p className="text-sm text-destructive">{errors.expireYear}</p>
+                        <p className="text-sm text-destructive">
+                          {errors.expireYear}
+                        </p>
                       )}
                     </div>
                     <div className="space-y-2">
@@ -503,7 +537,9 @@ function CheckoutForm() {
                       <Input
                         id="cvc"
                         value={paymentData.cvc}
-                        onChange={(event) => handlePaymentChange("cvc", event.target.value)}
+                        onChange={(event) =>
+                          handlePaymentChange("cvc", event.target.value)
+                        }
                         placeholder="123"
                         maxLength={4}
                       />
@@ -562,7 +598,9 @@ function CheckoutForm() {
                   okudum ve kabul ediyorum.
                 </label>
               </div>
-              {errors.agreed && <p className="text-sm text-destructive">{errors.agreed}</p>}
+              {errors.agreed && (
+                <p className="text-sm text-destructive">{errors.agreed}</p>
+              )}
 
               <Button
                 type="submit"
@@ -575,10 +613,10 @@ function CheckoutForm() {
                     <span className="mr-2 inline-block size-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
                     Islem yapiliyor...
                   </>
+                ) : isFreeCheckout ? (
+                  "Aboneligi Baslat"
                 ) : (
-                  isFreeCheckout
-                    ? "Aboneligi Baslat"
-                    : `${effectivePricing.finalPrice.toFixed(2)} ${selectedPlan.currency} Ode`
+                  `${effectivePricing.finalPrice.toFixed(2)} ${selectedPlan.currency} Ode`
                 )}
               </Button>
             </form>
