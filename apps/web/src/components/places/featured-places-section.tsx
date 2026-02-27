@@ -9,9 +9,9 @@ import { useFeaturedPlaces } from "@/hooks/use-featured-content";
 
 import { PlaceCard } from "./place-card";
 
-const SECTION_TITLE = "Öne Çıkan Konaklamalar";
+const SECTION_TITLE = "Öne Çıkanlar";
 const SECTION_SUBTITLE =
-  "Misafir yorumlarıyla öne çıkan, özenle seçilmiş tatil evleri ve villalar.";
+  "Misafir yorumlarıyla öne çıkan, özenle seçilmiş konaklama ve deneyimler.";
 
 export function FeaturedPlacesSection() {
   const { data, isLoading } = useFeaturedPlaces();
