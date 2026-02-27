@@ -20,7 +20,10 @@ function RegisterPageContent() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const redirectTo = resolveSafeRedirect(searchParams.get("redirect"), "/" as Route);
+  const redirectTo = resolveSafeRedirect(
+    searchParams.get("redirect"),
+    "/" as Route,
+  );
   const loginHref =
     redirectTo === "/"
       ? ("/login" as Route)
@@ -64,6 +67,26 @@ function RegisterPageContent() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     register.mutate();
+  };
+
+  const handleGoogleSignUp = async () => {
+    const callbackURL =
+      typeof window === "undefined"
+        ? redirectTo
+        : new URL(redirectTo, window.location.origin).href;
+    const errorCallbackURL =
+      typeof window === "undefined"
+        ? "/register"
+        : new URL("/register", window.location.origin).href;
+    const result = await authClient.signIn.social({
+      provider: "google",
+      callbackURL,
+      errorCallbackURL,
+    });
+
+    if (result.error) {
+      toast.error(result.error.message || "Google ile kayıt başarısız oldu");
+    }
   };
 
   return (
@@ -145,6 +168,21 @@ function RegisterPageContent() {
             {register.isPending ? "Kayıt oluşturuluyor..." : "Kayıt Ol"}
           </Button>
         </form>
+
+        <div className="my-6 flex items-center gap-3 text-xs text-muted-foreground">
+          <span className="h-px flex-1 bg-border" />
+          veya
+          <span className="h-px flex-1 bg-border" />
+        </div>
+
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full"
+          onClick={handleGoogleSignUp}
+        >
+          Google ile kayıt ol
+        </Button>
 
         <div className="mt-6 text-center text-sm">
           <span className="text-muted-foreground">
