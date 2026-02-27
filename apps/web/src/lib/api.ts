@@ -305,6 +305,85 @@ type OwnerPlaceListResponse = {
   };
 };
 
+type BookingNightlyLine = {
+  date: string;
+  nightlyPrice: number;
+  sourceType: "place_base" | "room_base" | "place_price_rule" | "room_price_rule";
+  sourceId: string;
+};
+
+type BookingQuote = {
+  currency: "TRY" | "USD" | "EUR";
+  nights: number;
+  nightlyLines: BookingNightlyLine[];
+  subtotal: number;
+  total: number;
+  checkInDate: string;
+  checkOutDate: string;
+  guests: number;
+  place: {
+    id: string;
+    kind: string;
+    nightlyPrice: string | null;
+  };
+  room: {
+    id: string;
+    name?: string;
+    status: string;
+    baseNightlyPrice: string | null;
+  } | null;
+};
+
+type BookingReservation = {
+  id: string;
+  bookingReference: string;
+  placeId: string;
+  roomId: string | null;
+  userId: string;
+  checkInDate: string;
+  checkOutDate: string;
+  guests: number;
+  totalPrice: string;
+  currency: "TRY" | "USD" | "EUR";
+  status: "pending" | "confirmed" | "cancelled" | "completed";
+  paymentStatus: "pending" | "paid" | "refunded";
+  specialRequests?: string | null;
+  pricingSnapshot?: {
+    currency: string;
+    nights: number;
+    subtotal: number;
+    total: number;
+    nightlyLines: BookingNightlyLine[];
+  } | null;
+  placeName?: string;
+  placeSlug?: string;
+  roomName?: string | null;
+  travelerName?: string;
+  travelerEmail?: string;
+  travelerPhone?: string | null;
+  createdAt: string | Date;
+  updatedAt: string | Date;
+};
+
+type OwnerPlacePriceRule = {
+  id: string;
+  placeId: string;
+  startsOn: string;
+  endsOn: string;
+  nightlyPrice: string;
+  createdAt: string | Date;
+  updatedAt: string | Date;
+};
+
+type OwnerAvailabilityBlock = {
+  id: string;
+  startsOn: string;
+  endsOn: string;
+  reason?: string | null;
+  createdAt: string | Date;
+  updatedAt: string | Date;
+};
+
 function safelyParseJSON<T>(
   input: string | object | null | undefined,
   fallback: T,
@@ -636,6 +715,80 @@ export const api = {
       );
     },
   },
+  bookings: {
+    async quote(params: {
+      placeId: string;
+      roomId?: string;
+      checkIn: string;
+      checkOut: string;
+      guests: number;
+    }) {
+      const query = new URLSearchParams({
+        placeId: params.placeId,
+        checkIn: params.checkIn,
+        checkOut: params.checkOut,
+        guests: String(params.guests),
+      });
+      if (params.roomId) query.set("roomId", params.roomId);
+
+      return await request<{ quote: BookingQuote }>(
+        `/api/bookings/quote?${query.toString()}`,
+      );
+    },
+    async listRooms(params: {
+      placeId: string;
+      checkIn: string;
+      checkOut: string;
+      guests: number;
+    }) {
+      const query = new URLSearchParams({
+        placeId: params.placeId,
+        checkIn: params.checkIn,
+        checkOut: params.checkOut,
+        guests: String(params.guests),
+      });
+      return await request<{
+        rooms: Array<{
+          id: string;
+          name: string;
+          slug: string;
+          maxAdults: number;
+          maxChildren: number;
+          maxGuests: number;
+          baseNightlyPrice: string | null;
+          status: string;
+          available: boolean;
+        }>;
+      }>(`/api/bookings/rooms?${query.toString()}`);
+    },
+    async create(data: {
+      placeId: string;
+      roomId?: string;
+      checkInDate: string;
+      checkOutDate: string;
+      guests: number;
+      specialRequests?: string;
+    }) {
+      return await request<{
+        success: boolean;
+        message: string;
+        booking: BookingReservation;
+      }>("/api/bookings", {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+    },
+    async listMine() {
+      return await request<{ reservations: BookingReservation[] }>(
+        "/api/bookings/me",
+      );
+    },
+    async getMineById(bookingId: string) {
+      return await request<{ reservation: BookingReservation }>(
+        `/api/bookings/me/${bookingId}`,
+      );
+    },
+  },
   locations: {
     async cities() {
       const data = await request<{
@@ -845,6 +998,145 @@ export const api = {
       async deleteRoomRate(placeId: string, roomId: string, rateId: string) {
         return await request<{ success: boolean }>(
           `/api/owner/places/${placeId}/rooms/${roomId}/rates/${rateId}`,
+          { method: "DELETE" },
+        );
+      },
+      async listReservations(
+        placeId: string,
+        params?: {
+          page?: number;
+          limit?: number;
+          status?: string;
+          paymentStatus?: string;
+          roomId?: string;
+          checkInFrom?: string;
+          checkInTo?: string;
+        },
+      ) {
+        const query = new URLSearchParams();
+        if (params?.page) query.set("page", String(params.page));
+        if (params?.limit) query.set("limit", String(params.limit));
+        if (params?.status) query.set("status", params.status);
+        if (params?.paymentStatus) query.set("paymentStatus", params.paymentStatus);
+        if (params?.roomId) query.set("roomId", params.roomId);
+        if (params?.checkInFrom) query.set("checkInFrom", params.checkInFrom);
+        if (params?.checkInTo) query.set("checkInTo", params.checkInTo);
+
+        return await request<{
+          reservations: BookingReservation[];
+          pagination: {
+            page: number;
+            limit: number;
+            total: number;
+            totalPages: number;
+          };
+        }>(`/api/owner/places/${placeId}/reservations?${query.toString()}`);
+      },
+      async getReservationById(placeId: string, reservationId: string) {
+        return await request<{ reservation: BookingReservation }>(
+          `/api/owner/places/${placeId}/reservations/${reservationId}`,
+        );
+      },
+      async updateReservationStatus(
+        placeId: string,
+        reservationId: string,
+        data: { status: "confirmed" | "cancelled"; reason?: string },
+      ) {
+        return await request<{ success: boolean; reservation: BookingReservation }>(
+          `/api/owner/places/${placeId}/reservations/${reservationId}/status`,
+          { method: "PATCH", body: JSON.stringify(data) },
+        );
+      },
+      async updateReservationPayment(
+        placeId: string,
+        reservationId: string,
+        data: { paymentStatus: "pending" | "paid" | "refunded"; reason?: string },
+      ) {
+        return await request<{ success: boolean; reservation: BookingReservation }>(
+          `/api/owner/places/${placeId}/reservations/${reservationId}/payment`,
+          { method: "PATCH", body: JSON.stringify(data) },
+        );
+      },
+      async listPriceRules(placeId: string) {
+        return await request<{ rules: OwnerPlacePriceRule[] }>(
+          `/api/owner/places/${placeId}/price-rules`,
+        );
+      },
+      async createPriceRule(
+        placeId: string,
+        data: {
+          startsOn: string;
+          endsOn: string;
+          nightlyPrice: number;
+        },
+      ) {
+        return await request<{ success: boolean; rule: OwnerPlacePriceRule }>(
+          `/api/owner/places/${placeId}/price-rules`,
+          { method: "POST", body: JSON.stringify(data) },
+        );
+      },
+      async updatePriceRule(
+        placeId: string,
+        ruleId: string,
+        data: Partial<{
+          startsOn: string;
+          endsOn: string;
+          nightlyPrice: number;
+        }>,
+      ) {
+        return await request<{ success: boolean; rule: OwnerPlacePriceRule }>(
+          `/api/owner/places/${placeId}/price-rules/${ruleId}`,
+          { method: "PUT", body: JSON.stringify(data) },
+        );
+      },
+      async deletePriceRule(placeId: string, ruleId: string) {
+        return await request<{ success: boolean }>(
+          `/api/owner/places/${placeId}/price-rules/${ruleId}`,
+          { method: "DELETE" },
+        );
+      },
+      async listAvailabilityBlocks(placeId: string) {
+        return await request<{ blocks: OwnerAvailabilityBlock[] }>(
+          `/api/owner/places/${placeId}/availability-blocks`,
+        );
+      },
+      async createAvailabilityBlock(
+        placeId: string,
+        data: { startsOn: string; endsOn: string; reason?: string },
+      ) {
+        return await request<{ success: boolean; block: OwnerAvailabilityBlock }>(
+          `/api/owner/places/${placeId}/availability-blocks`,
+          { method: "POST", body: JSON.stringify(data) },
+        );
+      },
+      async deleteAvailabilityBlock(placeId: string, blockId: string) {
+        return await request<{ success: boolean }>(
+          `/api/owner/places/${placeId}/availability-blocks/${blockId}`,
+          { method: "DELETE" },
+        );
+      },
+      async listRoomAvailabilityBlocks(placeId: string, roomId: string) {
+        return await request<{ blocks: OwnerAvailabilityBlock[] }>(
+          `/api/owner/places/${placeId}/rooms/${roomId}/availability-blocks`,
+        );
+      },
+      async createRoomAvailabilityBlock(
+        placeId: string,
+        roomId: string,
+        data: { startsOn: string; endsOn: string; reason?: string },
+      ) {
+        return await request<{ success: boolean; block: OwnerAvailabilityBlock }>(
+          `/api/owner/places/${placeId}/rooms/${roomId}/availability-blocks`,
+          { method: "POST", body: JSON.stringify(data) },
+        );
+      },
+      async deleteRoomAvailabilityBlock(
+        placeId: string,
+        roomId: string,
+        blockId: string,
+      ) {
+        return await request<{ success: boolean }>(
+          `/api/owner/places/${placeId}/rooms/${roomId}/availability-blocks/${blockId}`,
           { method: "DELETE" },
         );
       },

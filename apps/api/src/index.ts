@@ -63,6 +63,7 @@ app.get("/api", (c) =>
       blog: "/api/blog",
       reviews: "/api/reviews",
       search: "/api/search",
+      bookings: "/api/bookings",
     },
     documentation: "https://github.com/your-repo/mytrip",
   }),

@@ -17,6 +17,7 @@ export * from "./locations.ts";
 export * from "./places.ts";
 export * from "./place-profiles.ts";
 export * from "./place-hotel.ts";
+export * from "./place-booking.ts";
 export * from "./place-dining.ts";
 export * from "./place-activity.ts";
 export * from "./bookings.ts";

@@ -15,6 +15,7 @@ import {
   MapPin,
   MoreVertical,
   TrendingUp,
+  Calendar,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -34,7 +35,6 @@ import {
   ProgressBar,
 } from "@/components/dashboard";
 import { api } from "@/lib/api";
-import { cn } from "@/lib/utils";
 
 type PlaceStatus = "pending" | "active" | "rejected" | "inactive" | "suspended";
 
@@ -254,6 +254,15 @@ export default function PlacesPage() {
                           >
                             <Edit className="size-4" />
                             Düzenle
+                          </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                          <Link
+                            href={`/dashboard/places/${place.id}/manage`}
+                            className="flex items-center gap-2"
+                          >
+                            <Calendar className="size-4" />
+                            Takvim ve Rezervasyon
                           </Link>
                         </DropdownMenuItem>
                         {place.status !== "active" &&

@@ -3,6 +3,7 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { db } from "../../db/index.ts";
 import {
+  booking,
   activityPackage,
   activityPackageMedia,
   activityPackagePriceTier,
@@ -13,16 +14,29 @@ import {
   district,
   file,
   hotelRoom,
+  hotelRoomAvailabilityBlock,
   hotelRoomFeature,
   hotelRoomMedia,
   hotelRoomRate,
   place,
+  placeAvailabilityBlock,
+  placePriceRule,
   placeKind,
   placeImage,
   province,
   user,
 } from "../../db/schemas/index.ts";
-import { and, asc, desc, eq, ilike, inArray, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gte,
+  ilike,
+  inArray,
+  lte,
+  sql,
+} from "drizzle-orm";
 import { getSessionFromRequest } from "../../lib/session.ts";
 import {
   derivePlaceTypeFromCategorySlug,
@@ -44,6 +58,7 @@ import {
   supportsPackagesForKind,
   supportsRoomsForKind,
 } from "../../lib/place-kind-registry.ts";
+import { maybeAutoCompleteBookings } from "../../lib/booking-domain.ts";
 
 const app = new Hono();
 
@@ -144,6 +159,30 @@ const createRoomRateSchema = z.object({
 });
 
 const updateRoomRateSchema = createRoomRateSchema.partial();
+
+const createPlacePriceRuleSchema = z.object({
+  startsOn: z.string().min(1),
+  endsOn: z.string().min(1),
+  nightlyPrice: z.number().min(0),
+});
+
+const updatePlacePriceRuleSchema = createPlacePriceRuleSchema.partial();
+
+const createAvailabilityBlockSchema = z.object({
+  startsOn: z.string().min(1),
+  endsOn: z.string().min(1),
+  reason: z.string().trim().max(500).optional(),
+});
+
+const reservationStatusUpdateSchema = z.object({
+  status: z.enum(["confirmed", "cancelled"]),
+  reason: z.string().trim().max(500).optional(),
+});
+
+const reservationPaymentUpdateSchema = z.object({
+  paymentStatus: z.enum(["pending", "paid", "refunded"]),
+  reason: z.string().trim().max(500).optional(),
+});
 
 const menuItemInputSchema = z.object({
   name: z.string().trim().min(1).max(200),
@@ -1451,6 +1490,69 @@ async function getOwnedPackageContext({
   return row ?? null;
 }
 
+const isStayKind = (kind: string) => kind === "hotel" || kind === "villa";
+
+const parsePricingSnapshot = (input: string | null) => {
+  if (!input) return null;
+  try {
+    return JSON.parse(input);
+  } catch {
+    return null;
+  }
+};
+
+const mapReservationStatusForOwner = (
+  current: "pending" | "confirmed" | "cancelled" | "completed",
+  next: "confirmed" | "cancelled",
+) => {
+  if (current === "completed") {
+    return {
+      ok: false as const,
+      message: "Tamamlanmış rezervasyon güncellenemez",
+    };
+  }
+
+  if (current === "cancelled") {
+    return {
+      ok: false as const,
+      message: "İptal edilen rezervasyon güncellenemez",
+    };
+  }
+
+  if (current === "pending" && (next === "confirmed" || next === "cancelled")) {
+    return { ok: true as const };
+  }
+
+  if (current === "confirmed" && next === "cancelled") {
+    return { ok: true as const };
+  }
+
+  return {
+    ok: false as const,
+    message: "Bu durum geçişine izin verilmiyor",
+  };
+};
+
+const DATE_ONLY_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+
+const validateInclusiveDateRange = (startsOn: string, endsOn: string) => {
+  if (!DATE_ONLY_REGEX.test(startsOn) || !DATE_ONLY_REGEX.test(endsOn)) {
+    return {
+      ok: false as const,
+      message: "Tarihler YYYY-MM-DD formatında olmalıdır",
+    };
+  }
+
+  if (startsOn > endsOn) {
+    return {
+      ok: false as const,
+      message: "Başlangıç tarihi bitiş tarihinden sonra olamaz",
+    };
+  }
+
+  return { ok: true as const };
+};
+
 app.get("/:id/rooms", async (c) => {
   try {
     const session = await getSessionFromRequest(c);
@@ -2247,6 +2349,620 @@ app.delete("/:id/packages/:packageId", async (c) => {
     return c.json({ success: true });
   } catch (error) {
     console.error("Delete owner activity package error:", error);
+    return c.json({ error: "Internal server error" }, 500);
+  }
+});
+
+app.get("/:id/reservations", async (c) => {
+  try {
+    const session = await getSessionFromRequest(c);
+    if (!session?.user?.id) return c.json({ error: "Unauthorized" }, 401);
+
+    const userId = session.user.id;
+    const placeId = c.req.param("id");
+    const placeCtx = await getOwnedPlaceContext(placeId, userId);
+    if (!placeCtx) return c.json({ error: "Place not found" }, 404);
+    if (!isStayKind(placeCtx.kind)) {
+      return c.json({ error: "Not supported", message: "Bu mekan türü rezervasyon desteklemiyor" }, 400);
+    }
+
+    await maybeAutoCompleteBookings();
+
+    const {
+      page = "1",
+      limit = "20",
+      status = "",
+      paymentStatus = "",
+      roomId = "",
+      checkInFrom = "",
+      checkInTo = "",
+    } = c.req.query();
+
+    const pageInt = Math.max(1, Number.parseInt(page, 10) || 1);
+    const limitInt = Math.min(100, Math.max(1, Number.parseInt(limit, 10) || 20));
+    const offset = (pageInt - 1) * limitInt;
+
+    const conditions = [eq(booking.placeId, placeId)];
+    if (status) {
+      conditions.push(eq(booking.status, status as any));
+    }
+    if (paymentStatus) {
+      conditions.push(eq(booking.paymentStatus, paymentStatus as any));
+    }
+    if (roomId) {
+      conditions.push(eq(booking.roomId, roomId));
+    }
+    if (checkInFrom) {
+      conditions.push(gte(booking.checkInDate, checkInFrom));
+    }
+    if (checkInTo) {
+      conditions.push(lte(booking.checkInDate, checkInTo));
+    }
+
+    const whereClause = and(...conditions);
+
+    const [{ count }] = await db
+      .select({ count: sql<number>`COUNT(*)::int` })
+      .from(booking)
+      .where(whereClause);
+
+    const reservations = await db
+      .select({
+        id: booking.id,
+        bookingReference: booking.bookingReference,
+        placeId: booking.placeId,
+        roomId: booking.roomId,
+        userId: booking.userId,
+        checkInDate: booking.checkInDate,
+        checkOutDate: booking.checkOutDate,
+        guests: booking.guests,
+        totalPrice: booking.totalPrice,
+        currency: booking.currency,
+        status: booking.status,
+        paymentStatus: booking.paymentStatus,
+        specialRequests: booking.specialRequests,
+        pricingSnapshot: booking.pricingSnapshot,
+        createdAt: booking.createdAt,
+        updatedAt: booking.updatedAt,
+        travelerName: user.name,
+        travelerEmail: user.email,
+        roomName: hotelRoom.name,
+      })
+      .from(booking)
+      .innerJoin(user, eq(booking.userId, user.id))
+      .leftJoin(hotelRoom, eq(booking.roomId, hotelRoom.id))
+      .where(whereClause)
+      .orderBy(desc(booking.createdAt))
+      .limit(limitInt)
+      .offset(offset);
+
+    return c.json({
+      reservations: reservations.map((item) => ({
+        ...item,
+        pricingSnapshot: parsePricingSnapshot(item.pricingSnapshot),
+      })),
+      pagination: {
+        page: pageInt,
+        limit: limitInt,
+        total: Number(count),
+        totalPages: Math.ceil(Number(count) / limitInt),
+      },
+    });
+  } catch (error) {
+    console.error("Get owner reservations error:", error);
+    return c.json({ error: "Internal server error" }, 500);
+  }
+});
+
+app.get("/:id/reservations/:reservationId", async (c) => {
+  try {
+    const session = await getSessionFromRequest(c);
+    if (!session?.user?.id) return c.json({ error: "Unauthorized" }, 401);
+
+    const userId = session.user.id;
+    const placeId = c.req.param("id");
+    const reservationId = c.req.param("reservationId");
+    const placeCtx = await getOwnedPlaceContext(placeId, userId);
+    if (!placeCtx) return c.json({ error: "Place not found" }, 404);
+    if (!isStayKind(placeCtx.kind)) {
+      return c.json({ error: "Not supported", message: "Bu mekan türü rezervasyon desteklemiyor" }, 400);
+    }
+
+    await maybeAutoCompleteBookings();
+
+    const [reservation] = await db
+      .select({
+        id: booking.id,
+        bookingReference: booking.bookingReference,
+        placeId: booking.placeId,
+        roomId: booking.roomId,
+        userId: booking.userId,
+        checkInDate: booking.checkInDate,
+        checkOutDate: booking.checkOutDate,
+        guests: booking.guests,
+        totalPrice: booking.totalPrice,
+        currency: booking.currency,
+        status: booking.status,
+        paymentStatus: booking.paymentStatus,
+        specialRequests: booking.specialRequests,
+        pricingSnapshot: booking.pricingSnapshot,
+        createdAt: booking.createdAt,
+        updatedAt: booking.updatedAt,
+        travelerName: user.name,
+        travelerEmail: user.email,
+        travelerPhone: user.phone,
+        roomName: hotelRoom.name,
+      })
+      .from(booking)
+      .innerJoin(user, eq(booking.userId, user.id))
+      .leftJoin(hotelRoom, eq(booking.roomId, hotelRoom.id))
+      .where(and(eq(booking.id, reservationId), eq(booking.placeId, placeId)))
+      .limit(1);
+
+    if (!reservation) return c.json({ error: "Reservation not found" }, 404);
+
+    return c.json({
+      reservation: {
+        ...reservation,
+        pricingSnapshot: parsePricingSnapshot(reservation.pricingSnapshot),
+      },
+    });
+  } catch (error) {
+    console.error("Get owner reservation detail error:", error);
+    return c.json({ error: "Internal server error" }, 500);
+  }
+});
+
+app.patch(
+  "/:id/reservations/:reservationId/status",
+  zValidator("json", reservationStatusUpdateSchema),
+  async (c) => {
+    try {
+      const session = await getSessionFromRequest(c);
+      if (!session?.user?.id) return c.json({ error: "Unauthorized" }, 401);
+
+      const userId = session.user.id;
+      const placeId = c.req.param("id");
+      const reservationId = c.req.param("reservationId");
+      const data = c.req.valid("json");
+
+      const placeCtx = await getOwnedPlaceContext(placeId, userId);
+      if (!placeCtx) return c.json({ error: "Place not found" }, 404);
+      if (!isStayKind(placeCtx.kind)) {
+        return c.json({ error: "Not supported", message: "Bu mekan türü rezervasyon desteklemiyor" }, 400);
+      }
+
+      await maybeAutoCompleteBookings();
+
+      const [existing] = await db
+        .select({
+          id: booking.id,
+          status: booking.status,
+        })
+        .from(booking)
+        .where(and(eq(booking.id, reservationId), eq(booking.placeId, placeId)))
+        .limit(1);
+
+      if (!existing) return c.json({ error: "Reservation not found" }, 404);
+
+      const transition = mapReservationStatusForOwner(existing.status, data.status);
+      if (!transition.ok) {
+        return c.json({ error: "Validation failed", message: transition.message }, 400);
+      }
+
+      const [updated] = await db
+        .update(booking)
+        .set({
+          status: data.status,
+          updatedAt: new Date(),
+        })
+        .where(eq(booking.id, reservationId))
+        .returning();
+
+      return c.json({
+        success: true,
+        reservation: {
+          ...updated,
+          pricingSnapshot: parsePricingSnapshot(updated.pricingSnapshot),
+        },
+        reason: data.reason ?? null,
+      });
+    } catch (error) {
+      console.error("Update owner reservation status error:", error);
+      return c.json({ error: "Internal server error" }, 500);
+    }
+  },
+);
+
+app.patch(
+  "/:id/reservations/:reservationId/payment",
+  zValidator("json", reservationPaymentUpdateSchema),
+  async (c) => {
+    try {
+      const session = await getSessionFromRequest(c);
+      if (!session?.user?.id) return c.json({ error: "Unauthorized" }, 401);
+
+      const userId = session.user.id;
+      const placeId = c.req.param("id");
+      const reservationId = c.req.param("reservationId");
+      const data = c.req.valid("json");
+
+      const placeCtx = await getOwnedPlaceContext(placeId, userId);
+      if (!placeCtx) return c.json({ error: "Place not found" }, 404);
+      if (!isStayKind(placeCtx.kind)) {
+        return c.json({ error: "Not supported", message: "Bu mekan türü rezervasyon desteklemiyor" }, 400);
+      }
+
+      const [updated] = await db
+        .update(booking)
+        .set({
+          paymentStatus: data.paymentStatus,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(booking.id, reservationId), eq(booking.placeId, placeId)))
+        .returning();
+
+      if (!updated) return c.json({ error: "Reservation not found" }, 404);
+
+      return c.json({
+        success: true,
+        reservation: {
+          ...updated,
+          pricingSnapshot: parsePricingSnapshot(updated.pricingSnapshot),
+        },
+        reason: data.reason ?? null,
+      });
+    } catch (error) {
+      console.error("Update owner reservation payment error:", error);
+      return c.json({ error: "Internal server error" }, 500);
+    }
+  },
+);
+
+app.get("/:id/price-rules", async (c) => {
+  try {
+    const session = await getSessionFromRequest(c);
+    if (!session?.user?.id) return c.json({ error: "Unauthorized" }, 401);
+
+    const userId = session.user.id;
+    const placeId = c.req.param("id");
+    const placeCtx = await getOwnedPlaceContext(placeId, userId);
+    if (!placeCtx) return c.json({ error: "Place not found" }, 404);
+    if (!isStayKind(placeCtx.kind)) {
+      return c.json({ error: "Not supported", message: "Bu mekan türü tarih bazlı fiyat desteklemiyor" }, 400);
+    }
+
+    const rules = await db
+      .select()
+      .from(placePriceRule)
+      .where(eq(placePriceRule.placeId, placeId))
+      .orderBy(asc(placePriceRule.startsOn), asc(placePriceRule.createdAt));
+
+    return c.json({ rules });
+  } catch (error) {
+    console.error("Get owner place price rules error:", error);
+    return c.json({ error: "Internal server error" }, 500);
+  }
+});
+
+app.post(
+  "/:id/price-rules",
+  zValidator("json", createPlacePriceRuleSchema),
+  async (c) => {
+    try {
+      const session = await getSessionFromRequest(c);
+      if (!session?.user?.id) return c.json({ error: "Unauthorized" }, 401);
+
+      const userId = session.user.id;
+      const placeId = c.req.param("id");
+      const data = c.req.valid("json");
+      const placeCtx = await getOwnedPlaceContext(placeId, userId);
+      if (!placeCtx) return c.json({ error: "Place not found" }, 404);
+      if (!isStayKind(placeCtx.kind)) {
+        return c.json({ error: "Not supported", message: "Bu mekan türü tarih bazlı fiyat desteklemiyor" }, 400);
+      }
+
+      const dateValidation = validateInclusiveDateRange(data.startsOn, data.endsOn);
+      if (!dateValidation.ok) {
+        return c.json({ error: "Validation failed", message: dateValidation.message }, 400);
+      }
+
+      const id = crypto.randomUUID();
+      const [rule] = await db
+        .insert(placePriceRule)
+        .values({
+          id,
+          placeId,
+          startsOn: data.startsOn,
+          endsOn: data.endsOn,
+          nightlyPrice: data.nightlyPrice.toString(),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .returning();
+
+      return c.json({ success: true, rule }, 201);
+    } catch (error) {
+      console.error("Create owner place price rule error:", error);
+      return c.json({ error: "Internal server error" }, 500);
+    }
+  },
+);
+
+app.put(
+  "/:id/price-rules/:ruleId",
+  zValidator("json", updatePlacePriceRuleSchema),
+  async (c) => {
+    try {
+      const session = await getSessionFromRequest(c);
+      if (!session?.user?.id) return c.json({ error: "Unauthorized" }, 401);
+
+      const userId = session.user.id;
+      const placeId = c.req.param("id");
+      const ruleId = c.req.param("ruleId");
+      const data = c.req.valid("json");
+
+      const placeCtx = await getOwnedPlaceContext(placeId, userId);
+      if (!placeCtx) return c.json({ error: "Place not found" }, 404);
+      if (!isStayKind(placeCtx.kind)) {
+        return c.json({ error: "Not supported", message: "Bu mekan türü tarih bazlı fiyat desteklemiyor" }, 400);
+      }
+
+      const [existing] = await db
+        .select()
+        .from(placePriceRule)
+        .where(and(eq(placePriceRule.id, ruleId), eq(placePriceRule.placeId, placeId)))
+        .limit(1);
+      if (!existing) return c.json({ error: "Rule not found" }, 404);
+
+      const startsOn = data.startsOn ?? existing.startsOn;
+      const endsOn = data.endsOn ?? existing.endsOn;
+      const dateValidation = validateInclusiveDateRange(startsOn, endsOn);
+      if (!dateValidation.ok) {
+        return c.json({ error: "Validation failed", message: dateValidation.message }, 400);
+      }
+
+      const [updated] = await db
+        .update(placePriceRule)
+        .set({
+          startsOn,
+          endsOn,
+          nightlyPrice:
+            data.nightlyPrice !== undefined
+              ? data.nightlyPrice.toString()
+              : existing.nightlyPrice,
+          updatedAt: new Date(),
+        })
+        .where(eq(placePriceRule.id, ruleId))
+        .returning();
+
+      return c.json({ success: true, rule: updated });
+    } catch (error) {
+      console.error("Update owner place price rule error:", error);
+      return c.json({ error: "Internal server error" }, 500);
+    }
+  },
+);
+
+app.delete("/:id/price-rules/:ruleId", async (c) => {
+  try {
+    const session = await getSessionFromRequest(c);
+    if (!session?.user?.id) return c.json({ error: "Unauthorized" }, 401);
+
+    const userId = session.user.id;
+    const placeId = c.req.param("id");
+    const ruleId = c.req.param("ruleId");
+
+    const placeCtx = await getOwnedPlaceContext(placeId, userId);
+    if (!placeCtx) return c.json({ error: "Place not found" }, 404);
+    if (!isStayKind(placeCtx.kind)) {
+      return c.json({ error: "Not supported", message: "Bu mekan türü tarih bazlı fiyat desteklemiyor" }, 400);
+    }
+
+    const [deleted] = await db
+      .delete(placePriceRule)
+      .where(and(eq(placePriceRule.id, ruleId), eq(placePriceRule.placeId, placeId)))
+      .returning({ id: placePriceRule.id });
+
+    if (!deleted) return c.json({ error: "Rule not found" }, 404);
+    return c.json({ success: true });
+  } catch (error) {
+    console.error("Delete owner place price rule error:", error);
+    return c.json({ error: "Internal server error" }, 500);
+  }
+});
+
+app.get("/:id/availability-blocks", async (c) => {
+  try {
+    const session = await getSessionFromRequest(c);
+    if (!session?.user?.id) return c.json({ error: "Unauthorized" }, 401);
+
+    const userId = session.user.id;
+    const placeId = c.req.param("id");
+    const placeCtx = await getOwnedPlaceContext(placeId, userId);
+    if (!placeCtx) return c.json({ error: "Place not found" }, 404);
+    if (placeCtx.kind !== "villa") {
+      return c.json({ error: "Not supported", message: "Otel için oda bazlı takvim blokları kullanılmalıdır" }, 400);
+    }
+
+    const blocks = await db
+      .select()
+      .from(placeAvailabilityBlock)
+      .where(eq(placeAvailabilityBlock.placeId, placeId))
+      .orderBy(asc(placeAvailabilityBlock.startsOn), asc(placeAvailabilityBlock.createdAt));
+
+    return c.json({ blocks });
+  } catch (error) {
+    console.error("Get owner place availability blocks error:", error);
+    return c.json({ error: "Internal server error" }, 500);
+  }
+});
+
+app.post(
+  "/:id/availability-blocks",
+  zValidator("json", createAvailabilityBlockSchema),
+  async (c) => {
+    try {
+      const session = await getSessionFromRequest(c);
+      if (!session?.user?.id) return c.json({ error: "Unauthorized" }, 401);
+
+      const userId = session.user.id;
+      const placeId = c.req.param("id");
+      const data = c.req.valid("json");
+      const placeCtx = await getOwnedPlaceContext(placeId, userId);
+      if (!placeCtx) return c.json({ error: "Place not found" }, 404);
+      if (placeCtx.kind !== "villa") {
+        return c.json({ error: "Not supported", message: "Otel için oda bazlı takvim blokları kullanılmalıdır" }, 400);
+      }
+
+      const dateValidation = validateInclusiveDateRange(data.startsOn, data.endsOn);
+      if (!dateValidation.ok) {
+        return c.json({ error: "Validation failed", message: dateValidation.message }, 400);
+      }
+
+      const id = crypto.randomUUID();
+      const [block] = await db
+        .insert(placeAvailabilityBlock)
+        .values({
+          id,
+          placeId,
+          startsOn: data.startsOn,
+          endsOn: data.endsOn,
+          reason: data.reason,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .returning();
+
+      return c.json({ success: true, block }, 201);
+    } catch (error) {
+      console.error("Create owner place availability block error:", error);
+      return c.json({ error: "Internal server error" }, 500);
+    }
+  },
+);
+
+app.delete("/:id/availability-blocks/:blockId", async (c) => {
+  try {
+    const session = await getSessionFromRequest(c);
+    if (!session?.user?.id) return c.json({ error: "Unauthorized" }, 401);
+
+    const userId = session.user.id;
+    const placeId = c.req.param("id");
+    const blockId = c.req.param("blockId");
+    const placeCtx = await getOwnedPlaceContext(placeId, userId);
+    if (!placeCtx) return c.json({ error: "Place not found" }, 404);
+    if (placeCtx.kind !== "villa") {
+      return c.json({ error: "Not supported", message: "Otel için oda bazlı takvim blokları kullanılmalıdır" }, 400);
+    }
+
+    const [deleted] = await db
+      .delete(placeAvailabilityBlock)
+      .where(and(eq(placeAvailabilityBlock.id, blockId), eq(placeAvailabilityBlock.placeId, placeId)))
+      .returning({ id: placeAvailabilityBlock.id });
+    if (!deleted) return c.json({ error: "Block not found" }, 404);
+    return c.json({ success: true });
+  } catch (error) {
+    console.error("Delete owner place availability block error:", error);
+    return c.json({ error: "Internal server error" }, 500);
+  }
+});
+
+app.get("/:id/rooms/:roomId/availability-blocks", async (c) => {
+  try {
+    const session = await getSessionFromRequest(c);
+    if (!session?.user?.id) return c.json({ error: "Unauthorized" }, 401);
+
+    const userId = session.user.id;
+    const placeId = c.req.param("id");
+    const roomId = c.req.param("roomId");
+    const roomCtx = await getOwnedRoomContext({ placeId, roomId, userId });
+    if (!roomCtx) return c.json({ error: "Room not found" }, 404);
+
+    const blocks = await db
+      .select()
+      .from(hotelRoomAvailabilityBlock)
+      .where(eq(hotelRoomAvailabilityBlock.roomId, roomId))
+      .orderBy(
+        asc(hotelRoomAvailabilityBlock.startsOn),
+        asc(hotelRoomAvailabilityBlock.createdAt),
+      );
+
+    return c.json({ blocks });
+  } catch (error) {
+    console.error("Get owner room availability blocks error:", error);
+    return c.json({ error: "Internal server error" }, 500);
+  }
+});
+
+app.post(
+  "/:id/rooms/:roomId/availability-blocks",
+  zValidator("json", createAvailabilityBlockSchema),
+  async (c) => {
+    try {
+      const session = await getSessionFromRequest(c);
+      if (!session?.user?.id) return c.json({ error: "Unauthorized" }, 401);
+
+      const userId = session.user.id;
+      const placeId = c.req.param("id");
+      const roomId = c.req.param("roomId");
+      const data = c.req.valid("json");
+      const roomCtx = await getOwnedRoomContext({ placeId, roomId, userId });
+      if (!roomCtx) return c.json({ error: "Room not found" }, 404);
+
+      const dateValidation = validateInclusiveDateRange(data.startsOn, data.endsOn);
+      if (!dateValidation.ok) {
+        return c.json({ error: "Validation failed", message: dateValidation.message }, 400);
+      }
+
+      const id = crypto.randomUUID();
+      const [block] = await db
+        .insert(hotelRoomAvailabilityBlock)
+        .values({
+          id,
+          roomId,
+          startsOn: data.startsOn,
+          endsOn: data.endsOn,
+          reason: data.reason,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .returning();
+
+      return c.json({ success: true, block }, 201);
+    } catch (error) {
+      console.error("Create owner room availability block error:", error);
+      return c.json({ error: "Internal server error" }, 500);
+    }
+  },
+);
+
+app.delete("/:id/rooms/:roomId/availability-blocks/:blockId", async (c) => {
+  try {
+    const session = await getSessionFromRequest(c);
+    if (!session?.user?.id) return c.json({ error: "Unauthorized" }, 401);
+
+    const userId = session.user.id;
+    const placeId = c.req.param("id");
+    const roomId = c.req.param("roomId");
+    const blockId = c.req.param("blockId");
+    const roomCtx = await getOwnedRoomContext({ placeId, roomId, userId });
+    if (!roomCtx) return c.json({ error: "Room not found" }, 404);
+
+    const [deleted] = await db
+      .delete(hotelRoomAvailabilityBlock)
+      .where(
+        and(
+          eq(hotelRoomAvailabilityBlock.id, blockId),
+          eq(hotelRoomAvailabilityBlock.roomId, roomId),
+        ),
+      )
+      .returning({ id: hotelRoomAvailabilityBlock.id });
+
+    if (!deleted) return c.json({ error: "Block not found" }, 404);
+    return c.json({ success: true });
+  } catch (error) {
+    console.error("Delete owner room availability block error:", error);
     return c.json({ error: "Internal server error" }, 500);
   }
 });

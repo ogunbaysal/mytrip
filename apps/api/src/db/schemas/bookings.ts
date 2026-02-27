@@ -5,10 +5,12 @@ import {
   numeric,
   date,
   timestamp,
-  pgEnum
+  pgEnum,
+  index,
 } from "drizzle-orm/pg-core";
 import { user } from "./auth.ts";
 import { place } from "./places.ts";
+import { hotelRoom } from "./place-hotel.ts";
 
 // ============================================================================
 // ENUMS
@@ -38,6 +40,9 @@ export const booking = pgTable("booking", {
   placeId: text("place_id")
     .notNull()
     .references(() => place.id, { onDelete: "cascade" }),
+  roomId: text("room_id").references(() => hotelRoom.id, {
+    onDelete: "set null",
+  }),
   userId: text("user_id")
     .notNull()
     .references(() => user.id, { onDelete: "cascade" }),
@@ -48,6 +53,7 @@ export const booking = pgTable("booking", {
   currency: bookingCurrencyEnum("currency").notNull().default("TRY"),
   status: bookingStatusEnum("status").notNull().default("pending"),
   specialRequests: text("special_requests"),
+  pricingSnapshot: text("pricing_snapshot"),
   paymentStatus: bookingPaymentStatusEnum("payment_status")
     .notNull()
     .default("pending"),
@@ -58,7 +64,20 @@ export const booking = pgTable("booking", {
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
-});
+}, (table) => [
+  index("booking_place_status_dates_idx").on(
+    table.placeId,
+    table.status,
+    table.checkInDate,
+    table.checkOutDate,
+  ),
+  index("booking_room_status_dates_idx").on(
+    table.roomId,
+    table.status,
+    table.checkInDate,
+    table.checkOutDate,
+  ),
+]);
 
 // ============================================================================
 // TYPE EXPORTS

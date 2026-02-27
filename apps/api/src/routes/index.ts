@@ -4,6 +4,7 @@ import { collectionsRoutes } from "./collections.ts";
 import { blogRoutes } from "./blog.ts";
 import { reviewsRoutes } from "./reviews.ts";
 import { searchRoutes } from "./search.ts";
+import { bookingsRoutes } from "./bookings.ts";
 
 const app = new Hono();
 
@@ -19,6 +20,7 @@ app.get("/", (c) => {
       blog: "/blog",
       reviews: "/reviews",
       search: "/search",
+      bookings: "/bookings",
       auth: "/auth",
       admin: "/admin",
     },
@@ -35,5 +37,6 @@ app.route("/collections", collectionsRoutes);
 app.route("/blog", blogRoutes);
 app.route("/reviews", reviewsRoutes);
 app.route("/search", searchRoutes);
+app.route("/bookings", bookingsRoutes);
 
 export { app as routes };
