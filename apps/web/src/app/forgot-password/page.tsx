@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import type { Route } from "next";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 
-export default function ForgotPasswordPage() {
+function ForgotPasswordForm() {
   const searchParams = useSearchParams();
   const redirectTo = resolveSafeRedirect(
     searchParams.get("redirect"),
@@ -104,5 +104,26 @@ export default function ForgotPasswordPage() {
         </div>
       </Card>
     </div>
+  );
+}
+
+export default function ForgotPasswordPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center px-4 py-12">
+          <Card className="w-full max-w-md p-8">
+            <div className="mb-8 text-center">
+              <h1 className="text-2xl font-bold">Şifremi Unuttum</h1>
+              <p className="mt-2 text-muted-foreground">
+                Şifre sıfırlama ekranı yükleniyor...
+              </p>
+            </div>
+          </Card>
+        </div>
+      }
+    >
+      <ForgotPasswordForm />
+    </Suspense>
   );
 }
