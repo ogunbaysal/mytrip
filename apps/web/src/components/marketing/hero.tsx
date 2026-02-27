@@ -7,7 +7,7 @@ import { MapPin, Search, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const HERO_EYEBROW = "TatilDesen";
-const HERO_TITLE = "Tatil planını tek ekranda başlat";
+const HERO_TITLE = "Komisyonsuz tatil planını tek ekranda başlat";
 const HERO_SUBTITLE =
   "Konaklama, deneyim ve popüler mekanları hızlıca keşfet. Aradığını seç, sana en uygun seçeneklere geç.";
 
