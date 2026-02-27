@@ -65,10 +65,18 @@ function LoginPageContent() {
   };
 
   const handleGoogleSignIn = async () => {
+    const callbackURL =
+      typeof window === "undefined"
+        ? redirectTo
+        : new URL(redirectTo, window.location.origin).href;
+    const errorCallbackURL =
+      typeof window === "undefined"
+        ? "/login"
+        : new URL("/login", window.location.origin).href;
     const result = await authClient.signIn.social({
       provider: "google",
-      callbackURL: redirectTo,
-      errorCallbackURL: "/login",
+      callbackURL,
+      errorCallbackURL,
     });
 
     if (result.error) {
