@@ -44,7 +44,7 @@
 ### Web Auth Enhancements
 
 - [x] **AUTH-01**: Web users can request a password reset email from the login flow using Better Auth web namespace.
-- [ ] **AUTH-02**: Web users can set a new password using a reset token and return to login.
+- [x] **AUTH-02**: Web users can set a new password using a reset token and return to login.
 - [x] **AUTH-03**: Web users can sign in with Google using Better Auth web namespace.
 
 ## Traceability
@@ -59,7 +59,7 @@
 | CLEAN-01    | Phase 3 | Pending |
 | RESP-01     | Phase 3 | Pending |
 | AUTH-01     | Phase 4 | Complete |
-| AUTH-02     | Phase 4 | Pending |
+| AUTH-02     | Phase 4 | Complete |
 | AUTH-03     | Phase 4 | Complete |
 
 **Coverage:**
