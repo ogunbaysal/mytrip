@@ -60,7 +60,10 @@ const PLACE_ENTITLEMENT_ORDER: Array<
   "place.balloon_tour",
 ];
 
-const RESOURCE_LABELS: Record<Plan["entitlements"][number]["resourceKey"], string> = {
+const RESOURCE_LABELS: Record<
+  Plan["entitlements"][number]["resourceKey"],
+  string
+> = {
   "place.villa": "Villalar",
   "place.bungalow_tiny_house": "Bungalov & Tiny House",
   "place.hotel_pension": "Otel & Pansiyon",
@@ -89,9 +92,10 @@ export default function PricingPage() {
     staleTime: 1000 * 60,
   });
 
-  const plans = (plansData?.plans as Plan[] | undefined)?.filter(
-    (plan) => plan.billingCycle === "yearly",
-  ) || [];
+  const plans =
+    (plansData?.plans as Plan[] | undefined)?.filter(
+      (plan) => plan.billingCycle === "yearly",
+    ) || [];
   const user = session?.data?.user;
 
   const handlePlanSelect = (planId: string) => {
@@ -148,6 +152,19 @@ export default function PricingPage() {
           <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
             {plans.map((plan) => {
               const isPopular = plan.sortOrder === 1;
+              const priceNumber =
+                typeof plan.price === "string"
+                  ? parseFloat(plan.price)
+                  : plan.price;
+              const isFreePlan = priceNumber <= 0;
+              const hasNoPlaceEntitlements = plan.entitlements
+                .filter((item) => item.resourceKey.startsWith("place."))
+                .every(
+                  (item) =>
+                    !item.isUnlimited &&
+                    (item.limitCount === null || item.limitCount <= 0),
+                );
+              const isContactOnly = !isFreePlan && hasNoPlaceEntitlements;
               return (
                 <Card
                   key={plan.id}
@@ -207,10 +224,11 @@ export default function PricingPage() {
                           {RESOURCE_LABELS["blog.post"]}
                         </span>
                         <span className="font-semibold">
-                          {formatEntitlementLimit(getEntitlement(plan, "blog.post"))}
+                          {formatEntitlementLimit(
+                            getEntitlement(plan, "blog.post"),
+                          )}
                         </span>
                       </div>
-
                     </div>
                   </div>
 
@@ -236,18 +254,11 @@ export default function PricingPage() {
                     >
                       {isSessionLoading
                         ? "Kontrol ediliyor..."
-                        : plan.entitlements
-                              .filter(
-                                (item) =>
-                                  item.resourceKey.startsWith("place."),
-                              )
-                              .every(
-                                (item) =>
-                                  !item.isUnlimited &&
-                                  (item.limitCount === null || item.limitCount <= 0),
-                              )
-                          ? "İletişime Geç"
-                          : "Planı Seç"}
+                        : isFreePlan
+                          ? "Ücretsiz Başla"
+                          : isContactOnly
+                            ? "İletişime Geç"
+                            : "Planı Seç"}
                       <ArrowRight className="ml-2 size-4" />
                     </Button>
                   </div>
